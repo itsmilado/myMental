@@ -43,8 +43,11 @@ const transcriptionMiddleware = async (req, res) => {
 
         // Save transcription and metadata to the database
 
-        const transcriptionText = transcript.text;
-        console.log("Transcription text(db):", transcript);
+        let transcriptionText = "";
+        for (let utterance of transcript.utterances) {
+            transcriptionText += `Speaker ${utterance.speaker}: ${utterance.text}\n`;
+        }
+        console.log("Transcription utterance text(db):", transcriptionText);
 
         await insertTranscription(
             filename,
