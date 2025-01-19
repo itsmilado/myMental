@@ -8,14 +8,36 @@ const {
     assemblyClientUpload,
     transcribeAudio,
 } = require("../utils/assemblyaiClient");
-const { insertTranscription } = require("../db/transcribeQueries");
+const {
+    insertTranscription,
+    getAllTranscriptions,
+    getTranscriptionByApiTranscriptId,
+    getTranscriptionById,
+} = require("../db/transcribeQueries");
+
+/**
+ * fetch all transcriptions from the database.
+ * @param {object} req - Express request object.
+ * @param {object} res - Express response object.
+ * @returns {object} - The response object
+ */
+
+const fetchAllTranscriptions = async (req, res) => {
+    try {
+        const transcriptions = await getAllTranscriptions();
+        res.json(transcriptions);
+    } catch (error) {
+        console.error("Error fetching transcriptions:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
 
 /**
  * Handle transcription process.
  * @param {object} req - Express request object.
  * @param {object} res - Express response object.
  */
-const transcriptionMiddleware = async (req, res) => {
+const createTranscription = async (req, res) => {
     try {
         // Handle file upload
         const { filePath, filename, fileRecordedAt, formattedDate } =
@@ -90,9 +112,61 @@ const transcriptionMiddleware = async (req, res) => {
     }
 };
 
+/**
+ * Retrieve a transcription by its ID.
+ * @param {object} req - Express request object.
+ * req.params.id - The ID of the transcription to retrieve.
+ * @param {object} res - Express response object.
+ */
+
+const fetchTranscriptionById = async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Fetch the transcription by ID
+        const transcription = await getTranscriptionById(id);
+        if (!transcription) {
+            return res.status(404).json({ message: "Transcription not found" });
+        }
+        res.json(transcription);
+    } catch (error) {
+        console.error("Error fetching transcription:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+/**
+ * Retrieve a transcription by its API transcript ID.
+ * @param {object} req - Express request object.
+ * req.params.transcriptId - The API transcript ID of the transcription to retrieve.
+ * @param {object} res - Express response object.
+ */
+
+const fetchTranscriptionByApiTranscriptId = async (req, res) => {
+    const { transcriptId } = req.params;
+    try {
+        // Fetch the transcription by API transcript ID
+        const transcription = await getTranscriptionByApiTranscriptId(
+            transcriptId
+        );
+        if (!transcription) {
+            return res.status(404).json({ message: "Transcription not found" });
+        }
+        res.json(transcription);
+    } catch (error) {
+        console.error("Error fetching transcription:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
 const errorHandler = (err, req, res) => {
     err.status = err.status || 500;
     res.status(err.status).json({ message: err.message });
 };
 
-module.exports = { transcriptionMiddleware, errorHandler };
+module.exports = {
+    createTranscription,
+    fetchAllTranscriptions,
+    fetchTranscriptionById,
+    fetchTranscriptionByApiTranscriptId,
+    errorHandler,
+};

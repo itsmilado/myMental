@@ -31,11 +31,21 @@ const insertTranscription = async (
 };
 
 /**
+ * Retrieve all transcriptions from the database.
+ * @returns {Promise<Array>} - An array of transcription objects.
+ */
+const getAllTranscriptions = async () => {
+    const query = "SELECT * FROM transcriptions ORDER BY recorded_at DESC";
+    const { rows } = await pool.query(query);
+    return rows;
+};
+
+/**
  * Retrieve a transcription record by its transcript ID.
  * @param {string} transcriptId - The AssemblyAI transcript ID.
  * @returns {Promise<object|null>} - The transcription record or null if not found.
  */
-const getTranscriptionByTranscriptId = async (transcriptId) => {
+const getTranscriptionByApiTranscriptId = async (transcriptId) => {
     const query = `
     SELECT * FROM transcriptions
     WHERE transcript_id = $1
@@ -51,7 +61,31 @@ const getTranscriptionByTranscriptId = async (transcriptId) => {
     }
 };
 
+/**
+ * Retrieve a specific transcription by its ID.
+ * @param {number} tid - The Database ID of the transcription.
+ * @returns {Promise<Object>} - The transcription object.
+ */
+
+const getTranscriptionById = async (tid) => {
+    const query = `
+    SELECT * FROM transcriptions
+    WHERE tid = $1
+  `;
+    const values = [tid];
+
+    try {
+        const result = await pool.query(query, values);
+        return result.rows[0] || null;
+    } catch (error) {
+        console.error("Error retrieving transcription:", error);
+        throw error;
+    }
+};
+
 module.exports = {
     insertTranscription,
-    getTranscriptionByTranscriptId,
+    getAllTranscriptions,
+    getTranscriptionByApiTranscriptId,
+    getTranscriptionById,
 };
