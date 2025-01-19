@@ -1,6 +1,4 @@
-const pool = require("./db"); // Import the connection from db.js
-
-// Function to describe the table structure and test the connection
+const pool = require("./db");
 
 (async () => {
     try {
