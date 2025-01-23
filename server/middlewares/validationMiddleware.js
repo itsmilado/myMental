@@ -45,12 +45,28 @@ const validateSignupRules = [
     body("repeat_password")
         .notEmpty()
         .withMessage("Repeat password is required")
-        .custom((value, { request }) => {
-            if (value !== request.body.password) {
+        .custom((value, { req }) => {
+            if (value !== req.body.password) {
                 throw new Error("Passwords do not match");
             }
             return true;
         }),
+];
+
+const validationLoginRules = [
+    // Validate email and password
+    body("email")
+        .trim()
+        .notEmpty()
+        .withMessage("Email is required")
+        .isEmail()
+        .withMessage("Invalid email format")
+        .normalizeEmail(),
+    body("password")
+        .notEmpty()
+        .withMessage("Password is required")
+        .isLength({ min: 6 })
+        .withMessage("Password must be at least 6 characters long"),
 ];
 
 const handleValidationErrors = (request, response, next) => {
@@ -69,5 +85,6 @@ const handleValidationErrors = (request, response, next) => {
 
 module.exports = {
     validateSignupRules,
+    validationLoginRules,
     handleValidationErrors,
 };

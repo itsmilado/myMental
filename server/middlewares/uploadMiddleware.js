@@ -1,32 +1,36 @@
-//middlewares/uploadMiddleware.js
-
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs");
-const { getFileModifiedDate } = require("../utils/getMod");
+const logger = require("../utils/logger"); // Replace console logs with logger
 
-// Configure storage options
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, "uploads/"); // Specify the destination directory
-    },
-    filename: (req, file, cb) => {
-        // Store the file with a temporary name
-        const tempFilename = `${Date.now()}_${file.originalname}`;
-        cb(null, tempFilename);
-    },
-});
-
-// Initialize multer with the storage configuration
-const upload = multer({ storage });
-
-// Middleware to handle single file upload
 const uploadMiddleware = (req, res, next) => {
     const uploadSingle = upload.single("audioFile");
 
     uploadSingle(req, res, (err) => {
         if (err) {
-            return next(err);
+            // Handle Multer-specific errors
+            if (err instanceof multer.MulterError) {
+                logger.error(`Multer error: ${err.message}`);
+                return res.status(400).json({
+                    success: false,
+                    message: `File upload error: ${err.message}`,
+                });
+            }
+
+            // Handle unknown errors
+            logger.error(`Unknown upload error: ${err.message}`);
+            return res.status(500).json({
+                success: false,
+                message: "An unknown error occurred during file upload.",
+            });
+        }
+
+        // Ensure the file exists before proceeding
+        if (!req.file) {
+            logger.warn("No file uploaded in the request");
+            return res.status(400).json({
+                success: false,
+                message: "No file uploaded. Please provide a valid audio file.",
+            });
         }
 
         // Get the original filename without the extension
@@ -38,33 +42,16 @@ const uploadMiddleware = (req, res, next) => {
         const currentTime = now
             .toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
             .replace(/:/g, ".");
-        const currentDateTime = `${currentDate}_${currentTime}`;
-        // Get the modified date of the original file
-        const modifiedDate = getFileModifiedDate(req.file.path)
-            .toLocaleDateString("en-GB")
-            .replace(/\//g, ".");
 
-        // Combine the elements to form the new filename
-        const newFilename = `${originalName}_${currentDateTime}_${modifiedDate}${path.extname(
-            req.file.originalname
-        )}`;
+        // Add the processed name to the request object
+        req.file.processedName = `${originalName}_${currentDate}_${currentTime}.txt`;
 
-        // Define the new file path
-        const newPath = path.join(req.file.destination, newFilename);
+        logger.info(
+            `File uploaded successfully: ${req.file.originalname}, processed name: ${req.file.processedName}`
+        );
 
-        // Rename the file
-        fs.rename(req.file.path, newPath, (err) => {
-            if (err) {
-                return next(err);
-            }
-
-            // Update the file path and filename in the request object
-            req.file.path = newPath;
-            req.file.filename = newFilename;
-
-            next();
-        });
+        next();
     });
 };
 
-module.exports = { uploadMiddleware };
+module.exports = uploadMiddleware;
