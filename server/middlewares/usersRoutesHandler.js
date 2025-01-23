@@ -1,7 +1,7 @@
 // middlwares/usersRoutesHandler.js
 
 const { hashPassword } = require("../utils/hashPass");
-const { logger } = require("../utils/logger");
+const logger = require("../utils/logger");
 const {
     createUserQuery,
     // getUserById,
@@ -10,6 +10,11 @@ const {
 
 const createUsers = async (request, response, next) => {
     try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`
+        ); // Log the request URL
+        logger.info(`Request body: ${JSON.stringify(request.body)}`); // Log the request body
+
         const { password } = request.body;
         const hashed_password = await hashPassword(password);
         const newUser = await createUserQuery({
@@ -23,9 +28,8 @@ const createUsers = async (request, response, next) => {
             data: { id: newUser.id, email: newUser.email },
         });
     } catch (error) {
-        console.error(
-            "[usersRoutesHandler > Line 15 - createUsers] => Error creating user:",
-            error
+        logger.error(
+            `[usersRoutesHandler > Line 15 - createUsers] => Error creating user: ${error.message}`
         );
         next(error);
     }

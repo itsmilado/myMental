@@ -45,8 +45,8 @@ const validateSignupRules = [
     body("repeat_password")
         .notEmpty()
         .withMessage("Repeat password is required")
-        .custom((value, { req }) => {
-            if (value !== req.body.password) {
+        .custom((value, { request }) => {
+            if (value !== request.body.password) {
                 throw new Error("Passwords do not match");
             }
             return true;
@@ -56,7 +56,7 @@ const validateSignupRules = [
 const handleValidationErrors = (request, response, next) => {
     const errors = validationResult(request);
     if (!errors.isEmpty()) {
-        logger.error("Validation errors:", errors.array());
+        logger.error(`Validation errors: ${JSON.stringify(errors.array())}`);
         return response.status(400).json({
             success: false,
             message: "Validation failed. Please check your input.",
