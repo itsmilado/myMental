@@ -3,7 +3,7 @@
 const express = require("express");
 const transcriptionRoutes = express.Router();
 
-const { uploadMiddleware } = require("../middlewares/uploadMiddleware");
+const uploadMiddleware = require("../middlewares/uploadMiddleware");
 const {
     errorHandler,
     createTranscription,
