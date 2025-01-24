@@ -45,12 +45,8 @@ const validateSignupRules = [
     body("repeat_password")
         .notEmpty()
         .withMessage("Repeat password is required")
-        .custom((value, { req }) => {
-            if (value !== req.body.password) {
-                throw new Error("Passwords do not match");
-            }
-            return true;
-        }),
+        .custom((value, { req }) => value === req.body.password)
+        .withMessage("Passwords do not match"),
 ];
 
 const validationLoginRules = [

@@ -27,5 +27,8 @@
         "nodemon": "^3.1.9",
         "pg": "^8.13.1",
         "winston": "^3.17.0"
+    },
+    "devDependencies": {
+        "node-mocks-http": "^1.16.2"
     }
 }
