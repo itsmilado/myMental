@@ -15,13 +15,6 @@ const {
     getTranscriptionById,
 } = require("../db/transcribeQueries");
 
-/**
- * fetch all transcriptions from the database.
- * @param {object} req - Express request object.
- * @param {object} res - Express response object.
- * @returns {object} - The response object
- */
-
 const fetchAllTranscriptions = async (req, res) => {
     try {
         const transcriptions = await getAllTranscriptions();
@@ -32,11 +25,6 @@ const fetchAllTranscriptions = async (req, res) => {
     }
 };
 
-/**
- * Handle transcription process.
- * @param {object} req - Express request object.
- * @param {object} res - Express response object.
- */
 const createTranscription = async (req, res) => {
     try {
         // Handle file upload
@@ -112,13 +100,6 @@ const createTranscription = async (req, res) => {
     }
 };
 
-/**
- * Retrieve a transcription by its ID.
- * @param {object} req - Express request object.
- * req.params.id - The ID of the transcription to retrieve.
- * @param {object} res - Express response object.
- */
-
 const fetchTranscriptionById = async (req, res) => {
     const { id } = req.params;
     try {
@@ -133,13 +114,6 @@ const fetchTranscriptionById = async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 };
-
-/**
- * Retrieve a transcription by its API transcript ID.
- * @param {object} req - Express request object.
- * req.params.transcriptId - The API transcript ID of the transcription to retrieve.
- * @param {object} res - Express response object.
- */
 
 const fetchTranscriptionByApiTranscriptId = async (req, res) => {
     const { transcriptId } = req.params;

@@ -57,28 +57,57 @@ const userLogin = async (request, response, next) => {
 
         const matchUser = await loginCheck({ ...request.body });
         if (!matchUser) {
-            logger.error(`User login failed: email or password is wrong!`);
+            logger.error(
+                `[userHandlers > userLogin] User login failed: email or password is wrong!`
+            );
             response.status(401).json({
                 success: false,
                 message: "Email or Password is wrong!",
             });
             return false; // Return false to exit the function
         }
-        logger.info(`User logged in: user_id(${JSON.stringify(matchUser.id)})`);
+        logger.info(
+            `User logged in successfully: user_id(${JSON.stringify(
+                matchUser.id
+            )})`
+        );
+        request.session.user = {
+            id: matchUser.id,
+            email: matchUser.email,
+        };
         response.status(201).json({
             success: true,
             message: "login success",
             data: { id: matchUser.id, email: matchUser.email },
         });
     } catch (error) {
-        logger.error(``);
+        logger.error(`[userHandlers > userLogin] Error: ${error.message}`);
         next(error);
     }
 };
 
-const userLoggedOut = async (request, response) => {
-    logger.info(`Incoming request to ${request.method} ${request.originalUrl}`);
-    response.status(200).json({ success: true, message: "logout successfull" });
+const userLoggedOut = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`
+        );
+        request.session.destroy((error) => {
+            if (error) {
+                logger.error(
+                    `[userHandlers > userLoggedOut] Error destroying session: ${error.message}`
+                );
+                return next(error); // Pass the error to the error handler middleware
+            }
+            response.clearCookie("connect.sid"); // Clear the session cookie
+            logger.info("Session cookie cleared");
+            response
+                .status(200)
+                .json({ success: true, message: "logout successfull" });
+        });
+    } catch (error) {
+        logger.error(`[userHandlers > userLoggedOut] Error: ${error.message}`);
+        next(error);
+    }
 };
 
 const getUserInfo = async (request, response, next) => {

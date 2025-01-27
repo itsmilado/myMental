@@ -30,21 +30,12 @@ const insertTranscription = async (
     }
 };
 
-/**
- * Retrieve all transcriptions from the database.
- * @returns {Promise<Array>} - An array of transcription objects.
- */
 const getAllTranscriptions = async () => {
     const query = "SELECT * FROM transcriptions ORDER BY recorded_at DESC";
     const { rows } = await pool.query(query);
     return rows;
 };
 
-/**
- * Retrieve a transcription record by its transcript ID.
- * @param {string} transcriptId - The AssemblyAI transcript ID.
- * @returns {Promise<object|null>} - The transcription record or null if not found.
- */
 const getTranscriptionByApiTranscriptId = async (transcriptId) => {
     const query = `
     SELECT * FROM transcriptions
@@ -60,12 +51,6 @@ const getTranscriptionByApiTranscriptId = async (transcriptId) => {
         throw error;
     }
 };
-
-/**
- * Retrieve a specific transcription by its ID.
- * @param {number} tid - The Database ID of the transcription.
- * @returns {Promise<Object>} - The transcription object.
- */
 
 const getTranscriptionById = async (tid) => {
     const query = `

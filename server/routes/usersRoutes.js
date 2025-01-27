@@ -29,8 +29,8 @@ usersRoutes.post(
     userLogin,
     errorHandler
 );
+usersRoutes.post("/logout", userLoggedOut, errorHandler);
 usersRoutes.get("/profile/:user_id", getUserInfo, errorHandler);
-usersRoutes.post("/logout", userLoggedOut);
 
 // usersRoutes.get("/checkLogin", checkloggedIn);
 
