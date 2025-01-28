@@ -8,12 +8,13 @@ const createUserQuery = async ({
     last_name,
     email,
     hashed_password,
+    user_role,
 }) => {
     try {
         const createdUser = await pool.query(
-            `INSERT INTO users (first_name, last_name, email, hashed_password) 
-            VALUES ($1, $2, $3, $4) RETURNING *`,
-            [first_name, last_name, email, hashed_password]
+            `INSERT INTO users (first_name, last_name, email, hashed_password, user_role) 
+            VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            [first_name, last_name, email, hashed_password, user_role]
         );
 
         return createdUser.rows[0];
@@ -26,16 +27,16 @@ const createUserQuery = async ({
     }
 };
 
-const getUserByIdQuery = async ({ user_id }) => {
+const getUserByIdQuery = async ({ id }) => {
     try {
         const user = await pool.query("SELECT * FROM users WHERE id = $1", [
-            user_id,
+            id,
         ]);
         if (user.rows.length === 0) {
             logger.error(
-                `[usersQueries > getUserByIdQuery] => User not found with ID: ${user_id}`
+                `[usersQueries > getUserByIdQuery] => User not found with ID: ${id}`
             );
-            return null; // Explicitly return null if no user is found
+            return false; // Explicitly return false if no user is found
         }
         return user.rows[0];
     } catch (error) {
@@ -66,10 +67,29 @@ const getUserByEmailQuery = async ({ email }) => {
     }
 };
 
+const getAllUsersQuery = async () => {
+    try {
+        const users = await pool.query("SELECT * FROM users");
+        if (users.rows.length === 0) {
+            logger.error(
+                `[usersQueries > getAllUsersQuery] => No users retrieved`
+            );
+            return null; // Explicitly return null if no user is found
+        }
+        return users.rows;
+    } catch (error) {
+        logger.error(
+            `[usersQueries > getAllUsers] => Error getting all users: ${error.message}`
+        );
+        throw error; // Rethrow the error to be caught in the calling function
+    }
+};
+
 module.exports = {
     createUserQuery,
     getUserByIdQuery,
     getUserByEmailQuery,
+    getAllUsersQuery,
     // updateProfilePic,
     // updateUser,
     // updateUserWithPassword,

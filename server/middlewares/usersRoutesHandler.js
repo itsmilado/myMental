@@ -6,6 +6,7 @@ const loginCheck = require("../utils/loginCheck");
 const {
     createUserQuery,
     getUserByIdQuery,
+    getAllUsersQuery,
     getUserByEmailQuery,
 } = require("../db/usersQueries");
 
@@ -22,11 +23,12 @@ const createUsers = async (request, response, next) => {
         ]);
         logger.info(`Request body: ${JSON.stringify(filteredBody)}`); // Log filtered body
 
-        const { password } = request.body;
+        const { password, user_role } = request.body;
         const hashed_password = await hashPassword(password);
         const newUser = await createUserQuery({
             ...request.body,
             hashed_password,
+            user_role: user_role || "user", // Set user_role to "user" if it doesn't exist
         });
         logger.info(
             `New user created: user_id(${JSON.stringify(newUser.id)}) `
@@ -35,7 +37,11 @@ const createUsers = async (request, response, next) => {
         response.status(201).json({
             success: true,
             message: "User created successfully",
-            data: { id: newUser.id, email: newUser.email },
+            data: {
+                id: newUser.id,
+                email: newUser.email,
+                role: newUser.user_role,
+            },
         });
     } catch (error) {
         logger.error(
@@ -74,11 +80,16 @@ const userLogin = async (request, response, next) => {
         request.session.user = {
             id: matchUser.id,
             email: matchUser.email,
+            role: matchUser.user_role,
         };
         response.status(201).json({
             success: true,
             message: "login success",
-            data: { id: matchUser.id, email: matchUser.email },
+            data: {
+                id: matchUser.id,
+                email: matchUser.email,
+                role: matchUser.user_role,
+            },
         });
     } catch (error) {
         logger.error(`[userHandlers > userLogin] Error: ${error.message}`);
@@ -98,7 +109,7 @@ const userLoggedOut = async (request, response, next) => {
                 );
                 return next(error); // Pass the error to the error handler middleware
             }
-            response.clearCookie("connect.sid"); // Clear the session cookie
+            response.clearCookie("sessionId"); // Clear the session cookie
             logger.info("Session cookie cleared");
             response
                 .status(200)
@@ -118,13 +129,13 @@ const getUserInfo = async (request, response, next) => {
         logger.info(`Request params: ${JSON.stringify(request.params)}`); // Log the request params
 
         const user = await getUserByIdQuery({ ...request.params });
-        logger.info(`User found by ID: ${JSON.stringify(user.id)}`); // Log the user object
         if (!user) {
             response
                 .status(404)
                 .json({ success: false, message: "User not found" });
             return;
         }
+        logger.info(`User found by ID: ${JSON.stringify(user.id)}`); // Log the user object
         response.status(200).json({
             success: true,
             message: "User found",
@@ -133,6 +144,46 @@ const getUserInfo = async (request, response, next) => {
     } catch (error) {
         logger.error(
             `[usersRoutesHandler > Line 38 - getUserInfo] => Error getting user info: ${error.message}`
+        );
+        next(error);
+    }
+};
+
+const getAllProfiles = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`
+        ); // Log the request URL
+        const users = await getAllUsersQuery();
+        if (!users) {
+            response
+                .status(404)
+                .json({ success: false, message: "No users retrieved" });
+            return;
+        }
+        logger.info(
+            `[usersRoutesHandler - getAllProfiles]: ${JSON.stringify(
+                serializeUserInfo(users)
+            )}`
+        ); // Log the users array
+        response.status(200).json({
+            success: true,
+            message: "Users found",
+            data: users.map((user) => serializeUserInfo(user)),
+        });
+        logger.info(
+            `[usersRoutesHandler - getAllProfiles] => Users found: ${JSON.stringify(
+                users
+            )}`
+        );
+        logger.info(
+            `[usersRoutesHandler > - getAllProfiles] => Users found: ${JSON.stringify(
+                users
+            )}`
+        );
+    } catch (error) {
+        logger.error(
+            `[usersRoutesHandler - getAllProfiles] => Error fetching users: ${error.message}`
         );
         next(error);
     }
@@ -157,6 +208,7 @@ const serializeUserInfo = (user) => {
         last_name: user.last_name,
         email: user.email,
         isConfirmed: user.isConfirmed,
+        user_role: user.user_role,
         created_at: user.created_at,
     };
 };
@@ -166,5 +218,6 @@ module.exports = {
     userLogin,
     userLoggedOut,
     getUserInfo,
+    getAllProfiles,
     // checkloggedIn,
 };

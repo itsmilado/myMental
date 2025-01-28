@@ -1,5 +1,5 @@
-DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS transcriptions;
+DROP TABLE IF EXISTS users;
 
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
@@ -8,6 +8,7 @@ CREATE TABLE users (
   email VARCHAR(255) NOT NULL,
   isConfirmed BOOLEAN DEFAULT false,
   hashed_password VARCHAR(255) NOT NULL,
+  user_role VARCHAR(50) NOT NULL,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 

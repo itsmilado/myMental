@@ -5,6 +5,7 @@ const {
     getUserInfo,
     userLogin,
     userLoggedOut,
+    getAllProfiles,
     // checkloggedIn,
 } = require("../middlewares/usersRoutesHandler");
 const errorHandler = require("../middlewares/errorHandler");
@@ -13,6 +14,9 @@ const {
     validationLoginRules,
     handleValidationErrors,
 } = require("../middlewares/validationMiddleware");
+
+const isAuthenticated = require("../middlewares/authMiddleware");
+const { hasRole } = require("../middlewares/roleMiddleware");
 
 usersRoutes.post(
     "/signup",
@@ -30,7 +34,24 @@ usersRoutes.post(
     errorHandler
 );
 usersRoutes.post("/logout", userLoggedOut, errorHandler);
-usersRoutes.get("/profile/:user_id", getUserInfo, errorHandler);
+usersRoutes.get("/profile/:id", isAuthenticated, getUserInfo, errorHandler);
+
+// usersRoutes.get(
+//     "/admin",
+//     isAuthenticated,
+//     hasRole("admin"),
+//     adminProfile,
+//     errorHandler
+// );
+usersRoutes.get(
+    "/admin/all_profiles",
+    isAuthenticated,
+    hasRole("admin"),
+    getAllProfiles,
+    errorHandler
+);
+
+// usersRoutes.get("/allprofiles", getAllProfiles, errorHandler);
 
 // usersRoutes.get("/checkLogin", checkloggedIn);
 
