@@ -4,7 +4,7 @@ const logger = require("../utils/logger");
 
 const isAuthenticated = (request, response, next) => {
     logger.info(
-        `[isAuthenticated] => User is attempting to access with user_id: ${request.session.user.id} Role: ${request.session.user.role}`
+        `[isAuthenticated] => User is attempting to access "${request.method} ${request.originalUrl}" `
     );
     if (!request.session || !request.session.user) {
         logger.warn(

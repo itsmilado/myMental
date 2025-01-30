@@ -5,20 +5,20 @@ const logger = require("../utils/logger");
 
 const insertTranscriptionQuery = async ({
     user_id,
-    filename,
-    transcriptionText,
-    fileRecordedAt,
-    transcriptId,
+    file_name,
+    transcript_id,
+    transcription,
+    file_recorded_at,
 }) => {
     try {
         const insertQuery =
-            "INSERT INTO transcriptions (user_id, filename, transcription, file_recorded_at, transcript_id) VALUES ($1, $2, $3, $4, $5) RETURNING *";
+            "INSERT INTO transcriptions (user_id, file_name, transcript_id, transcription, file_recorded_at) VALUES ($1, $2, $3, $4, $5) RETURNING *";
         const insertValues = [
             user_id,
-            filename,
-            transcriptionText,
-            fileRecordedAt,
-            transcriptId,
+            file_name,
+            transcript_id,
+            transcription,
+            file_recorded_at,
         ];
 
         const insertedTranscription = await pool.query(
@@ -86,19 +86,19 @@ const getTranscriptionByApiTranscriptIdQuery = async (transcriptId) => {
     }
 };
 
-const getTranscriptionByIdQuery = async (tid) => {
+const getTranscriptionByIdQuery = async (id) => {
     try {
         const fetchQuery = `
         SELECT * FROM transcriptions
-        WHERE tid = $1
+        WHERE id = $1
          `;
-        const fetchValues = [tid];
+        const fetchValues = [id];
 
         const transcription = await pool.query(fetchQuery, fetchValues);
 
         if (transcription.rows.length === 0) {
             logger.error(
-                `[transcribeQueries > getTranscriptionById] => Transcription not found with ID: ${tid}`
+                `[transcribeQueries > getTranscriptionByIdQuery] => Transcription not found with ID: ${id}`
             );
             return false;
         }
@@ -106,7 +106,7 @@ const getTranscriptionByIdQuery = async (tid) => {
         return transcription.rows[0];
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getTranscriptionById] => Error getting transcription by ID: ${error.message}`
+            `[transcribeQueries > getTranscriptionByIdQuery] => Error getting transcription by ID: ${error.message}`
         );
 
         throw error;

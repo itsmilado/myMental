@@ -19,7 +19,7 @@ transcriptionRoutes.post(
     "/upload",
     isAuthenticated,
     uploadMiddleware,
-    createTranscription,
+    // createTranscription,
     errorHandler
 );
 
@@ -38,7 +38,7 @@ transcriptionRoutes.get(
 );
 
 transcriptionRoutes.get(
-    "/by_api_id/:apiTranscriptId",
+    "/by_api_id/:transcriptId",
     isAuthenticated,
     fetchTranscriptionByApiId,
     errorHandler

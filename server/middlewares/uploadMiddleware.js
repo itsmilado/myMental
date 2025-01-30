@@ -1,7 +1,10 @@
+// middlewares/uploadMiddleware.js
+
 const multer = require("multer");
 const path = require("path");
-const logger = require("../utils/logger"); // Replace console logs with logger
+const logger = require("../utils/logger");
 
+const upload = multer({ dest: "uploads/" });
 const uploadMiddleware = (req, res, next) => {
     const uploadSingle = upload.single("audioFile");
 
@@ -44,10 +47,10 @@ const uploadMiddleware = (req, res, next) => {
             .replace(/:/g, ".");
 
         // Add the processed name to the request object
-        req.file.processedName = `${originalName}_${currentDate}_${currentTime}.txt`;
+        req.file.processedName = `${originalName}_${currentDate}_${currentTime}`;
 
         logger.info(
-            `File uploaded successfully: ${req.file.originalname}, processed name: ${req.file.processedName}`
+            `File successfully uploaded to server : ${req.file.originalname}, processed name: ${req.file.processedName}`
         );
 
         next();
