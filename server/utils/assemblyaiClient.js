@@ -1,4 +1,5 @@
 // utils/assemblyaiClient.js
+
 const axios = require("axios");
 const fs = require("fs").promises;
 const { AssemblyAI } = require("assemblyai");
@@ -20,12 +21,6 @@ const transcriptionOptions = {
     return_word_timestamps: false,
     // more other options as needed
 };
-
-/**
- * Transcribe audio using AssemblyAI.
- * @param {string} audioUrl - The URL of the audio file to transcribe.
- * @returns {Promise<object>} - The transcript object.
- */
 
 const transcribeAudio = async (audioUrl) => {
     try {

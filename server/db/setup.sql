@@ -16,7 +16,7 @@ CREATE TABLE transcriptions (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users (id),
   file_name VARCHAR(255) NOT NULL,
-  transcript_id VARCHAR(255) NOT NULL,
+  transcript_id VARCHAR(255) UNIQUE NOT NULL,
   transcription TEXT NOT NULL,
   file_recorded_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP

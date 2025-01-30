@@ -1,3 +1,5 @@
+// middlewares/usersRoutesHandler.js
+
 const express = require("express");
 const usersRoutes = express.Router();
 const {
@@ -15,7 +17,7 @@ const {
     handleValidationErrors,
 } = require("../middlewares/validationMiddleware");
 
-const isAuthenticated = require("../middlewares/authMiddleware");
+const { isAuthenticated } = require("../middlewares/authMiddleware");
 const { hasRole } = require("../middlewares/roleMiddleware");
 
 usersRoutes.post(

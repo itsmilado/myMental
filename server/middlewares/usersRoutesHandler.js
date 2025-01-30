@@ -28,7 +28,7 @@ const createUsers = async (request, response, next) => {
         const newUser = await createUserQuery({
             ...request.body,
             hashed_password,
-            user_role: user_role || "user", // Set user_role to "user" if it doesn't exist
+            user_role: user_role || "user", // Set user_role to "user" if it is not provided
         });
         logger.info(
             `New user created: user_id(${JSON.stringify(newUser.id)}) `
@@ -171,16 +171,6 @@ const getAllProfiles = async (request, response, next) => {
             message: "Users found",
             data: users.map((user) => serializeUserInfo(user)),
         });
-        logger.info(
-            `[usersRoutesHandler - getAllProfiles] => Users found: ${JSON.stringify(
-                users
-            )}`
-        );
-        logger.info(
-            `[usersRoutesHandler > - getAllProfiles] => Users found: ${JSON.stringify(
-                users
-            )}`
-        );
     } catch (error) {
         logger.error(
             `[usersRoutesHandler - getAllProfiles] => Error fetching users: ${error.message}`
