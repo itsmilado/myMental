@@ -1,16 +1,16 @@
 // utils/assemblyaiTranscriber.js
 
 const logger = require("./logger");
-const assemblyClient = require("../utils/assemblyaiClient");
+const { assemblyClient } = require("../utils/assemblyaiClient");
 
 // Default transcription options
 const transcriptionOptions = {
     speaker_labels: true,
-    speakers_expected: 2,
+    // speakers_expected: 2,
     sentiment_analysis: true,
     speech_model: "nano",
     language_code: "en",
-    return_word_timestamps: false,
+    format_text: true,
 };
 
 // Request transcription from AssemblyAI
@@ -20,7 +20,7 @@ const requestTranscription = async (audioUrl) => {
             audio_url: audioUrl,
             ...transcriptionOptions,
         };
-        const transcript = await assemblyClient.transcripts.create(
+        const transcript = await assemblyClient.transcripts.transcribe(
             transcriptOptions
         );
 
@@ -46,7 +46,7 @@ const pollTranscriptionResult = async (transcriptId) => {
             transcript = await assemblyClient.transcripts.get(transcriptId);
             if (transcript.status === "completed") {
                 logger.info(
-                    `[pollTranscriptionResult] => Transcription completed`
+                    `[pollTranscriptionResult] => Transcription completed and fetched`
                 );
                 return transcript;
             } else if (transcript.status === "failed") {

@@ -19,7 +19,7 @@ transcriptionRoutes.post(
     "/upload",
     isAuthenticated,
     uploadMiddleware,
-    // createTranscription,
+    createTranscription,
     errorHandler
 );
 

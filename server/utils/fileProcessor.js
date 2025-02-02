@@ -1,41 +1,53 @@
+// utils/fileProcessor.js
+
 const path = require("path");
 const fs = require("fs");
+const logger = require("../utils/logger");
 
-const processUploadedFile = (file) => {
-    const filePath = file.path;
-    const filename = file.processedName;
-    const file_recorded_at = getFileModifiedDate(file.path);
-    const formattedDate = file_recorded_at.split("T")[0];
+// Ensure "transcriptions" directory exists
+const transcriptionDir = path.join(__dirname, "../transcriptions");
+if (!fs.existsSync(transcriptionDir)) {
+    fs.mkdirSync(transcriptionDir, { recursive: true });
+}
 
-    return { filePath, filename, file_recorded_at, formattedDate };
-};
+const saveTranscriptionToFile = (
+    filename,
+    transcriptText,
+    fileModifiedDate
+) => {
+    try {
+        const modifiedDate = fileModifiedDate.match(/^(\d{4})-(\d{2})-(\d{2})/); // Extract YYYY-MM-DD
+        const [, year, month, day] = modifiedDate;
+        const formattedModifiedDate = `${day}.${month}.${year}`;
+        const originalName = path.parse(filename).name;
+        const transcriptionFileName = `${originalName} - [${formattedModifiedDate}].txt`;
+        const transcriptionFilePath = path.join(
+            transcriptionDir,
+            transcriptionFileName
+        );
 
-const saveTranscriptionToFile = (filename, formattedDate, transcriptText) => {
-    const transcriptionFilename = `${
-        path.parse(filename).name
-    }_${formattedDate}.txt`;
-    const transcriptionFilePath = path.join(
-        __dirname,
-        "../transcriptions",
-        transcriptionFilename
-    );
+        if (!fs.existsSync(path.dirname(transcriptionFilePath))) {
+            fs.mkdirSync(path.dirname(transcriptionFilePath), {
+                recursive: true,
+            });
+        }
 
-    if (!fs.existsSync(path.dirname(transcriptionFilePath))) {
-        fs.mkdirSync(path.dirname(transcriptionFilePath), { recursive: true });
+        fs.writeFileSync(transcriptionFilePath, transcriptText, "utf8");
+
+        logger.info(
+            `[saveTranscriptionToFile] => Transcription saved to: ${transcriptionFilePath}`
+        );
+
+        return transcriptionFilePath;
+    } catch (error) {
+        logger.error(
+            `[saveTranscriptionToFile] => Error saving transcription: ${error.message}`
+        );
+
+        throw error;
     }
-
-    fs.writeFileSync(transcriptionFilePath, transcriptText);
-    return transcriptionFilePath;
-};
-
-// Helper function to store modified Date
-
-const getFileModifiedDate = (filePath) => {
-    const stats = fs.statSync(filePath);
-    return stats.mtime;
 };
 
 module.exports = {
-    processUploadedFile,
     saveTranscriptionToFile,
 };

@@ -73,9 +73,9 @@ const userLogin = async (request, response, next) => {
             return false; // Return false to exit the function
         }
         logger.info(
-            `User logged in successfully: user_id(${JSON.stringify(
+            `User logged in successfully: user_id ${JSON.stringify(
                 matchUser.id
-            )})`
+            )} user_role ${JSON.stringify(matchUser.user_role)}`
         );
         request.session.user = {
             id: matchUser.id,

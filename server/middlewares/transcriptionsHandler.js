@@ -33,9 +33,7 @@ const fetchAllTranscriptions = async (request, response, next) => {
         }
 
         logger.info(
-            `[transcriptionsMiddleware - getAllTranscriptions] => Transcriptions found: ${JSON.stringify(
-                transcriptions
-            )}`
+            `[transcriptionsMiddleware - fetchAllTranscriptions] => Transcriptions retrieved`
         );
         response.status(200).json({
             success: true,
@@ -53,11 +51,15 @@ const fetchAllTranscriptions = async (request, response, next) => {
 const createTranscription = async (request, response, next) => {
     try {
         const loggedUserId = request.session.user.id;
-        const { filePath, filename, file_recorded_at, formattedDate } =
-            processUploadedFile(request.file);
+        const { filePath, filename } = { ...request.file };
+        const { fileModifiedDate } = { ...request.body } || "00.00.00"; // default to 00.00.00 if not provided or invalid
 
         logger.info(
             `Incoming request to Transcribe from user_id ${loggedUserId} to "${request.method} ${request.originalUrl}"`
+        );
+
+        logger.info(
+            `[transcriptionHandler - createTranscription] => filename, fileModifiedDate in request.file: ${filename} - ${fileModifiedDate}`
         );
 
         // Upload the audio file to AssemblyAI API
@@ -74,7 +76,7 @@ const createTranscription = async (request, response, next) => {
             user_id: loggedUserId,
             file_name: filename,
             transcript_id: transcriptId,
-            file_recorded_at: file_recorded_at,
+            file_recorded_at: fileModifiedDate,
             transcriptObject: transcript,
         };
         const insertedTranscription = await storeTranscriptionText({
@@ -82,12 +84,16 @@ const createTranscription = async (request, response, next) => {
         });
 
         // Save the transcription to a file
-        saveTranscriptionToFile(filename, formattedDate, transcript.text);
+        const storedTxtfilePath = saveTranscriptionToFile(
+            filename,
+            insertedTranscription.transcription,
+            fileModifiedDate
+        );
 
         // Send response
         response.status(200).json({
             success: true,
-            message: "Transcription created and stored successfully",
+            message: `Transcription created and stored successfully at: ${storedTxtfilePath}`,
             data: insertedTranscription,
         });
     } catch (error) {
@@ -119,7 +125,7 @@ const fetchTranscriptionById = async (request, response, next) => {
         );
         response.status(200).json({
             success: true,
-            message: "Transcription fetched successfully",
+            message: "Transcription retrieved successfully",
             data: transcription,
         });
     } catch (error) {
@@ -218,7 +224,7 @@ const storeTranscriptionText = async ({ transcriptData }) => {
             transcriptionText += `Speaker ${utterance.speaker}: ${utterance.text}\n`;
         }
         logger.info(`
-            [transcriptionMiddleware - createTranscription - storeTranscriptionText] => Transcription utterance text(before db): ${transcriptionText}
+            [transcriptionMiddleware - createTranscription - storeTranscriptionText] => Transcription utterance text done.
             `);
 
         const transcriptionDataToInsert = {
@@ -231,8 +237,8 @@ const storeTranscriptionText = async ({ transcriptData }) => {
 
         logger.info(
             `Transcription stored in database. insertedTranscription: ${JSON.stringify(
-                insertedTranscription
-            )}`
+                insertedTranscription.transcript_id
+            )} Text: ${insertedTranscription.transcription}`
         );
 
         return insertedTranscription;
@@ -240,7 +246,7 @@ const storeTranscriptionText = async ({ transcriptData }) => {
         logger.error(
             `[transcriptionsMiddleware - storeTranscriptionText] => Error storing transcription: ${error.message}`
         );
-        next(error);
+        throw error;
     }
 };
 
