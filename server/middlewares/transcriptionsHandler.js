@@ -1,9 +1,6 @@
 // middleWares/transcriptionMiddleWare.js
 
-const {
-    processUploadedFile,
-    saveTranscriptionToFile,
-} = require("../utils/fileProcessor");
+const { saveTranscriptionToFile } = require("../utils/fileProcessor");
 const uploadAudioFile = require("../utils/assemblyaiUploader");
 const {
     requestTranscription,
