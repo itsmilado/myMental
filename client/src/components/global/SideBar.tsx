@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
     Box,
     Typography,
@@ -28,6 +29,7 @@ const Sidebar = () => {
     const colors = tokens(theme.palette.mode as "light" | "dark");
     const navigate = useNavigate();
     const location = useLocation();
+    const [isCollapsed, setIsCollapsed] = useState(false);
 
     const menuItems: SidebarItem[] = [
         { text: "Overview", icon: <HomeIcon />, path: "/dashboard" },
@@ -44,25 +46,45 @@ const Sidebar = () => {
 
     return (
         <Box
-            width="260px"
+            width={isCollapsed ? "80px" : "260px"}
             height="100vh"
             display="flex"
             flexDirection="column"
             bgcolor={colors.primary[400]}
             sx={{ borderRight: `1px solid ${colors.grey[700]}`, px: 2, py: 3 }}
         >
-            {/* Avatar and Username */}
-            <Box
-                display="flex"
-                flexDirection="column"
-                alignItems="center"
-                mb={4}
-            >
-                <Avatar sx={{ width: 64, height: 64, mb: 1 }} />
-                <Typography variant="h5" color={colors.grey[100]}>
-                    User Name
-                </Typography>
+            {/* Collapse Button */}
+            <Box display="flex" justifyContent="flex-end" mb={2}>
+                <ListItemButton
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    sx={{
+                        borderRadius: "8px",
+                        backgroundColor: colors.blueAccent[600],
+                        "&:hover": {
+                            backgroundColor: colors.blueAccent[700],
+                        },
+                    }}
+                >
+                    <ListItemIcon sx={{ color: colors.grey[100] }}>
+                        {isCollapsed ? "▶" : "◀"}
+                    </ListItemIcon>
+                </ListItemButton>
             </Box>
+
+            {/* Avatar and Username */}
+            {!isCollapsed && (
+                <Box
+                    display="flex"
+                    flexDirection="column"
+                    alignItems="center"
+                    mb={4}
+                >
+                    <Avatar sx={{ width: 64, height: 64, mb: 1 }} />
+                    <Typography variant="h5" color={colors.grey[100]}>
+                        User Name
+                    </Typography>
+                </Box>
+            )}
 
             <Divider sx={{ mb: 2, bgcolor: colors.grey[600] }} />
 
@@ -87,20 +109,22 @@ const Sidebar = () => {
                         <ListItemIcon sx={{ color: colors.grey[100] }}>
                             {item.icon}
                         </ListItemIcon>
-                        <ListItemText
-                            primary={
-                                <Typography
-                                    color={colors.grey[100]}
-                                    fontWeight={
-                                        location.pathname === item.path
-                                            ? "bold"
-                                            : "normal"
-                                    }
-                                >
-                                    {item.text}
-                                </Typography>
-                            }
-                        />
+                        {!isCollapsed && (
+                            <ListItemText
+                                primary={
+                                    <Typography
+                                        color={colors.grey[100]}
+                                        fontWeight={
+                                            location.pathname === item.path
+                                                ? "bold"
+                                                : "normal"
+                                        }
+                                    >
+                                        {item.text}
+                                    </Typography>
+                                }
+                            />
+                        )}
                     </ListItemButton>
                 ))}
             </List>
