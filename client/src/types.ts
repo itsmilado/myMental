@@ -1,5 +1,5 @@
 // ./src/types.ts
-
+import type { ReactNode } from "react";
 import type { ThemeOptions } from "@mui/material/styles";
 
 export type ColorMode = "light" | "dark";
@@ -61,12 +61,6 @@ export interface TypographyOptions {
 }
 
 export type ThemeSettings = ThemeOptions;
-// export const themeSettings = (mode: ColorMode): ThemeOptions => {
-//     palette: {
-//         mode: mode,
-//         PaletteMode;
-//     typography: TypographyOptions;
-// };
 
 export interface ColorModeContextValue {
     toggleColorMode: () => void;
@@ -76,4 +70,23 @@ export interface SidebarItem {
     text: string;
     icon: React.ReactElement;
     path: string;
+}
+
+export interface SidebarItemProps {
+    text: string;
+    icon: ReactNode;
+    path: string;
+    subMenu?: SubMenuItemProps[] | null;
+}
+
+export interface SubMenuItemProps {
+    text: string;
+    path: string;
+    icon?: ReactNode;
+}
+
+export interface SidebarProps {
+    isCollapsed: boolean;
+    toggleCollapse: () => void;
+    menuItems: SidebarItemProps[];
 }

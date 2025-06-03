@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     Box,
     Typography,
@@ -9,8 +9,8 @@ import {
     ListItemIcon,
     ListItemText,
     Divider,
+    Collapse,
 } from "@mui/material";
-
 import {
     Home as HomeIcon,
     Person as PersonIcon,
@@ -18,11 +18,25 @@ import {
     PictureAsPdf as PdfIcon,
     Checklist as ChecklistIcon,
     CalendarMonth as CalendarIcon,
+    ExpandLess,
+    ExpandMore,
+    BarChart as BarChartIcon,
+    Assessment as AssessmentIcon,
+    Settings as SettingsIcon,
+    Edit as EditIcon,
+    Lock as LockIcon,
+    Notifications as NotificationsIcon,
+    Upload as UploadIcon,
+    History as HistoryIcon,
+    Share as ShareIcon,
+    Task as TaskIcon,
+    Event as EventIcon,
+    Alarm as AlarmIcon,
+    HolidayVillage as HolidayVillageIcon,
 } from "@mui/icons-material";
-
 import { tokens } from "../../theme";
 import { useLocation, useNavigate } from "react-router-dom";
-import { SidebarItem } from "../../types";
+import { SidebarItemProps, SubMenuItemProps } from "../../types";
 
 const Sidebar = () => {
     const theme = useTheme();
@@ -31,17 +45,140 @@ const Sidebar = () => {
     const location = useLocation();
     const [isCollapsed, setIsCollapsed] = useState(false);
 
-    const menuItems: SidebarItem[] = [
-        { text: "Overview", icon: <HomeIcon />, path: "/dashboard" },
-        { text: "Profile", icon: <PersonIcon />, path: "/profile" },
+    // Menu items with submenus and icons
+    const menuItems: SidebarItemProps[] = [
+        {
+            text: "Overview",
+            icon: <HomeIcon />,
+            path: "/dashboard",
+            subMenu: [
+                {
+                    text: "Analytics",
+                    path: "/dashboard/analytics",
+                    icon: <BarChartIcon />,
+                },
+                {
+                    text: "Reports",
+                    path: "/dashboard/reports",
+                    icon: <AssessmentIcon />,
+                },
+                {
+                    text: "Settings",
+                    path: "/dashboard/settings",
+                    icon: <SettingsIcon />,
+                },
+            ],
+        },
+        {
+            text: "Profile",
+            icon: <PersonIcon />,
+            path: "/profile",
+            subMenu: [
+                {
+                    text: "Edit Profile",
+                    path: "/profile/edit",
+                    icon: <EditIcon />,
+                },
+                {
+                    text: "Privacy",
+                    path: "/profile/privacy",
+                    icon: <LockIcon />,
+                },
+                {
+                    text: "Notifications",
+                    path: "/profile/notifications",
+                    icon: <NotificationsIcon />,
+                },
+            ],
+        },
         {
             text: "Transcriptions",
             icon: <ArticleIcon />,
             path: "/transcriptions",
+            subMenu: [
+                {
+                    text: "Upload",
+                    path: "/transcriptions/upload",
+                    icon: <UploadIcon />,
+                },
+                {
+                    text: "History",
+                    path: "/transcriptions/history",
+                    icon: <HistoryIcon />,
+                },
+                {
+                    text: "Settings",
+                    path: "/transcriptions/settings",
+                    icon: <SettingsIcon />,
+                },
+            ],
         },
-        { text: "Documents", icon: <PdfIcon />, path: "/documents" },
-        { text: "Tasks", icon: <ChecklistIcon />, path: "/tasks" },
-        { text: "Calendar", icon: <CalendarIcon />, path: "/calendar" },
+        {
+            text: "Documents",
+            icon: <PdfIcon />,
+            path: "/documents",
+            subMenu: [
+                {
+                    text: "Upload",
+                    path: "/documents/upload",
+                    icon: <UploadIcon />,
+                },
+                {
+                    text: "Shared",
+                    path: "/documents/shared",
+                    icon: <ShareIcon />,
+                },
+                {
+                    text: "Archived",
+                    path: "/documents/archived",
+                    icon: <HistoryIcon />,
+                },
+            ],
+        },
+        {
+            text: "Tasks",
+            icon: <ChecklistIcon />,
+            path: "/tasks",
+            subMenu: [
+                {
+                    text: "My Tasks",
+                    path: "/tasks/my-tasks",
+                    icon: <TaskIcon />,
+                },
+                {
+                    text: "Team Tasks",
+                    path: "/tasks/team-tasks",
+                    icon: <TaskIcon />,
+                },
+                {
+                    text: "Completed",
+                    path: "/tasks/completed",
+                    icon: <TaskIcon />,
+                },
+            ],
+        },
+        {
+            text: "Calendar",
+            icon: <CalendarIcon />,
+            path: "/calendar",
+            subMenu: [
+                {
+                    text: "Events",
+                    path: "/calendar/events",
+                    icon: <EventIcon />,
+                },
+                {
+                    text: "Reminders",
+                    path: "/calendar/reminders",
+                    icon: <AlarmIcon />,
+                },
+                {
+                    text: "Holidays",
+                    path: "/calendar/holidays",
+                    icon: <HolidayVillageIcon />,
+                },
+            ],
+        },
     ];
 
     return (
@@ -51,7 +188,7 @@ const Sidebar = () => {
             display="flex"
             flexDirection="column"
             bgcolor={colors.primary[400]}
-            sx={{ borderRight: `1px solid ${colors.grey[700]}`, px: 2, py: 3 }}
+            sx={{ borderRight: `1px solid ${colors.grey[100]}`, px: 2, py: 3 }}
         >
             {/* Collapse Button */}
             <Box display="flex" justifyContent="flex-end" mb={2}>
@@ -91,44 +228,107 @@ const Sidebar = () => {
             {/* Menu */}
             <List disablePadding>
                 {menuItems.map((item) => (
-                    <ListItemButton
+                    <SidebarItemComponent
                         key={item.text}
-                        onClick={() => navigate(item.path)}
-                        sx={{
-                            my: 0.5,
-                            borderRadius: "8px",
-                            backgroundColor:
-                                location.pathname === item.path
-                                    ? colors.blueAccent[600]
-                                    : "transparent",
-                            "&:hover": {
-                                backgroundColor: colors.blueAccent[700],
-                            },
-                        }}
-                    >
-                        <ListItemIcon sx={{ color: colors.grey[100] }}>
-                            {item.icon}
-                        </ListItemIcon>
-                        {!isCollapsed && (
-                            <ListItemText
-                                primary={
-                                    <Typography
-                                        color={colors.grey[100]}
-                                        fontWeight={
-                                            location.pathname === item.path
-                                                ? "bold"
-                                                : "normal"
-                                        }
-                                    >
-                                        {item.text}
-                                    </Typography>
-                                }
-                            />
-                        )}
-                    </ListItemButton>
+                        item={item}
+                        isCollapsed={isCollapsed}
+                        navigate={navigate}
+                        location={location}
+                    />
                 ))}
             </List>
         </Box>
+    );
+};
+
+const SidebarItemComponent = ({
+    item,
+    isCollapsed,
+    navigate,
+    location,
+}: {
+    item: SidebarItemProps;
+    isCollapsed: boolean;
+    navigate: (path: string) => void;
+    location: { pathname: string };
+}) => {
+    const [expandSubMenu, setExpandSubMenu] = useState(false);
+    const theme = useTheme();
+    const colors = tokens(theme.palette.mode);
+
+    return (
+        <>
+            <ListItemButton
+                onClick={() => {
+                    if (item.subMenu) {
+                        setExpandSubMenu(!expandSubMenu);
+                    } else {
+                        navigate(item.path);
+                    }
+                }}
+                sx={{
+                    my: 0.5,
+                    borderRadius: "8px",
+                    backgroundColor:
+                        location.pathname === item.path
+                            ? "rgba(0, 0, 0, 0.1)"
+                            : "transparent",
+                    "&:hover": {
+                        backgroundColor: "rgba(0, 0, 0, 0.2)",
+                    },
+                }}
+            >
+                <ListItemIcon sx={{ color: "gray" }}>{item.icon}</ListItemIcon>
+                {!isCollapsed && (
+                    <ListItemText
+                        primary={
+                            <Typography
+                                color={colors.grey[100]}
+                                fontWeight={
+                                    location.pathname === item.path
+                                        ? "bold"
+                                        : "normal"
+                                }
+                            >
+                                {item.text}
+                            </Typography>
+                        }
+                    />
+                )}
+                {item.subMenu &&
+                    !isCollapsed &&
+                    (expandSubMenu ? <ExpandLess /> : <ExpandMore />)}
+            </ListItemButton>
+            {item.subMenu && (
+                <Collapse in={expandSubMenu} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding>
+                        {item.subMenu.map((subItem) => (
+                            <ListItemButton
+                                key={subItem.text}
+                                onClick={() => navigate(subItem.path)}
+                                sx={{
+                                    pl: 4,
+                                    "&:hover": {
+                                        backgroundColor: "rgba(0, 0, 0, 0.1)",
+                                    },
+                                }}
+                            >
+                                <ListItemIcon sx={{ color: "gray" }}>
+                                    {subItem.icon}
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary={
+                                        <Typography color={colors.grey[100]}>
+                                            {subItem.text}
+                                        </Typography>
+                                    }
+                                />
+                            </ListItemButton>
+                        ))}
+                    </List>
+                </Collapse>
+            )}
+        </>
     );
 };
 
