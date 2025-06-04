@@ -5,7 +5,7 @@ import type {
     ColorTokens,
     ThemeSettings,
     ColorModeContextValue,
-} from "./types";
+} from "../types/types";
 
 export const tokens = (mode: ColorMode): ColorTokens => ({
     ...(mode === "dark"

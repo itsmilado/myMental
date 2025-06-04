@@ -1,17 +1,23 @@
 import React from "react";
 import "./App.css";
-import Sidebar from "./components/global/SideBar";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { Box } from "@mui/material";
+import Sidebar from "./components/global/SideBar";
+import AppRoutes from "./routes/AppRoutes"; // central route config
+import { ThemeProvider, CssBaseline, useTheme } from "@mui/material";
+// import { theme } from "./theme/theme";
 
 function App() {
+    const theme = useTheme();
     return (
-        <Box display="flex">
-            <Sidebar />
-            <Box flexGrow={1} p={3}>
-                {/* Your Routes will render here */}
+        <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <Box display="flex">
+                <Sidebar />
+                <Box flexGrow={1} p={3}>
+                    <AppRoutes />
+                </Box>
             </Box>
-        </Box>
+        </ThemeProvider>
     );
 }
 

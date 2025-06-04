@@ -34,9 +34,9 @@ import {
     Alarm as AlarmIcon,
     HolidayVillage as HolidayVillageIcon,
 } from "@mui/icons-material";
-import { tokens } from "../../theme";
+import { tokens } from "../../theme/theme";
 import { useLocation, useNavigate } from "react-router-dom";
-import { SidebarItemProps, SubMenuItemProps } from "../../types";
+import { SidebarItemProps, SubMenuItemProps } from "../../types/types";
 
 const Sidebar = () => {
     const theme = useTheme();
