@@ -1,4 +1,5 @@
 import * as React from "react";
+import axios from "axios";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
@@ -21,6 +22,8 @@ import {
     FacebookIcon,
     SitemarkIcon,
 } from "../../../components/CustomIcons";
+import { LineAxisOutlined } from "@mui/icons-material";
+import { Navigate, useNavigate } from "react-router-dom";
 
 const Card = styled(MuiCard)(({ theme }) => ({
     display: "flex",
@@ -70,6 +73,7 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
     const [passwordError, setPasswordError] = React.useState(false);
     const [passwordErrorMessage, setPasswordErrorMessage] = React.useState("");
     const [open, setOpen] = React.useState(false);
+    const navigate = useNavigate();
 
     const handleClickOpen = () => {
         setOpen(true);
@@ -79,16 +83,33 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
         setOpen(false);
     };
 
-    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-        if (emailError || passwordError) {
-            event.preventDefault();
-            return;
-        }
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (emailError || passwordError) return;
+
         const data = new FormData(event.currentTarget);
-        console.log({
-            email: data.get("email"),
-            password: data.get("password"),
-        });
+        const email = data.get("email") as string;
+        const password = data.get("password") as string;
+
+        try {
+            const response = await axios.post(
+                "http://localhost:5000/users/login",
+                {
+                    email,
+                    password,
+                }
+            );
+            console.log(response.data.data);
+            if (!response.data.success) {
+                setPasswordError(true);
+                setPasswordErrorMessage("Invalid email or password.");
+                return;
+            }
+            localStorage.setItem("user", JSON.stringify(response.data.data));
+            navigate("/dashboard");
+        } catch (error: any) {
+            console.error("Error:", error);
+        }
     };
 
     const validateInputs = () => {
