@@ -1,3 +1,4 @@
+import axios from "axios";
 import { AppBar, Box, IconButton, Toolbar, Typography } from "@mui/material";
 import { LightMode, DarkMode, Logout } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
@@ -11,8 +12,14 @@ const TopBar = () => {
     const { toggleColorMode } = useColorMode();
     const navigate = useNavigate();
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
         localStorage.removeItem("user");
+        try {
+            await axios.post("http://localhost:5000/users/logout");
+        } catch (error) {
+            console.error("Logout failed:", error);
+        }
+        console.log("Logout successful");
         navigate("/");
     };
 
