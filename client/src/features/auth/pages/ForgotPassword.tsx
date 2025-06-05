@@ -25,6 +25,7 @@ export default function ForgotPassword({
                     component: "form",
                     onSubmit: (event: React.FormEvent<HTMLFormElement>) => {
                         event.preventDefault();
+                        console.log("Form submitted");
                         handleClose();
                     },
                     sx: { backgroundImage: "none" },
