@@ -1,11 +1,11 @@
+import { useNavigate } from "react-router-dom";
 import * as React from "react";
-import axios from "axios";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import CssBaseline from "@mui/material/CssBaseline";
-import FormControlLabel from "@mui/material/FormControlLabel";
 import Divider from "@mui/material/Divider";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import FormLabel from "@mui/material/FormLabel";
 import FormControl from "@mui/material/FormControl";
 import Link from "@mui/material/Link";
@@ -14,7 +14,6 @@ import Typography from "@mui/material/Typography";
 import Stack from "@mui/material/Stack";
 import MuiCard from "@mui/material/Card";
 import { styled } from "@mui/material/styles";
-import ForgotPassword from "./ForgotPassword";
 import AppTheme from "../../../components/shared-theme/AppTheme";
 import ColorModeSelect from "../../../components/shared-theme/ColorModeSelect";
 import {
@@ -22,8 +21,7 @@ import {
     FacebookIcon,
     SitemarkIcon,
 } from "../../../components/CustomIcons";
-import { LineAxisOutlined } from "@mui/icons-material";
-import { Navigate, useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const Card = styled(MuiCard)(({ theme }) => ({
     display: "flex",
@@ -33,18 +31,18 @@ const Card = styled(MuiCard)(({ theme }) => ({
     padding: theme.spacing(4),
     gap: theme.spacing(2),
     margin: "auto",
-    [theme.breakpoints.up("sm")]: {
-        maxWidth: "450px",
-    },
     boxShadow:
         "hsla(220, 30%, 5%, 0.05) 0px 5px 15px 0px, hsla(220, 25%, 10%, 0.05) 0px 15px 35px -5px",
+    [theme.breakpoints.up("sm")]: {
+        width: "450px",
+    },
     ...theme.applyStyles("dark", {
         boxShadow:
             "hsla(220, 30%, 5%, 0.5) 0px 5px 15px 0px, hsla(220, 25%, 10%, 0.08) 0px 15px 35px -5px",
     }),
 }));
 
-const SignInContainer = styled(Stack)(({ theme }) => ({
+const SignUpContainer = styled(Stack)(({ theme }) => ({
     height: "calc((1 - var(--template-frame-height, 0)) * 100dvh)",
     minHeight: "100%",
     padding: theme.spacing(2),
@@ -67,55 +65,28 @@ const SignInContainer = styled(Stack)(({ theme }) => ({
     },
 }));
 
-export default function SignIn(props: { disableCustomTheme?: boolean }) {
+export default function SignUp(props: { disableCustomTheme?: boolean }) {
     const [emailError, setEmailError] = React.useState(false);
     const [emailErrorMessage, setEmailErrorMessage] = React.useState("");
     const [passwordError, setPasswordError] = React.useState(false);
     const [passwordErrorMessage, setPasswordErrorMessage] = React.useState("");
-    const [open, setOpen] = React.useState(false);
+    const [nameError, setNameError] = React.useState(false);
+    const [nameErrorMessage, setNameErrorMessage] = React.useState("");
     const navigate = useNavigate();
-
-    const handleClickOpen = () => {
-        setOpen(true);
-    };
-
-    const handleClose = () => {
-        setOpen(false);
-    };
-
-    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        if (emailError || passwordError) return;
-
-        const data = new FormData(event.currentTarget);
-        const email = data.get("email") as string;
-        const password = data.get("password") as string;
-
-        try {
-            const response = await axios.post(
-                "http://localhost:5000/users/login",
-                {
-                    email,
-                    password,
-                }
-            );
-            console.log(response.data.data);
-            if (!response.data.success) {
-                setPasswordError(true);
-                setPasswordErrorMessage("Invalid email or password.");
-                return;
-            }
-            localStorage.setItem("user", JSON.stringify(response.data.data));
-            navigate("/dashboard");
-        } catch (error: any) {
-            console.error("Error:", error);
-        }
-    };
 
     const validateInputs = () => {
         const email = document.getElementById("email") as HTMLInputElement;
         const password = document.getElementById(
             "password"
+        ) as HTMLInputElement;
+        const repeat_password = document.getElementById(
+            "repeat_password"
+        ) as HTMLInputElement;
+        const first_name = document.getElementById(
+            "first_name"
+        ) as HTMLInputElement;
+        const last_name = document.getElementById(
+            "last_name"
         ) as HTMLInputElement;
 
         let isValid = true;
@@ -139,14 +110,74 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
             setPasswordError(false);
             setPasswordErrorMessage("");
         }
+        if (repeat_password.value !== password.value) {
+            setPasswordError(true);
+            setPasswordErrorMessage("Passwords are not match.");
+            isValid = false;
+        } else {
+            setPasswordError(false);
+            setPasswordErrorMessage("");
+        }
+
+        if (!first_name.value || first_name.value.length < 1) {
+            setNameError(true);
+            setNameErrorMessage("Name is required.");
+            isValid = false;
+        } else {
+            setNameError(false);
+            setNameErrorMessage("");
+        }
+        if (!last_name.value || last_name.value.length < 1) {
+            setNameError(true);
+            setNameErrorMessage("Last Name is required.");
+            isValid = false;
+        } else {
+            setNameError(false);
+            setNameErrorMessage("");
+        }
 
         return isValid;
+    };
+
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (nameError || emailError || passwordError) return;
+
+        const data = new FormData(event.currentTarget);
+        const first_name = data.get("first_name");
+        const last_name = data.get("last_name");
+        const email = data.get("email");
+        const password = data.get("password");
+        const repeat_password = data.get("repeat_password");
+
+        try {
+            const response = await axios.post(
+                "http://localhost:5000/users/signup",
+                {
+                    first_name,
+                    last_name,
+                    email,
+                    password,
+                    repeat_password,
+                }
+            );
+            console.log("Response:", response.data);
+            if (!response.data.success) {
+                console.log("Error:", response.data.message);
+                return;
+            }
+            console.log("User signed up successfully:", response.data.data);
+            localStorage.setItem("user", JSON.stringify(response.data.data));
+            navigate("/");
+        } catch (error: any) {
+            console.error("Error:", error);
+        }
     };
 
     return (
         <AppTheme {...props}>
             <CssBaseline enableColorScheme />
-            <SignInContainer direction="column" justifyContent="space-between">
+            <SignUpContainer direction="column" justifyContent="space-between">
                 <ColorModeSelect
                     sx={{ position: "fixed", top: "1rem", right: "1rem" }}
                 />
@@ -160,79 +191,115 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
                             fontSize: "clamp(2rem, 10vw, 2.15rem)",
                         }}
                     >
-                        Sign in
+                        Sign up
                     </Typography>
                     <Box
                         component="form"
                         onSubmit={handleSubmit}
-                        noValidate
                         sx={{
                             display: "flex",
                             flexDirection: "column",
-                            width: "100%",
                             gap: 2,
                         }}
                     >
                         <FormControl>
-                            <FormLabel htmlFor="email">Email</FormLabel>
+                            <FormLabel htmlFor="first_name">
+                                First Name
+                            </FormLabel>
                             <TextField
-                                error={emailError}
-                                helperText={emailErrorMessage}
-                                id="email"
-                                type="email"
-                                name="email"
-                                placeholder="your@email.com"
-                                autoComplete="email"
-                                autoFocus
+                                autoComplete="first-name"
+                                name="first_name"
                                 required
                                 fullWidth
+                                id="first_name"
+                                placeholder="Jon"
+                                error={nameError}
+                                helperText={nameErrorMessage}
+                                color={nameError ? "error" : "primary"}
+                            />
+                            <FormLabel htmlFor="last_name">Last Name</FormLabel>
+                            <TextField
+                                autoComplete="last-name"
+                                name="last_name"
+                                required
+                                fullWidth
+                                id="last_name"
+                                placeholder="Snow"
+                                error={nameError}
+                                helperText={nameErrorMessage}
+                                color={nameError ? "error" : "primary"}
+                            />
+                        </FormControl>
+                        <FormControl>
+                            <FormLabel htmlFor="email">Email</FormLabel>
+                            <TextField
+                                required
+                                fullWidth
+                                id="email"
+                                placeholder="your@email.com"
+                                name="email"
+                                autoComplete="email"
                                 variant="outlined"
-                                color={emailError ? "error" : "primary"}
+                                error={emailError}
+                                helperText={emailErrorMessage}
+                                color={passwordError ? "error" : "primary"}
                             />
                         </FormControl>
                         <FormControl>
                             <FormLabel htmlFor="password">Password</FormLabel>
                             <TextField
-                                error={passwordError}
-                                helperText={passwordErrorMessage}
+                                required
+                                fullWidth
                                 name="password"
                                 placeholder="••••••"
                                 type="password"
                                 id="password"
-                                autoComplete="current-password"
-                                autoFocus
+                                autoComplete="new-password"
+                                variant="outlined"
+                                error={passwordError}
+                                helperText={passwordErrorMessage}
+                                color={passwordError ? "error" : "primary"}
+                            />
+                        </FormControl>
+                        <FormControl>
+                            <FormLabel htmlFor="password">Password</FormLabel>
+                            <TextField
                                 required
                                 fullWidth
+                                name="repeat_password"
+                                placeholder="••••••"
+                                type="password"
+                                id="repeat_password"
+                                autoComplete="repeat-password"
                                 variant="outlined"
+                                error={passwordError}
+                                helperText={passwordErrorMessage}
                                 color={passwordError ? "error" : "primary"}
                             />
                         </FormControl>
                         <FormControlLabel
                             control={
-                                <Checkbox value="remember" color="primary" />
+                                <Checkbox
+                                    value="allowExtraEmails"
+                                    color="primary"
+                                />
                             }
-                            label="Remember me"
+                            label="I want to receive updates via email."
                         />
-                        <ForgotPassword open={open} handleClose={handleClose} />
                         <Button
                             type="submit"
                             fullWidth
                             variant="contained"
                             onClick={validateInputs}
                         >
-                            Sign in
+                            Sign up
                         </Button>
-                        <Link
-                            component="button"
-                            type="button"
-                            onClick={handleClickOpen}
-                            variant="body2"
-                            sx={{ alignSelf: "center" }}
-                        >
-                            Forgot your password?
-                        </Link>
                     </Box>
-                    <Divider>or</Divider>
+                    <Divider>
+                        <Typography sx={{ color: "text.secondary" }}>
+                            or
+                        </Typography>
+                    </Divider>
                     <Box
                         sx={{
                             display: "flex",
@@ -243,32 +310,32 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
                         <Button
                             fullWidth
                             variant="outlined"
-                            onClick={() => alert("Sign in with Google")}
+                            onClick={() => alert("Sign up with Google")}
                             startIcon={<GoogleIcon />}
                         >
-                            Sign in with Google
+                            Sign up with Google
                         </Button>
                         <Button
                             fullWidth
                             variant="outlined"
-                            onClick={() => alert("Sign in with Facebook")}
+                            onClick={() => alert("Sign up with Facebook")}
                             startIcon={<FacebookIcon />}
                         >
-                            Sign in with Facebook
+                            Sign up with Facebook
                         </Button>
                         <Typography sx={{ textAlign: "center" }}>
-                            Don&apos;t have an account?{" "}
+                            Already have an account?{" "}
                             <Link
-                                href="/sign-up"
+                                href="/"
                                 variant="body2"
                                 sx={{ alignSelf: "center" }}
                             >
-                                Sign up
+                                Sign in
                             </Link>
                         </Typography>
                     </Box>
                 </Card>
-            </SignInContainer>
+            </SignUpContainer>
         </AppTheme>
     );
 }
