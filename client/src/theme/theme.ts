@@ -1,3 +1,4 @@
+import { useContext } from "react";
 import { createTheme } from "@mui/material/styles";
 import { createContext, useState, useMemo } from "react";
 import type {
@@ -221,3 +222,5 @@ export const useMode = (): [
     const theme = useMemo(() => createTheme(themeSettings(mode)), [mode]);
     return [theme, colorMode];
 };
+
+export const useColorMode = () => useContext(ColorModeContext);
