@@ -1,4 +1,3 @@
-import axios from "axios";
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -12,11 +11,13 @@ import {
     Menu,
     MenuItem,
 } from "@mui/material";
-import { LightMode, DarkMode, Logout } from "@mui/icons-material";
+import { LightMode, DarkMode } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { tokens } from "../../theme/theme";
 import { useColorMode } from "../../theme/theme";
 import { User } from "../../types/types";
+import { logoutUser } from "../../features/auth/api";
+import { useAuthStore } from "../../store/auseAuthStore";
 
 const TopBar = () => {
     const theme = useTheme();
@@ -40,13 +41,14 @@ const TopBar = () => {
     };
 
     const handleLogout = async () => {
-        localStorage.removeItem("user");
         try {
-            await axios.post("http://localhost:5000/users/logout");
+            await logoutUser();
+            useAuthStore.getState().clearUser();
+            console.log("Logout successful");
         } catch (error) {
             console.error("Logout failed:", error);
         }
-        console.log("Logout successful");
+        localStorage.removeItem("user");
         navigate("/");
     };
     const pageTitle = path
@@ -75,9 +77,7 @@ const TopBar = () => {
                             <DarkMode />
                         )}
                     </IconButton>
-                    <IconButton onClick={handleLogout} color="inherit">
-                        <Logout />
-                    </IconButton>
+
                     <Tooltip title={user.email}>
                         <Avatar
                             sx={{
@@ -113,8 +113,8 @@ const TopBar = () => {
                         </MenuItem>
                         <MenuItem
                             onClick={() => {
-                                localStorage.removeItem("user");
-                                navigate("/");
+                                handleLogout();
+                                handleMenuClose();
                             }}
                         >
                             Logout

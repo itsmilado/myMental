@@ -22,8 +22,8 @@ import {
     FacebookIcon,
     SitemarkIcon,
 } from "../../../components/CustomIcons";
-import { LineAxisOutlined } from "@mui/icons-material";
-import { Navigate, useNavigate } from "react-router-dom";
+// import { LineAxisOutlined } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 
 const Card = styled(MuiCard)(({ theme }) => ({
     display: "flex",
@@ -99,7 +99,7 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
                     password,
                 }
             );
-            console.log(response.data.data);
+            console.log("Sign-in Data:", response.data.data);
             if (!response.data.success) {
                 setPasswordError(true);
                 setPasswordErrorMessage("Invalid email or password.");

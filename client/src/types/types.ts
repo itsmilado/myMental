@@ -92,8 +92,16 @@ export interface SidebarProps {
 }
 
 export interface User {
-    id: string;
+    id: number;
     email: string;
     first_name: string;
     last_name: string;
+    isConfirmed: boolean;
+    created_at: string;
+}
+
+export interface AuthState {
+    user: User | null;
+    setUser: (user: User | null) => void;
+    clearUser: () => void;
 }
