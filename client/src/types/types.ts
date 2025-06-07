@@ -90,3 +90,10 @@ export interface SidebarProps {
     toggleCollapse: () => void;
     menuItems: SidebarItemProps[];
 }
+
+export interface User {
+    id: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+}
