@@ -17,7 +17,7 @@ import { tokens } from "../../theme/theme";
 import { useColorMode } from "../../theme/theme";
 import { User } from "../../types/types";
 import { logoutUser } from "../../features/auth/api";
-import { useAuthStore } from "../../store/auseAuthStore";
+import { useAuthStore } from "../../store/useAuthStore";
 
 const TopBar = () => {
     const theme = useTheme();
