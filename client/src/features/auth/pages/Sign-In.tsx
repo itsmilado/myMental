@@ -24,6 +24,7 @@ import {
 } from "../../../components/CustomIcons";
 // import { LineAxisOutlined } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "../../../store/useAuthStore";
 
 const Card = styled(MuiCard)(({ theme }) => ({
     display: "flex",
@@ -99,13 +100,16 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
                     password,
                 }
             );
-            console.log("Sign-in Data:", response.data.data);
             if (!response.data.success) {
                 setPasswordError(true);
                 setPasswordErrorMessage("Invalid email or password.");
                 return;
             }
-            localStorage.setItem("user", JSON.stringify(response.data.data));
+            console.log("Sign-in Data:", response.data.data);
+            useAuthStore.setState({
+                user: response.data.data,
+            });
+            // localStorage.setItem("user", JSON.stringify(response.data.data));
             navigate("/dashboard");
         } catch (error: any) {
             console.error("Error:", error);

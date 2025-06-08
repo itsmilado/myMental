@@ -18,18 +18,19 @@ import { useColorMode } from "../../theme/theme";
 import { User } from "../../types/types";
 import { logoutUser } from "../../features/auth/api";
 import { useAuthStore } from "../../store/useAuthStore";
+import ProfileDialog from "../../features/profile/components/ProfileDialog";
 
 const TopBar = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
-    const { toggleColorMode } = useColorMode();
     const navigate = useNavigate();
+    const { toggleColorMode } = useColorMode();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const open: boolean = Boolean(anchorEl);
 
-    const user: Partial<User> = JSON.parse(
-        localStorage.getItem("user") || "{}"
-    );
+    const [openProfileDialog, setOpenProfileDialog] = useState(false);
+
+    const user = useAuthStore((state) => state.user);
     const location = useLocation();
     const path = location.pathname.split("/").pop();
 
@@ -48,7 +49,7 @@ const TopBar = () => {
         } catch (error) {
             console.error("Logout failed:", error);
         }
-        localStorage.removeItem("user");
+        // localStorage.removeItem("user");
         navigate("/");
     };
     const pageTitle = path
@@ -78,7 +79,7 @@ const TopBar = () => {
                         )}
                     </IconButton>
 
-                    <Tooltip title={user.email}>
+                    <Tooltip title={user?.email ?? "User"}>
                         <Avatar
                             sx={{
                                 bgcolor: colors.greenAccent[500],
@@ -89,6 +90,10 @@ const TopBar = () => {
                             {user?.first_name?.[0] || "U"}
                         </Avatar>
                     </Tooltip>
+                    <ProfileDialog
+                        open={openProfileDialog}
+                        onClose={() => setOpenProfileDialog(false)}
+                    />
                     <Menu
                         anchorEl={anchorEl}
                         open={open}
@@ -103,9 +108,10 @@ const TopBar = () => {
                             vertical: "bottom",
                         }}
                     >
-                        <MenuItem onClick={() => navigate("/profile")}>
+                        <MenuItem onClick={() => setOpenProfileDialog(true)}>
                             My Profile
                         </MenuItem>
+
                         <MenuItem
                             onClick={() => navigate("/dashboard/settings")}
                         >

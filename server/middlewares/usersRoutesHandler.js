@@ -87,8 +87,11 @@ const userLogin = async (request, response, next) => {
             message: "login success",
             data: {
                 id: matchUser.id,
+                first_name: matchUser.first_name,
+                last_name: matchUser.last_name,
                 email: matchUser.email,
                 role: matchUser.user_role,
+                created_at: matchUser.created_at,
             },
         });
     } catch (error) {

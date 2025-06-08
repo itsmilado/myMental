@@ -105,3 +105,8 @@ export interface AuthState {
     setUser: (user: User | null) => void;
     clearUser: () => void;
 }
+
+export type ProfileDialogProps = {
+    open: boolean;
+    onClose: () => void;
+};
