@@ -16,7 +16,7 @@ const saveTranscriptionToFile = (
     fileModifiedDate
 ) => {
     try {
-        const modifiedDate = fileModifiedDate.match(/^(\d{4})-(\d{2})-(\d{2})/); // Extract YYYY-MM-DD
+        const modifiedDate = fileModifiedDate;
         const [, year, month, day] = modifiedDate;
         const formattedModifiedDate = `${day}.${month}.${year}`;
         const originalName = path.parse(filename).name;

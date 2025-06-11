@@ -6,11 +6,12 @@ const { assemblyClient } = require("../utils/assemblyaiClient");
 // Default transcription options
 const transcriptionOptions = {
     speaker_labels: true,
-    // speakers_expected: 2,
-    sentiment_analysis: true,
-    speech_model: "nano",
+    speakers_expected: 2,
+    sentiment_analysis: false,
+    speech_model: "slam-1",
     language_code: "en",
     format_text: true,
+    entity_detection: true,
 };
 
 // Request transcription from AssemblyAI

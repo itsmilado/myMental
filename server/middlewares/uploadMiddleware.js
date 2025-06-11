@@ -19,7 +19,7 @@ const storage = multer.diskStorage({
     filename: (req, file, cb) => {
         // Get original filename without extension
         const originalName = path.parse(file.originalname).name;
-
+        const { fileModifiedDate } = req.body;
         // Format the current date and time (DD.MM.YY_HH.mm.ss)
         const now = new Date();
         const currentDate = now.toLocaleDateString("en-GB").replace(/\//g, ".");
@@ -31,7 +31,7 @@ const storage = multer.diskStorage({
         });
 
         // Create new filename
-        const newFileName = `${originalName} - ${currentDate}_${currentTime}${path.extname(
+        const newFileName = `${originalName} - ${fileModifiedDate} - ${currentDate}_${currentTime}${path.extname(
             file.originalname
         )}`;
         cb(null, newFileName);

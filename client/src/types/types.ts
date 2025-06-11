@@ -110,3 +110,30 @@ export type ProfileDialogProps = {
     open: boolean;
     onClose: () => void;
 };
+
+export type TranscriptData = {
+    id: string; // local DB ID
+    user_id: string;
+    transcript_id: string; // AssemblyAI API ID
+    file_name: string;
+    file_recorded_at: string; // YYYY-MM-DD
+    transcription: string; // plain text
+    created_at: string;
+    updated_at: string;
+};
+
+export type TranscriptionOptions = {
+    speaker_labels: boolean;
+    speakers_expected: number;
+    sentiment_analysis: boolean;
+    speech_model: string;
+    language_code: string;
+    format_text: boolean;
+    entity_detection: boolean;
+};
+
+export interface TranscriptionPayload {
+    file: File;
+    fileModifiedDate: string; // formatted as YYYY-MM-DD
+    options: TranscriptionOptions;
+}
