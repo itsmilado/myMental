@@ -37,10 +37,13 @@ const createUsers = async (request, response, next) => {
         response.status(201).json({
             success: true,
             message: "User created successfully",
-            data: {
+            userData: {
                 id: newUser.id,
+                first_name: newUser.first_name,
+                last_name: newUser.last_name,
                 email: newUser.email,
                 role: newUser.user_role,
+                created_at: newUser.created_at,
             },
         });
     } catch (error) {
@@ -85,7 +88,7 @@ const userLogin = async (request, response, next) => {
         response.status(201).json({
             success: true,
             message: "login success",
-            data: {
+            userData: {
                 id: matchUser.id,
                 first_name: matchUser.first_name,
                 last_name: matchUser.last_name,

@@ -1,5 +1,5 @@
-import { useNavigate } from "react-router-dom";
 import * as React from "react";
+import { useNavigate } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
@@ -21,7 +21,8 @@ import {
     FacebookIcon,
     SitemarkIcon,
 } from "../../../components/CustomIcons";
-import axios from "axios";
+import { useAuthStore } from "../../../store/useAuthStore";
+import { signupUser } from "../api";
 
 const Card = styled(MuiCard)(({ theme }) => ({
     display: "flex",
@@ -151,23 +152,22 @@ export default function SignUp(props: { disableCustomTheme?: boolean }) {
         const repeat_password = data.get("repeat_password");
 
         try {
-            const response = await axios.post(
-                "http://localhost:5000/users/signup",
-                {
-                    first_name,
-                    last_name,
-                    email,
-                    password,
-                    repeat_password,
-                }
+            const response = await signupUser(
+                first_name as string,
+                last_name as string,
+                email as string,
+                password as string,
+                repeat_password as string
             );
-            console.log("Response:", response.data);
-            if (!response.data.success) {
-                console.log("Error:", response.data.message);
+            console.log("Response:", response.userData);
+            if (!response.success) {
+                console.log("Error:", response.message);
                 return;
             }
-            console.log("User signed up successfully:", response.data.data);
-            localStorage.setItem("user", JSON.stringify(response.data.data));
+            console.log("User signed up successfully:", response.userData);
+            useAuthStore.setState({
+                user: response.userData,
+            });
             navigate("/");
         } catch (error: any) {
             console.error("Error:", error);

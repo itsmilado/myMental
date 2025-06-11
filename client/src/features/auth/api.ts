@@ -18,9 +18,26 @@ export const loginUser = async (email: string, password: string) => {
         email,
         password,
     });
-    return response.data.data;
+    return response.data;
 };
 
 export const logoutUser = async () => {
     await axios.post("http://localhost:5000/users/logout");
+};
+
+export const signupUser = async (
+    first_name: string,
+    last_name: string,
+    email: string,
+    password: string,
+    repeat_password: string
+) => {
+    const response = await axios.post("http://localhost:5000/users/signup", {
+        first_name,
+        last_name,
+        email,
+        password,
+        repeat_password,
+    });
+    return response.data;
 };

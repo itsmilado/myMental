@@ -25,6 +25,7 @@ import {
 // import { LineAxisOutlined } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../../store/useAuthStore";
+import { loginUser } from "../api";
 
 const Card = styled(MuiCard)(({ theme }) => ({
     display: "flex",
@@ -84,6 +85,17 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
         setOpen(false);
     };
 
+    const singInValue = () => {
+        if (!useAuthStore.getState().user) {
+            return {
+                email: "email@example.com",
+            };
+        }
+        return {
+            email: useAuthStore.getState().user?.email,
+        };
+    };
+
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         if (emailError || passwordError) return;
@@ -93,23 +105,16 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
         const password = data.get("password") as string;
 
         try {
-            const response = await axios.post(
-                "http://localhost:5000/users/login",
-                {
-                    email,
-                    password,
-                }
-            );
-            if (!response.data.success) {
+            const response = await loginUser(email, password);
+            console.log("Sign-in Data:", response.userData);
+            if (!response.success) {
                 setPasswordError(true);
                 setPasswordErrorMessage("Invalid email or password.");
                 return;
             }
-            console.log("Sign-in Data:", response.data.data);
             useAuthStore.setState({
-                user: response.data.data,
+                user: response.userData,
             });
-            // localStorage.setItem("user", JSON.stringify(response.data.data));
             navigate("/dashboard");
         } catch (error: any) {
             console.error("Error:", error);
@@ -180,6 +185,7 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
                         <FormControl>
                             <FormLabel htmlFor="email">Email</FormLabel>
                             <TextField
+                                defaultValue={singInValue().email}
                                 error={emailError}
                                 helperText={emailErrorMessage}
                                 id="email"
