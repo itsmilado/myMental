@@ -137,3 +137,9 @@ export interface TranscriptionPayload {
     fileModifiedDate: string; // formatted as YYYY-MM-DD
     options: TranscriptionOptions;
 }
+
+export interface AuthResponse {
+    success: boolean;
+    message: string;
+    userData: User;
+}

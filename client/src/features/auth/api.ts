@@ -1,5 +1,10 @@
 import axios from "axios";
-import { User, TranscriptData, TranscriptionOptions } from "../../types/types";
+import {
+    User,
+    TranscriptData,
+    TranscriptionOptions,
+    AuthResponse,
+} from "../../types/types";
 
 export const getUser = async (id: string): Promise<User> => {
     try {
@@ -16,12 +21,12 @@ export const getUser = async (id: string): Promise<User> => {
 export const loginUser = async (
     email: string,
     password: string
-): Promise<User> => {
+): Promise<AuthResponse> => {
     const response = await axios.post("http://localhost:5000/users/login", {
         email,
         password,
     });
-    return response.data;
+    return response.data as AuthResponse;
 };
 
 export const logoutUser = async () => {
@@ -34,7 +39,7 @@ export const signupUser = async (
     email: string,
     password: string,
     repeat_password: string
-): Promise<User> => {
+): Promise<AuthResponse> => {
     const response = await axios.post("http://localhost:5000/users/signup", {
         first_name,
         last_name,
@@ -42,7 +47,7 @@ export const signupUser = async (
         password,
         repeat_password,
     });
-    return response.data;
+    return response.data as AuthResponse;
 };
 
 export const uploadAudio = async (

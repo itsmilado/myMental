@@ -98,7 +98,7 @@ const Sidebar = () => {
             subMenu: [
                 {
                     text: "Upload",
-                    path: "/transcriptions/upload",
+                    path: "transcriptions/upload",
                     icon: <UploadIcon />,
                 },
                 {
