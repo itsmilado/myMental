@@ -20,7 +20,13 @@ const storage = multer.diskStorage({
         // Get original filename without extension
         const originalName = path.parse(file.originalname).name;
         const { fileModifiedDate } = req.body;
-        // Format the current date and time (DD.MM.YY_HH.mm.ss)
+        const safeDate = fileModifiedDate
+            ? new Date(fileModifiedDate)
+            : new Date();
+
+        const fileModifiedDisplayDate = safeDate
+            .toLocaleDateString("en-GB")
+            .replace(/\//g, ".");
         const now = new Date();
         const currentDate = now.toLocaleDateString("en-GB").replace(/\//g, ".");
         const currentTime = now.toLocaleTimeString("en-GB", {
@@ -31,7 +37,7 @@ const storage = multer.diskStorage({
         });
 
         // Create new filename
-        const newFileName = `${originalName} - ${fileModifiedDate} - ${currentDate}_${currentTime}${path.extname(
+        const newFileName = `${originalName} - ${fileModifiedDisplayDate} - ${currentDate}_${currentTime}${path.extname(
             file.originalname
         )}`;
         cb(null, newFileName);
@@ -42,13 +48,19 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage: storage,
     fileFilter: (req, file, cb) => {
+        logger.info(
+            `Incoming file: ${file.originalname}, type: ${file.mimetype}`
+        );
         const allowedTypes = [
             "audio/mp4",
             "audio/m4a",
+            "audio/x-m4a",
             "audio/mp3",
             "audio/wav",
+            "audio/x-wav",
             "audio/ogg",
             "audio/mpeg",
+            "audio/webm",
         ];
         if (!allowedTypes.includes(file.mimetype)) {
             logger.warn(`Invalid file type: ${file.mimetype}`);

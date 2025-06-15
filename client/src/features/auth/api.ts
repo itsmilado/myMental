@@ -1,10 +1,12 @@
 import axios from "axios";
 import {
     User,
-    TranscriptData,
+    transcriptUploadResponse,
     TranscriptionOptions,
     AuthResponse,
 } from "../../types/types";
+
+axios.defaults.withCredentials = true;
 
 export const getUser = async (id: string): Promise<User> => {
     try {
@@ -22,7 +24,7 @@ export const loginUser = async (
     email: string,
     password: string
 ): Promise<AuthResponse> => {
-    const response = await axios.post("http://localhost:5000/users/login", {
+    const response = await axios.post("http://localhost:5002/users/login", {
         email,
         password,
     });
@@ -52,20 +54,23 @@ export const signupUser = async (
 
 export const uploadAudio = async (
     file: File,
-    options: TranscriptionOptions
-): Promise<TranscriptData> => {
+    options: Partial<TranscriptionOptions>
+): Promise<transcriptUploadResponse> => {
     const formData = new FormData();
-    formData.append("file", file);
 
     const modified = new Date(file.lastModified);
-    const fileModifiedDate = modified.toISOString().split("T")[0]; // "YYYY-MM-DD"
+    const fileModifiedDate = modified.toISOString(); // e.g. "2018-12-13T00:00:00.000Z"
     console.log("File Modified Date:", fileModifiedDate);
 
     formData.append("fileModifiedDate", fileModifiedDate);
     formData.append("options", JSON.stringify(options));
+    Object.entries(options).forEach(([key, value]) => {
+        formData.append(key, value.toString());
+    });
+    formData.append("audioFile", file);
 
-    const response = await axios.post<TranscriptData>(
-        "http://localhost:5000/transcription/upload",
+    const response = await axios.post<transcriptUploadResponse>(
+        "http://localhost:5002/transcription/upload",
         formData,
         {
             headers: {

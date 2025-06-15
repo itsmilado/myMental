@@ -34,7 +34,8 @@ try {
         name: "sessionId",
         cookie: {
             secure: false, // Set to true in production (true: only transmit cookies over HTTPS)
-            httpOnly: process.env.NODE_ENV === "production", // Set to true in production (true: client side JS cannot access the cookie)
+            httpOnly: true, // Set to true in production (true: client side JS cannot access the cookie)
+            sameSite: "lax",
             maxAge: 1000 * 60 * 30 * 24, // expires in 24 hours
         },
     });

@@ -48,22 +48,49 @@ const fetchAllTranscriptions = async (request, response, next) => {
 const createTranscription = async (request, response, next) => {
     try {
         const loggedUserId = request.session.user.id;
-        const { filePath, filename } = { ...request.file };
-        const { fileModifiedDate } = { ...request.body } || "00.00.00"; // default to 00.00.00 if not provided or invalid
+        const { path: filePath, filename } = request.file;
+        const rawDate = request.body.fileModifiedDate; // safe for DB
+        const fileModifiedDate = rawDate ? new Date(rawDate) : "00.00.00";
+
+        const fileModifiedDisplayDate = fileModifiedDate
+            .toLocaleString("en-GB")
+            .replace(/\//g, ".");
 
         logger.info(
             `Incoming request to Transcribe from user_id ${loggedUserId} to "${request.method} ${request.originalUrl}"`
         );
 
         logger.info(
-            `[transcriptionHandler - createTranscription] => filename, fileModifiedDate in request.file: ${filename} - ${fileModifiedDate}`
+            `[transcriptionHandler - createTranscription] => filename, fileModifiedDate in request.file: ${filename} - ${fileModifiedDisplayDate}`
         );
+        logger.info(
+            `[Transcription] Received options: ${JSON.stringify(
+                request.body.options
+            )}`
+        );
+
+        let userOptions = {};
+        userOptions =
+            typeof request.body.options === "string"
+                ? JSON.parse(request.body.options)
+                : request.body.options;
 
         // Upload the audio file to AssemblyAI API
         const uploadUrl = await uploadAudioFile(filePath);
 
+        const transcriptionOptions = {
+            audio_url: uploadUrl,
+            ...userOptions,
+        };
+
+        logger.info(
+            `[createTranscription] transcriptionOptions: ${JSON.stringify(
+                transcriptionOptions
+            )}`
+        );
+
         // Request a transcription
-        const transcriptId = await requestTranscription(uploadUrl);
+        const transcriptId = await requestTranscription(transcriptionOptions);
 
         // Poll for transcription result
         const transcript = await pollTranscriptionResult(transcriptId);
@@ -84,14 +111,14 @@ const createTranscription = async (request, response, next) => {
         const storedTxtfilePath = saveTranscriptionToFile(
             filename,
             insertedTranscription.transcription,
-            fileModifiedDate
+            fileModifiedDisplayDate
         );
 
         // Send response
         response.status(200).json({
             success: true,
             message: `Transcription created and stored successfully at: ${storedTxtfilePath}`,
-            data: insertedTranscription,
+            TranscriptData: insertedTranscription,
         });
     } catch (error) {
         logger.error(`[createTranscription] => Error: ${error.message}`);

@@ -4,25 +4,21 @@ const logger = require("./logger");
 const { assemblyClient } = require("../utils/assemblyaiClient");
 
 // Default transcription options
-const transcriptionOptions = {
-    speaker_labels: true,
-    speakers_expected: 2,
-    sentiment_analysis: false,
-    speech_model: "slam-1",
-    language_code: "en",
-    format_text: true,
-    entity_detection: true,
-};
+// const transcriptionOptions = {
+//     speaker_labels: true,
+//     speakers_expected: 2,
+//     sentiment_analysis: false,
+//     speech_model: "slam-1",
+//     language_code: "en",
+//     format_text: true,
+//     entity_detection: true,
+// };
 
 // Request transcription from AssemblyAI
-const requestTranscription = async (audioUrl) => {
+const requestTranscription = async (transcriptionOptions) => {
     try {
-        const transcriptOptions = {
-            audio_url: audioUrl,
-            ...transcriptionOptions,
-        };
         const transcript = await assemblyClient.transcripts.transcribe(
-            transcriptOptions
+            transcriptionOptions
         );
 
         if (!transcript || !transcript.id) {

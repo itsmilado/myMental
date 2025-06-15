@@ -6,19 +6,30 @@ import {
     Switch,
     FormControlLabel,
     Paper,
+    Select,
+    MenuItem,
+    InputLabel,
+    FormControl,
 } from "@mui/material";
 import { useState } from "react";
 import { uploadAudio } from "../../auth/api";
 import { TranscriptionOptions, TranscriptData } from "../../../types/types";
+import { formatDateTime } from "../../../utils/formatDate";
 
 const defaultTranscriptionOptions: TranscriptionOptions = {
-    speaker_labels: true,
+    speaker_labels: false,
     speakers_expected: 2,
-    sentiment_analysis: true,
-    speech_model: "default",
+    sentiment_analysis: false,
+    speech_model: "slam-1",
     language_code: "en-US",
-    format_text: true,
-    entity_detection: true,
+    format_text: false,
+    entity_detection: false,
+};
+
+const modelLanguages: Record<string, string[]> = {
+    "slam-1": ["en", "en_uk", "en_us"],
+    universal: ["en", "en_uk", "en_us", "es", "de", "fr"],
+    nano: ["en", "en_uk", "en_us", "es", "de", "fr"],
 };
 
 export const TranscriptionPage = () => {
@@ -32,9 +43,21 @@ export const TranscriptionPage = () => {
     const handleUpload = async () => {
         if (!file) return;
         setLoading(true);
+        const userOptions: Partial<TranscriptionOptions> = {};
+        if (options.speaker_labels) userOptions.speaker_labels = true;
+        if (options.sentiment_analysis) userOptions.sentiment_analysis = true;
+        if (options.entity_detection) userOptions.entity_detection = true;
+        if (options.speakers_expected !== 2) {
+            userOptions.speakers_expected = options.speakers_expected;
+        }
+        userOptions.speech_model = options.speech_model;
+        userOptions.language_code = options.language_code;
+
         try {
-            const response = await uploadAudio(file, options);
-            setResults(response);
+            console.log("userOptions:", userOptions);
+
+            const response = await uploadAudio(file, userOptions);
+            setResults(response.TranscriptData);
         } catch (err) {
             console.error("Upload error:", err);
         } finally {
@@ -118,6 +141,53 @@ export const TranscriptionPage = () => {
                     }
                     size="small"
                 />
+                <FormControl size="small" fullWidth>
+                    <InputLabel id="model-select-label">
+                        Speech Model
+                    </InputLabel>
+                    <Select
+                        labelId="model-select-label"
+                        value={options.speech_model}
+                        label="Speech Model"
+                        onChange={(e) =>
+                            setOptions((o) => ({
+                                ...o,
+                                speech_model: e.target.value,
+                                language_code:
+                                    modelLanguages[e.target.value][0],
+                            }))
+                        }
+                    >
+                        {Object.keys(modelLanguages).map((model) => (
+                            <MenuItem key={model} value={model}>
+                                {model}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+
+                <FormControl size="small" fullWidth>
+                    <InputLabel id="language-select-label">
+                        Language Code
+                    </InputLabel>
+                    <Select
+                        labelId="language-select-label"
+                        value={options.language_code}
+                        label="Language Code"
+                        onChange={(e) =>
+                            setOptions((o) => ({
+                                ...o,
+                                language_code: e.target.value,
+                            }))
+                        }
+                    >
+                        {modelLanguages[options.speech_model].map((lang) => (
+                            <MenuItem key={lang} value={lang}>
+                                {lang}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
             </Box>
 
             <Button
@@ -129,9 +199,12 @@ export const TranscriptionPage = () => {
             </Button>
 
             {results && (
-                <Box>
-                    <Typography variant="h6" mt={2}>
-                        Transcript
+                <Box mt={4}>
+                    <Typography variant="h6" mt={2} mb={2}>
+                        {results.file_name}
+                    </Typography>
+                    <Typography variant="body2" mb={2}>
+                        Recorded at: {formatDateTime(results.file_recorded_at)}
                     </Typography>
                     <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
                         {results.transcription}

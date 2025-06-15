@@ -119,7 +119,6 @@ export type TranscriptData = {
     file_recorded_at: string; // YYYY-MM-DD
     transcription: string; // plain text
     created_at: string;
-    updated_at: string;
 };
 
 export type TranscriptionOptions = {
@@ -142,4 +141,10 @@ export interface AuthResponse {
     success: boolean;
     message: string;
     userData: User;
+}
+
+export interface transcriptUploadResponse {
+    success: boolean;
+    message: string;
+    TranscriptData: TranscriptData;
 }

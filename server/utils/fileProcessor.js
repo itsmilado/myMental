@@ -16,11 +16,11 @@ const saveTranscriptionToFile = (
     fileModifiedDate
 ) => {
     try {
-        const modifiedDate = fileModifiedDate;
-        const [, year, month, day] = modifiedDate;
-        const formattedModifiedDate = `${day}.${month}.${year}`;
         const originalName = path.parse(filename).name;
-        const transcriptionFileName = `${originalName} - [${formattedModifiedDate}].txt`;
+        const transcriptionFileName = `${originalName} - ${fileModifiedDate}.txt`;
+        logger.info(
+            `[saveTranscriptionToFile] => FileName: ${transcriptionFileName}`
+        );
         const transcriptionFilePath = path.join(
             transcriptionDir,
             transcriptionFileName
