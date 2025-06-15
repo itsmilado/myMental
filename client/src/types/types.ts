@@ -106,6 +106,12 @@ export interface AuthState {
     clearUser: () => void;
 }
 
+export interface AuthResponse {
+    success: boolean;
+    message: string;
+    userData: User;
+}
+
 export type ProfileDialogProps = {
     open: boolean;
     onClose: () => void;
@@ -137,14 +143,28 @@ export interface TranscriptionPayload {
     options: TranscriptionOptions;
 }
 
-export interface AuthResponse {
-    success: boolean;
-    message: string;
-    userData: User;
-}
-
 export interface transcriptUploadResponse {
     success: boolean;
     message: string;
     TranscriptData: TranscriptData;
 }
+
+export type Filters = {
+    status?: string;
+    model?: string;
+    language?: string;
+    dateRange?: { from: string; to: string };
+};
+
+export type TranscriptionState = {
+    list: TranscriptData[];
+    active: TranscriptData | null;
+    filters: Filters;
+    loading: boolean;
+    error: string | null;
+    setList: (data: TranscriptData[]) => void;
+    setActive: (item: TranscriptData | null) => void;
+    setFilters: (filters: Filters) => void;
+    setLoading: (loading: boolean) => void;
+    setError: (error: string | null) => void;
+};

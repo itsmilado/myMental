@@ -3,6 +3,7 @@ import {
     User,
     transcriptUploadResponse,
     TranscriptionOptions,
+    TranscriptData,
     AuthResponse,
 } from "../../types/types";
 
@@ -79,4 +80,14 @@ export const uploadAudio = async (
         }
     );
     return response.data;
+};
+
+// fetch all transcripts for a user
+
+export const fetchUserTranscripts = async (): Promise<TranscriptData[]> => {
+    const response = await axios.get(
+        "http://localhost:5002/transcription/all_transcriptions"
+    );
+    if (response.data.success) return response.data.data as TranscriptData[];
+    throw new Error(response.data.message || "Failed to fetch transcriptions");
 };

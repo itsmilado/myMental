@@ -103,7 +103,7 @@ const Sidebar = () => {
                 },
                 {
                     text: "History",
-                    path: "/transcriptions/history",
+                    path: "transcriptions/history",
                     icon: <HistoryIcon />,
                 },
                 {
