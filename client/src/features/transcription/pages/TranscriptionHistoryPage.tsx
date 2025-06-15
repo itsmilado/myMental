@@ -9,11 +9,13 @@ import {
     Paper,
 } from "@mui/material";
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { useTranscriptionList } from "../hooks/useTranscriptionList";
 
 const TranscriptionHistoryPage = () => {
-    const { list, loading, error } = useTranscriptionStore();
+    const navigate = useNavigate();
+    const { list, loading, error, setActive } = useTranscriptionStore();
     const { loadTranscriptions } = useTranscriptionList();
 
     useEffect(() => {
@@ -37,7 +39,17 @@ const TranscriptionHistoryPage = () => {
                     (list.length > 0 ? (
                         <List>
                             {list.map((t) => (
-                                <ListItem key={t.transcript_id} divider>
+                                <ListItem
+                                    component="button"
+                                    key={t.transcript_id}
+                                    onClick={() => {
+                                        setActive(t); //set the active transcription in zustand
+                                        navigate(
+                                            `/dashboard/transcriptions/${t.id}` //navigate to the transcription detail page
+                                        );
+                                    }}
+                                    divider
+                                >
                                     <ListItemText
                                         primary={t.file_name}
                                         secondary={
@@ -46,7 +58,14 @@ const TranscriptionHistoryPage = () => {
                                                     component="span"
                                                     variant="body2"
                                                 >
-                                                    ID: {t.transcript_id}
+                                                    Database ID: {t.id}
+                                                </Typography>
+                                                <br />
+                                                <Typography
+                                                    component="span"
+                                                    variant="body2"
+                                                >
+                                                    API ID: {t.transcript_id}
                                                 </Typography>
                                                 <br />
                                                 <Typography

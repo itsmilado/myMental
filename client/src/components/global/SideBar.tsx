@@ -36,7 +36,7 @@ import {
 } from "@mui/icons-material";
 import { tokens } from "../../theme/theme";
 import { useLocation, useNavigate } from "react-router-dom";
-import { SidebarItemProps, SubMenuItemProps } from "../../types/types";
+import { SidebarItemProps } from "../../types/types";
 
 const Sidebar = () => {
     const theme = useTheme();

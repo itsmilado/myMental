@@ -32,7 +32,7 @@ const modelLanguages: Record<string, string[]> = {
     nano: ["en", "en_uk", "en_us", "es", "de", "fr"],
 };
 
-export const TranscriptionPage = () => {
+export const UploadAudioPage = () => {
     const [file, setFile] = useState<File | null>(null);
     const [options, setOptions] = useState<TranscriptionOptions>(
         defaultTranscriptionOptions

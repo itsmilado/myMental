@@ -3,8 +3,9 @@ import SignIn from "../features/auth/pages/Sign-In";
 import SignUp from "../features/auth/pages/SignUp";
 import Dashboard from "../pages/Dashboard";
 import ProtectedRoute from "./ProtectedRoute";
-import { TranscriptionPage } from "../features/transcription/pages/TranscriptionPage";
+import { UploadAudioPage } from "../features/transcription/pages/UploadAudioPage";
 import TranscriptionHistoryPage from "../features/transcription/pages/TranscriptionHistoryPage";
+import TranscriptionDetailPage from "../features/transcription/pages/TranscriptionDetailPage";
 // import { SignUpPage } from "../features/auth/pages/SignUpPage";
 
 const AppRoutes = () => {
@@ -25,11 +26,15 @@ const AppRoutes = () => {
             >
                 <Route
                     path="transcriptions/upload"
-                    element={<TranscriptionPage />}
+                    element={<UploadAudioPage />}
                 />
                 <Route
                     path="transcriptions/history"
                     element={<TranscriptionHistoryPage />}
+                />
+                <Route
+                    path="/dashboard/transcriptions/:id"
+                    element={<TranscriptionDetailPage />}
                 />
                 <Route
                     index
