@@ -53,13 +53,22 @@ const fetchFilteredTranscriptions = async (request, response, next) => {
             `Incoming request to ${request.method} ${request.originalUrl}`
         );
         const userId = request.session.user.id;
-        const { file_name, transcript_id, date_from, date_to } = request.query;
+        const {
+            file_name,
+            transcript_id,
+            date_from,
+            date_to,
+            order_by,
+            direction,
+        } = request.query;
         const filters = {
             user_id: userId,
             file_name,
             transcript_id,
             date_from,
             date_to,
+            order_by,
+            direction,
         };
         logger.info(
             `[transcriptionsMiddleware - fetchFilteredTranscriptions] => Filters: ${JSON.stringify(

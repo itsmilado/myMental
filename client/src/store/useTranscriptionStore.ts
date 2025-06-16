@@ -7,9 +7,14 @@ export const useTranscriptionStore = create<TranscriptionState>((set) => ({
     filters: {},
     loading: false,
     error: null,
+    sort: {
+        orderBy: "file_recorded_at",
+        direction: "desc",
+    },
     setList: (data) => set({ list: data }),
     setActive: (item) => set({ active: item }),
     setFilters: (filters) => set({ filters }),
     setLoading: (loading) => set({ loading }),
     setError: (error) => set({ error }),
+    setSort: (sort) => set({ sort }),
 }));

@@ -1,15 +1,7 @@
 // src/features/transcription/pages/TranscriptionDetailPage.tsx
 
 import { useParams, useNavigate } from "react-router-dom";
-import {
-    Box,
-    Typography,
-    Button,
-    Paper,
-    IconButton,
-    Chip,
-    Stack,
-} from "@mui/material";
+import { Box, Typography, Button, Paper, IconButton } from "@mui/material";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CloseIcon from "@mui/icons-material/Close";

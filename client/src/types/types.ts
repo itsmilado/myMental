@@ -160,15 +160,22 @@ export type Filters = {
     // dateRange?: { from: string; to: string };
 };
 
+export type SortState = {
+    orderBy: "file_recorded_at" | "file_name" | "status";
+    direction: "asc" | "desc";
+};
+
 export type TranscriptionState = {
     list: TranscriptData[];
     active: TranscriptData | null;
     filters: Filters;
     loading: boolean;
     error: string | null;
+    sort: SortState;
     setList: (data: TranscriptData[]) => void;
     setActive: (item: TranscriptData | null) => void;
     setFilters: (filters: Filters) => void;
     setLoading: (loading: boolean) => void;
     setError: (error: string | null) => void;
+    setSort: (sort: SortState) => void;
 };

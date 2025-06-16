@@ -3,6 +3,14 @@
 const pool = require("./db");
 const logger = require("../utils/logger");
 
+const ALLOWED_SORT_FIELDS = [
+    "file_recorded_at",
+    "file_name",
+    "transcript_id",
+    "created_at",
+];
+const ALLOWED_DIRECTIONS = ["asc", "desc"];
+
 const insertTranscriptionQuery = async ({
     user_id,
     file_name,
@@ -62,6 +70,12 @@ const getAllTranscriptionsQuery = async () => {
     }
 };
 
+/**
+ * Fetches filtered and sorted transcriptions for a given user.
+ * @param {object} filters - Filtering and sorting options.
+ * @returns {Promise<Array>} Array of transcription rows.
+ */
+
 const getFilteredTranscriptionsQuery = async (filters) => {
     try {
         logger.info(
@@ -92,10 +106,27 @@ const getFilteredTranscriptionsQuery = async (filters) => {
             where.push(`file_recorded_at <= $${params.length}`);
         }
 
+        let orderBy = "file_recorded_at";
+        let direction = "DESC";
+        if (
+            filters.order_by &&
+            ALLOWED_SORT_FIELDS.includes(filters.order_by)
+        ) {
+            orderBy = filters.order_by;
+        }
+        if (
+            filters.direction &&
+            ALLOWED_DIRECTIONS.includes(filters.direction.toLowerCase())
+        ) {
+            direction = filters.direction.toUpperCase();
+        }
+
         let fetchQuery = "SELECT * FROM transcriptions";
         if (where.length > 0) {
             fetchQuery += " WHERE " + where.join(" AND ");
         }
+
+        fetchQuery += ` ORDER BY ${orderBy} ${direction} LIMIT 100`;
 
         const { rows } = await pool.query(fetchQuery, params);
         logger.info(

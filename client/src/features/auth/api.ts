@@ -8,6 +8,7 @@ import {
     TranscriptData,
     AuthResponse,
     Filters,
+    SortState,
 } from "../../types/types";
 
 axios.defaults.withCredentials = true;
@@ -36,7 +37,7 @@ export const loginUser = async (
 };
 
 export const logoutUser = async () => {
-    await axios.post("http://localhost:5000/users/logout");
+    await axios.post("http://localhost:5002/users/logout");
 };
 
 export const signupUser = async (
@@ -88,9 +89,14 @@ export const uploadAudio = async (
 // fetch all transcripts for a user
 
 export const fetchUserTranscripts = async (
-    filters: Filters = {}
+    filters: Filters = {},
+    sort: SortState = { orderBy: "file_recorded_at", direction: "desc" }
 ): Promise<TranscriptData[]> => {
-    const params = { ...filters };
+    const params = {
+        ...filters,
+        order_by: sort.orderBy,
+        direction: sort.direction,
+    };
     const response = await axios.get(
         "http://localhost:5002/transcription/filtered_transcriptions",
         { params }
