@@ -12,6 +12,7 @@ const {
     fetchTranscriptionById,
     fetchTranscriptionByApiId,
     fetchApiTranscriptionById,
+    fetchFilteredTranscriptions,
 } = require("../middlewares/transcriptionsHandler");
 
 // Route to handle file upload and transcription
@@ -27,6 +28,13 @@ transcriptionRoutes.get(
     "/all_transcriptions",
     isAuthenticated,
     fetchAllTranscriptions,
+    errorHandler
+);
+
+transcriptionRoutes.get(
+    "/filtered_transcriptions",
+    isAuthenticated,
+    fetchFilteredTranscriptions,
     errorHandler
 );
 

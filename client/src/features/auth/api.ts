@@ -1,3 +1,5 @@
+// src/features/auth/api.ts
+
 import axios from "axios";
 import {
     User,
@@ -5,6 +7,7 @@ import {
     TranscriptionOptions,
     TranscriptData,
     AuthResponse,
+    Filters,
 } from "../../types/types";
 
 axios.defaults.withCredentials = true;
@@ -84,9 +87,13 @@ export const uploadAudio = async (
 
 // fetch all transcripts for a user
 
-export const fetchUserTranscripts = async (): Promise<TranscriptData[]> => {
+export const fetchUserTranscripts = async (
+    filters: Filters = {}
+): Promise<TranscriptData[]> => {
+    const params = { ...filters };
     const response = await axios.get(
-        "http://localhost:5002/transcription/all_transcriptions"
+        "http://localhost:5002/transcription/filtered_transcriptions",
+        { params }
     );
     if (response.data.success) return response.data.data as TranscriptData[];
     throw new Error(response.data.message || "Failed to fetch transcriptions");

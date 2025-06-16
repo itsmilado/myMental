@@ -150,10 +150,14 @@ export interface transcriptUploadResponse {
 }
 
 export type Filters = {
-    status?: string;
-    model?: string;
-    language?: string;
-    dateRange?: { from: string; to: string };
+    file_name?: string;
+    transcript_id?: string;
+    date_from?: string;
+    date_to?: string;
+    // status?: string;
+    // model?: string;
+    // language?: string;
+    // dateRange?: { from: string; to: string };
 };
 
 export type TranscriptionState = {

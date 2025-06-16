@@ -11,9 +11,11 @@ const {
     getAllTranscriptionsQuery,
     getTranscriptionByApiTranscriptIdQuery,
     getTranscriptionByIdQuery,
+    getFilteredTranscriptionsQuery,
 } = require("../db/transcribeQueries");
 const logger = require("../utils/logger");
 const { assemblyClient } = require("../utils/assemblyaiClient");
+const { request, response } = require("express");
 
 const fetchAllTranscriptions = async (request, response, next) => {
     try {
@@ -45,6 +47,47 @@ const fetchAllTranscriptions = async (request, response, next) => {
     }
 };
 
+const fetchFilteredTranscriptions = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`
+        );
+        const userId = request.session.user.id;
+        const { file_name, transcript_id, date_from, date_to } = request.query;
+        const filters = {
+            user_id: userId,
+            file_name,
+            transcript_id,
+            date_from,
+            date_to,
+        };
+        logger.info(
+            `[transcriptionsMiddleware - fetchFilteredTranscriptions] => Filters: ${JSON.stringify(
+                filters
+            )}`
+        );
+        const transcriptions = await getFilteredTranscriptionsQuery(filters);
+        if (!transcriptions) {
+            response
+                .status(404)
+                .json({ success: false, message: "No transcriptions found" });
+            return;
+        }
+        logger.info(
+            `[transcriptionsMiddleware - fetchFilteredTranscriptions] => Filtered Transcriptions retrieved`
+        );
+        response.status(200).json({
+            success: true,
+            message: "Transcriptions found",
+            data: transcriptions,
+        });
+    } catch (error) {
+        logger.error(
+            `[transcriptionsMiddleware - getAllTranscriptions] => Error fetching transcriptions: ${error.message}`
+        );
+        next(error);
+    }
+};
 const createTranscription = async (request, response, next) => {
     try {
         const loggedUserId = request.session.user.id;
@@ -280,4 +323,5 @@ module.exports = {
     fetchTranscriptionById,
     fetchTranscriptionByApiId,
     fetchApiTranscriptionById,
+    fetchFilteredTranscriptions,
 };

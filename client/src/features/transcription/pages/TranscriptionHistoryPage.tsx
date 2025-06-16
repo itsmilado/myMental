@@ -1,3 +1,5 @@
+// src/features/transcription/pages/TranscriptionHistoryPage.tsx
+
 import {
     Box,
     Typography,
@@ -12,6 +14,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { useTranscriptionList } from "../hooks/useTranscriptionList";
+import FilterControls from "../components/FilterControls";
 
 const TranscriptionHistoryPage = () => {
     const navigate = useNavigate();
@@ -27,6 +30,7 @@ const TranscriptionHistoryPage = () => {
             <Typography variant="h4" gutterBottom>
                 Transcription History
             </Typography>
+            <FilterControls />
             <Paper sx={{ p: 2, borderRadius: 3 }}>
                 {loading && (
                     <Box display="flex" justifyContent="center" my={3}>
