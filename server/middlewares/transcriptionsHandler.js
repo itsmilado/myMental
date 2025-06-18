@@ -15,7 +15,7 @@ const {
 } = require("../db/transcribeQueries");
 const logger = require("../utils/logger");
 const { assemblyClient } = require("../utils/assemblyaiClient");
-const { request, response } = require("express");
+const { exportTranscriptionToFile } = require("../utils/exportService");
 
 const fetchAllTranscriptions = async (request, response, next) => {
     try {
@@ -291,6 +291,60 @@ const fetchApiTranscriptionById = async (request, response, next) => {
     }
 };
 
+const exportTranscription = async (request, response, next) => {
+    try {
+        const { id } = request.params;
+        const format = (request.query.format || "txt").toLowerCase();
+        const user = request.session.user;
+
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`
+        ); // Log the request URL
+
+        // Fetch transcription
+        const transcription = await getTranscriptionByIdQuery(id);
+        if (!transcription) {
+            logger.error(
+                `[transcriptionsMiddleware - fetchApiTranscriptionById] => Error fetching transcription by ID: ${error.message}`
+            );
+            return response.status(404).json({
+                success: false,
+                message: `transcription with ID ${id} Not found`,
+            });
+        }
+        if (transcription.user_id !== user.id && user.role !== "admin") {
+            return response.status(403).json({
+                success: false,
+                message: "You are not authorized to access this resource!",
+            });
+        }
+
+        const { buffer, mime, fileName } = await exportTranscriptionToFile(
+            transcription,
+            format
+        );
+
+        logger.info(
+            `[transcriptionsMiddleware - exportTranscription] => file name: ${fileName} `
+        );
+
+        response.setHeader("Content-Type", mime);
+        response.setHeader(
+            "Content-Disposition",
+            `attachment; filename="${fileName}"`
+        );
+        response.send(buffer);
+        logger.info(
+            `[transcriptionsMiddleware - exportTranscription] User ${request.session.user.id} exported ${transcription.transcript_id} as ${format}`
+        );
+    } catch (error) {
+        logger.error(
+            `[transcriptionsMiddleware - exportTranscription] => Error exporting transcription : ${error.message}`
+        );
+        next(error);
+    }
+};
+
 // Helper functions
 
 const storeTranscriptionText = async ({ transcriptData }) => {
@@ -333,4 +387,5 @@ module.exports = {
     fetchTranscriptionByApiId,
     fetchApiTranscriptionById,
     fetchFilteredTranscriptions,
+    exportTranscription,
 };

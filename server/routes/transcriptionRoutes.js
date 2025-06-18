@@ -13,6 +13,7 @@ const {
     fetchTranscriptionByApiId,
     fetchApiTranscriptionById,
     fetchFilteredTranscriptions,
+    exportTranscription,
 } = require("../middlewares/transcriptionsHandler");
 
 // Route to handle file upload and transcription
@@ -56,6 +57,13 @@ transcriptionRoutes.get(
     "/apiTranscriptId",
     isAuthenticated,
     fetchApiTranscriptionById,
+    errorHandler
+);
+
+transcriptionRoutes.get(
+    "/export/:id",
+    isAuthenticated,
+    exportTranscription,
     errorHandler
 );
 
