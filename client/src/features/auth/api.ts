@@ -104,3 +104,25 @@ export const fetchUserTranscripts = async (
     if (response.data.success) return response.data.data as TranscriptData[];
     throw new Error(response.data.message || "Failed to fetch transcriptions");
 };
+
+export const exportTranscription = async (
+    transcriptId: string,
+    format: "txt" | "pdf" | "docx"
+): Promise<{ blob: Blob; fileName: string }> => {
+    const res = await fetch(
+        `http://localhost:5002/transcription/export/${transcriptId}?format=${format}`,
+        { credentials: "include" }
+    );
+    if (!res.ok) {
+        throw new Error("Export failed");
+    }
+    const blob = await res.blob();
+    // Try to extract filename from header
+    const cd = res.headers.get("Content-Disposition");
+    let fileName = `${transcriptId}.${format}`;
+    if (cd) {
+        const match = cd.match(/filename="?([^"]+)"?/);
+        if (match) fileName = match[1];
+    }
+    return { blob, fileName };
+};

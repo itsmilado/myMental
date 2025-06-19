@@ -27,7 +27,7 @@ const TranscriptionHistoryPage = () => {
     }, [loadTranscriptions]);
 
     return (
-        <Box sx={{ maxWidth: 600, margin: "0 auto", py: 4 }}>
+        <Box sx={{ maxWidth: 1200, margin: "0 auto", py: 4 }}>
             <Typography variant="h4" gutterBottom>
                 Transcription History
             </Typography>
@@ -38,7 +38,7 @@ const TranscriptionHistoryPage = () => {
                 error={error}
                 onRowClick={(t) => {
                     setActive(t);
-                    navigate(`/dashboard/transcriptions/${t.transcript_id}`);
+                    navigate(`/dashboard/transcriptions/${t.id}`);
                 }}
             />
         </Box>

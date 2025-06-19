@@ -84,7 +84,7 @@ const getFilteredTranscriptionsQuery = async (filters) => {
         const params = [];
         const where = [];
 
-        // always filter by user_id
+        // always filtered by user_id
         if (filters.user_id) {
             params.push(filters.user_id);
             where.push(`user_id = $${params.length}`);

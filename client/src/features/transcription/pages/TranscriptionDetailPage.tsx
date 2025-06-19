@@ -1,8 +1,16 @@
 // src/features/transcription/pages/TranscriptionDetailPage.tsx
 
 import { useParams, useNavigate } from "react-router-dom";
-import { Box, Typography, Button, Paper, IconButton } from "@mui/material";
+import {
+    Box,
+    Typography,
+    Button,
+    Paper,
+    IconButton,
+    Stack,
+} from "@mui/material";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
+import { ExportButton } from "../components/ExportButton";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CloseIcon from "@mui/icons-material/Close";
 
@@ -43,7 +51,7 @@ const TranscriptionDetailPage = () => {
         );
     }
     return (
-        <Box sx={{ maxWidth: 700, mx: "auto", py: 4 }}>
+        <Box sx={{ maxWidth: 1000, mx: "auto", py: 4 }}>
             <Paper sx={{ p: 3, borderRadius: 3 }}>
                 <Box
                     display="flex"
@@ -71,12 +79,32 @@ const TranscriptionDetailPage = () => {
                         <CloseIcon />
                     </IconButton>
                 </Box>
-                <Typography variant="h5" gutterBottom>
-                    {transcription.file_name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                    ID: {transcription.transcript_id}
-                </Typography>
+                <Stack direction="row" spacing={2} alignItems="center" mb={2}>
+                    <Typography variant="h5" gutterBottom>
+                        {transcription.file_name}
+                    </Typography>
+                    <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        gutterBottom
+                    >
+                        ID (DB): {transcription.id}
+                    </Typography>
+                    <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        gutterBottom
+                    >
+                        API ID (AssemblyAI): {transcription.transcript_id}
+                    </Typography>
+
+                    {active && (
+                        <ExportButton
+                            transcriptId={active.id}
+                            fileName={active.file_name}
+                        />
+                    )}
+                </Stack>
                 <Typography variant="body2" gutterBottom>
                     Recorded at: {transcription.file_recorded_at}
                 </Typography>

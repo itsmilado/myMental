@@ -7,13 +7,12 @@ import {
     TableRow,
     TableSortLabel,
     Paper,
-    Chip,
-    Stack,
     CircularProgress,
     Box,
 } from "@mui/material";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { TranscriptData } from "../../../types/types";
+import { ExportButton } from "./ExportButton";
 
 type Props = {
     data: TranscriptData[];
@@ -23,9 +22,12 @@ type Props = {
 };
 
 const columns = [
-    { id: "transcript_id", label: "Transcript ID" },
+    { id: "id", label: "ID" },
     { id: "file_name", label: "File Name" },
     { id: "file_recorded_at", label: "Date" },
+    { id: "transcript_id", label: "API ID (AssemblyAI)" },
+    { id: "actions", label: "Actions" }, // <- New Actions column
+
     // Add status, model, etc. as needed
 ];
 
@@ -69,17 +71,21 @@ export const TranscriptionTable = ({
                     <TableRow>
                         {columns.map((col) => (
                             <TableCell key={col.id}>
-                                <TableSortLabel
-                                    active={sort.orderBy === col.id}
-                                    direction={
-                                        sort.orderBy === col.id
-                                            ? sort.direction
-                                            : "asc"
-                                    }
-                                    onClick={() => handleSort(col.id)}
-                                >
-                                    {col.label}
-                                </TableSortLabel>
+                                {col.id !== "actions" ? (
+                                    <TableSortLabel
+                                        active={sort.orderBy === col.id}
+                                        direction={
+                                            sort.orderBy === col.id
+                                                ? sort.direction
+                                                : "asc"
+                                        }
+                                        onClick={() => handleSort(col.id)}
+                                    >
+                                        {col.label}
+                                    </TableSortLabel>
+                                ) : (
+                                    col.label
+                                )}
                             </TableCell>
                         ))}
                         {/* Add more columns as needed */}
@@ -88,17 +94,24 @@ export const TranscriptionTable = ({
                 <TableBody>
                     {data.map((t) => (
                         <TableRow
-                            key={t.transcript_id}
+                            key={t.id}
                             hover
                             sx={{ cursor: onRowClick ? "pointer" : "default" }}
                             onClick={
                                 onRowClick ? () => onRowClick(t) : undefined
                             }
                         >
-                            <TableCell>{t.transcript_id}</TableCell>
+                            <TableCell>{t.id}</TableCell>
                             <TableCell>{t.file_name}</TableCell>
                             <TableCell>{t.file_recorded_at}</TableCell>
-                            {/* Render other fields and chips */}
+                            <TableCell>{t.transcript_id}</TableCell>
+                            <TableCell>
+                                <ExportButton
+                                    transcriptId={t.id}
+                                    fileName={t.file_name}
+                                />
+                            </TableCell>
+                            {/* Render other fields and actions */}
                         </TableRow>
                     ))}
                 </TableBody>

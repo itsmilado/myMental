@@ -1,5 +1,6 @@
 // middleWares/transcriptionMiddleWare.js
 
+// Import required modules and utilities
 const { saveTranscriptionToFile } = require("../utils/fileProcessor");
 const uploadAudioFile = require("../utils/assemblyaiUploader");
 const {
@@ -16,6 +17,11 @@ const {
 const logger = require("../utils/logger");
 const { assemblyClient } = require("../utils/assemblyaiClient");
 const { exportTranscriptionToFile } = require("../utils/exportService");
+
+/**
+ * Fetch all transcriptions from the database.
+ * Logs incoming request and result.
+ */
 
 const fetchAllTranscriptions = async (request, response, next) => {
     try {
@@ -47,12 +53,17 @@ const fetchAllTranscriptions = async (request, response, next) => {
     }
 };
 
+/**
+ * Fetch filtered transcriptions based on query parameters and user session.
+ * Logs incoming request, filters, and result.
+ */
 const fetchFilteredTranscriptions = async (request, response, next) => {
     try {
         logger.info(
             `Incoming request to ${request.method} ${request.originalUrl}`
         );
         const userId = request.session.user.id;
+        // Extract filters from query parameters
         const {
             file_name,
             transcript_id,
@@ -97,6 +108,12 @@ const fetchFilteredTranscriptions = async (request, response, next) => {
         next(error);
     }
 };
+
+/**
+ * Create a new transcription from an uploaded audio file.
+ * Handles file upload, transcription request, polling, DB storage, and file export.
+ * Logs all major steps and errors.
+ */
 const createTranscription = async (request, response, next) => {
     try {
         const loggedUserId = request.session.user.id;
@@ -104,6 +121,7 @@ const createTranscription = async (request, response, next) => {
         const rawDate = request.body.fileModifiedDate; // safe for DB
         const fileModifiedDate = rawDate ? new Date(rawDate) : "00.00.00";
 
+        // Format date for display
         const fileModifiedDisplayDate = fileModifiedDate
             .toLocaleString("en-GB")
             .replace(/\//g, ".");
@@ -121,6 +139,7 @@ const createTranscription = async (request, response, next) => {
             )}`
         );
 
+        // Parse user options from request body
         let userOptions = {};
         userOptions =
             typeof request.body.options === "string"
@@ -130,6 +149,7 @@ const createTranscription = async (request, response, next) => {
         // Upload the audio file to AssemblyAI API
         const uploadUrl = await uploadAudioFile(filePath);
 
+        // Prepare transcription options for API
         const transcriptionOptions = {
             audio_url: uploadUrl,
             ...userOptions,
@@ -141,7 +161,7 @@ const createTranscription = async (request, response, next) => {
             )}`
         );
 
-        // Request a transcription
+        // Request a transcription from AssemblyAI
         const transcriptId = await requestTranscription(transcriptionOptions);
 
         // Poll for transcription result
@@ -166,7 +186,7 @@ const createTranscription = async (request, response, next) => {
             fileModifiedDisplayDate
         );
 
-        // Send response
+        // Send response to client
         response.status(200).json({
             success: true,
             message: `Transcription created and stored successfully at: ${storedTxtfilePath}`,
@@ -178,6 +198,10 @@ const createTranscription = async (request, response, next) => {
     }
 };
 
+/**
+ * Fetch a transcription by its database ID.
+ * Logs request, result, and errors.
+ */
 const fetchTranscriptionById = async (request, response, next) => {
     try {
         logger.info(
@@ -212,6 +236,10 @@ const fetchTranscriptionById = async (request, response, next) => {
     }
 };
 
+/**
+ * Fetch a transcription by its AssemblyAI API transcript ID.
+ * Logs request, result, and errors.
+ */
 const fetchTranscriptionByApiId = async (request, response, next) => {
     try {
         const { transcriptId } = request.params;
@@ -250,6 +278,10 @@ const fetchTranscriptionByApiId = async (request, response, next) => {
     }
 };
 
+/**
+ * Fetch a transcription directly from the AssemblyAI API by transcript_id.
+ * Logs request, result, and errors.
+ */
 const fetchApiTranscriptionById = async (request, response, next) => {
     try {
         const { transcript_id } = request.body;
@@ -291,6 +323,10 @@ const fetchApiTranscriptionById = async (request, response, next) => {
     }
 };
 
+/**
+ * Export a transcription in the requested format (txt, etc.).
+ * Checks user authorization and logs all steps.
+ */
 const exportTranscription = async (request, response, next) => {
     try {
         const { id } = request.params;
@@ -312,6 +348,7 @@ const exportTranscription = async (request, response, next) => {
                 message: `transcription with ID ${id} Not found`,
             });
         }
+        // Check user authorization
         if (transcription.user_id !== user.id && user.role !== "admin") {
             return response.status(403).json({
                 success: false,
@@ -319,6 +356,7 @@ const exportTranscription = async (request, response, next) => {
             });
         }
 
+        // Export transcription to file
         const { buffer, mime, fileName } = await exportTranscriptionToFile(
             transcription,
             format
@@ -347,9 +385,16 @@ const exportTranscription = async (request, response, next) => {
 
 // Helper functions
 
+/**
+ * Helper to store transcription text in the database.
+ * Converts utterances to plain text and inserts into DB.
+ * @param {Object} transcriptData - Data containing transcript object and metadata.
+ * @returns {Object} Inserted transcription record.
+ */
 const storeTranscriptionText = async ({ transcriptData }) => {
     try {
         let transcriptionText = "";
+        // Concatenate all utterances into a single text block
         for (let utterance of transcriptData.transcriptObject.utterances) {
             transcriptionText += `Speaker ${utterance.speaker}: ${utterance.text}\n`;
         }
@@ -380,6 +425,7 @@ const storeTranscriptionText = async ({ transcriptData }) => {
     }
 };
 
+// Export all middleware functions for use in routes
 module.exports = {
     createTranscription,
     fetchAllTranscriptions,
