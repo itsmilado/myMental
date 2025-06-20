@@ -13,6 +13,7 @@ const {
     getTranscriptionByApiTranscriptIdQuery,
     getTranscriptionByIdQuery,
     getFilteredTranscriptionsQuery,
+    deleteTranscriptionByIdQuery,
 } = require("../db/transcribeQueries");
 const logger = require("../utils/logger");
 const { assemblyClient } = require("../utils/assemblyaiClient");
@@ -425,6 +426,53 @@ const storeTranscriptionText = async ({ transcriptData }) => {
     }
 };
 
+const deleteDBTranscription = async (request, response, next) => {
+    try {
+        const { id } = request.params;
+        const user = request.session.user;
+
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`
+        ); // Log the request URL
+
+        const transcription = await getTranscriptionByIdQuery(id);
+        if (!transcription) {
+            logger.error(
+                `[transcriptionsMiddleware - fetchApiTranscriptionById] => transcription with ID ${id} Not found`
+            );
+            return response.status(404).json({
+                success: false,
+                message: `transcription with ID ${id} Not found`,
+            });
+        }
+        if (transcription.user_id !== user.id && user.role !== "admin") {
+            return response.status(403).json({
+                success: false,
+                message: "You are not Not Authorized to access this resource!.",
+            });
+        }
+
+        // Only delete from DB
+        const transcriptionDeleted = await deleteTranscriptionByIdQuery(id);
+        if (!transcriptionDeleted) {
+            logger.error(
+                `[transcriptionsMiddleware - deleteDBTranscription] => Error delete transcription by ID: ${error.message}`
+            );
+            next(error);
+        }
+        logger.info(
+            `[deleteTranscription] User ${user.id} deleted transcription ${id} from database`
+        );
+        // remove associated local files here
+        response.json({
+            success: true,
+            message: `transcription with ID ${id} successfully deleted.`,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Export all middleware functions for use in routes
 module.exports = {
     createTranscription,
@@ -434,4 +482,5 @@ module.exports = {
     fetchApiTranscriptionById,
     fetchFilteredTranscriptions,
     exportTranscription,
+    deleteDBTranscription,
 };

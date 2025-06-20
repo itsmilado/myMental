@@ -195,10 +195,24 @@ const getTranscriptionByIdQuery = async (id) => {
     }
 };
 
+const deleteTranscriptionByIdQuery = async (id) => {
+    try {
+        await pool.query("DELETE FROM transcriptions WHERE id = $1", [id]);
+        return true;
+    } catch (error) {
+        logger.error(
+            `[transcribeQueries > getTranscriptionByIdQuery] => Error getting transcription by ID: ${error.message}`
+        );
+
+        throw error;
+    }
+};
+
 module.exports = {
     insertTranscriptionQuery,
     getAllTranscriptionsQuery,
     getTranscriptionByApiTranscriptIdQuery,
     getTranscriptionByIdQuery,
     getFilteredTranscriptionsQuery,
+    deleteTranscriptionByIdQuery,
 };

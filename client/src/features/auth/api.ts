@@ -107,22 +107,40 @@ export const fetchUserTranscripts = async (
 
 export const exportTranscription = async (
     transcriptId: string,
-    format: "txt" | "pdf" | "docx"
+    format: "txt" | "pdf" | "docx",
+    fallbackFileName?: string
 ): Promise<{ blob: Blob; fileName: string }> => {
-    const res = await fetch(
+    const res = await axios.get(
         `http://localhost:5002/transcription/export/${transcriptId}?format=${format}`,
-        { credentials: "include" }
+        { responseType: "blob" }
     );
-    if (!res.ok) {
-        throw new Error("Export failed");
-    }
-    const blob = await res.blob();
     // Try to extract filename from header
-    const cd = res.headers.get("Content-Disposition");
-    let fileName = `${transcriptId}.${format}`;
+    const cd = res.headers["content-disposition"];
+    let fileName = fallbackFileName
+        ? `${fallbackFileName.replace(
+              /\.[^/.]+$/,
+              ""
+          )}-${transcriptId}.${format}`
+        : `${transcriptId}.${format}`;
     if (cd) {
         const match = cd.match(/filename="?([^"]+)"?/);
         if (match) fileName = match[1];
     }
-    return { blob, fileName };
+    return { blob: res.data, fileName };
+};
+
+export const deleteTranscription = async (id: string): Promise<string> => {
+    try {
+        const response = await axios.delete(
+            `http://localhost:5002/transcription/delete/dbTranscription/${id}`
+        );
+        if (!response.data.success) {
+            throw new Error(response.data.message || "Delete failed");
+        }
+        return response.data.message;
+    } catch (error: any) {
+        const message =
+            error.response?.data?.message || error.message || "Delete failed";
+        throw new Error(message);
+    }
 };

@@ -17,4 +17,11 @@ export const useTranscriptionStore = create<TranscriptionState>((set) => ({
     setLoading: (loading) => set({ loading }),
     setError: (error) => set({ error }),
     setSort: (sort) => set({ sort }),
+    removeTranscriptionFromList: (id) =>
+        set((state) => ({
+            list: state.list.filter((t) => t.id !== id),
+            // clear active if it's the deleted item:
+            active:
+                state.active && state.active.id === id ? null : state.active,
+        })),
 }));

@@ -14,6 +14,7 @@ const {
     fetchApiTranscriptionById,
     fetchFilteredTranscriptions,
     exportTranscription,
+    deleteDBTranscription,
 } = require("../middlewares/transcriptionsHandler");
 
 // Route to handle file upload and transcription
@@ -64,6 +65,13 @@ transcriptionRoutes.get(
     "/export/:id",
     isAuthenticated,
     exportTranscription,
+    errorHandler
+);
+
+transcriptionRoutes.delete(
+    "/delete/dbTranscription/:id",
+    isAuthenticated,
+    deleteDBTranscription,
     errorHandler
 );
 

@@ -10,7 +10,6 @@ export const useTranscriptionList = () => {
     const loadTranscriptions = useCallback(async () => {
         setLoading(true);
         setError(null);
-
         try {
             const data = await fetchUserTranscripts(filters, sort);
             setList(data);
@@ -23,8 +22,9 @@ export const useTranscriptionList = () => {
 
     // Fetch on mount and whenever filters or sort change
     useEffect(() => {
+        console.log("Fetching user transcriptions", filters, sort);
         loadTranscriptions();
-    }, [loadTranscriptions]);
+    }, [filters, sort, loadTranscriptions]);
 
     return { loadTranscriptions };
 };

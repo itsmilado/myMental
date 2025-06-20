@@ -36,10 +36,6 @@ const AppRoutes = () => {
                     path="/dashboard/transcriptions/:id"
                     element={<TranscriptionDetailPage />}
                 />
-                <Route
-                    index
-                    element={<Navigate to="transcriptions/history" replace />}
-                />
             </Route>
         </Routes>
     );

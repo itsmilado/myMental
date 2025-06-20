@@ -1,5 +1,6 @@
 // src/features/transcription/pages/TranscriptionDetailPage.tsx
 
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     Box,
@@ -8,16 +9,27 @@ import {
     Paper,
     IconButton,
     Stack,
+    Snackbar,
+    Alert,
 } from "@mui/material";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { ExportButton } from "../components/ExportButton";
+import { DeleteButton } from "../components/DeleteButton";
+import { deleteTranscription } from "../../auth/api";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CloseIcon from "@mui/icons-material/Close";
 
 const TranscriptionDetailPage = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { list, active, setActive } = useTranscriptionStore();
+    const { list, active, setActive, removeTranscriptionFromList } =
+        useTranscriptionStore();
+
+    const [snackbar, setSnackbar] = useState<{
+        open: boolean;
+        message: string;
+        error?: boolean;
+    }>({ open: false, message: "" });
 
     // Find the transcription with the given id
     const transcription = active || list.find((t) => t.transcript_id === id);
@@ -50,6 +62,25 @@ const TranscriptionDetailPage = () => {
             </Box>
         );
     }
+
+    // Delete handler
+    const handleDelete = async () => {
+        try {
+            const msg = await deleteTranscription(transcription.id);
+            removeTranscriptionFromList(transcription.id);
+            setSnackbar({ open: true, message: msg });
+            // Navigate AFTER success, and DO NOT call setActive(null)
+            navigate("/dashboard/transcriptions/history", { replace: true });
+            return msg;
+        } catch (error: any) {
+            setSnackbar({
+                open: true,
+                message: error.message || "Delete failed",
+                error: true,
+            });
+            throw error;
+        }
+    };
     return (
         <Box sx={{ maxWidth: 1000, mx: "auto", py: 4 }}>
             <Paper sx={{ p: 3, borderRadius: 3 }}>
@@ -99,44 +130,19 @@ const TranscriptionDetailPage = () => {
                     </Typography>
 
                     {active && (
-                        <ExportButton
-                            transcriptId={active.id}
-                            fileName={active.file_name}
-                        />
+                        <>
+                            <ExportButton
+                                transcriptId={active.id}
+                                fileName={active.file_name}
+                            />
+                            <DeleteButton onDelete={handleDelete} />
+                        </>
                     )}
                 </Stack>
                 <Typography variant="body2" gutterBottom>
                     Recorded at: {transcription.file_recorded_at}
                 </Typography>
-                {/* <Stack direction="row" spacing={1} mb={2}>
-                    {transcription.speaker_labels && (
-                        <Chip label="Speaker Labels" />
-                    )}
-                    {transcription.sentiment_analysis && (
-                        <Chip label="Sentiment" />
-                    )}
-                    {transcription.entity_detection && (
-                        <Chip label="Entities" />
-                    )}
-                    {transcription.speech_model && (
-                        <Chip label={`Model: ${transcription.speech_model}`} />
-                    )}
-                    {transcription.language_code && (
-                        <Chip label={`Lang: ${transcription.language_code}`} />
-                    )}
-                    {transcription.status && (
-                        <Chip
-                            label={transcription.status}
-                            color={
-                                transcription.status === "completed"
-                                    ? "success"
-                                    : transcription.status === "failed"
-                                    ? "error"
-                                    : "warning"
-                            }
-                        />
-                    )}
-                </Stack> */}
+
                 <Typography variant="subtitle2" sx={{ mt: 2 }}>
                     Transcription:
                 </Typography>
@@ -144,6 +150,19 @@ const TranscriptionDetailPage = () => {
                     {transcription.transcription}
                 </Typography>
             </Paper>
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={2500}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            >
+                <Alert
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
+                    severity={snackbar.error ? "error" : "success"}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

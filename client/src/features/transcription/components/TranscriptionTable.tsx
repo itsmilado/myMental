@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
     Table,
     TableBody,
@@ -13,6 +14,8 @@ import {
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { TranscriptData } from "../../../types/types";
 import { ExportButton } from "./ExportButton";
+import { DeleteButton } from "./DeleteButton";
+import { deleteTranscription } from "../../auth/api";
 
 type Props = {
     data: TranscriptData[];
@@ -38,6 +41,14 @@ export const TranscriptionTable = ({
     onRowClick,
 }: Props) => {
     const { sort, setSort } = useTranscriptionStore();
+    const removeTranscriptionFromList = useTranscriptionStore(
+        (s) => s.removeTranscriptionFromList
+    );
+    const [snackbar, setSnackbar] = useState<{
+        open: boolean;
+        message: string;
+        error?: boolean;
+    }>({ open: false, message: "" });
 
     const handleSort = (col: string) => {
         if (sort.orderBy === col) {
@@ -65,57 +76,89 @@ export const TranscriptionTable = ({
     if (!data.length) return <Box p={2}>No transcriptions found.</Box>;
 
     return (
-        <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
-            <Table>
-                <TableHead>
-                    <TableRow>
-                        {columns.map((col) => (
-                            <TableCell key={col.id}>
-                                {col.id !== "actions" ? (
-                                    <TableSortLabel
-                                        active={sort.orderBy === col.id}
-                                        direction={
-                                            sort.orderBy === col.id
-                                                ? sort.direction
-                                                : "asc"
-                                        }
-                                        onClick={() => handleSort(col.id)}
-                                    >
-                                        {col.label}
-                                    </TableSortLabel>
-                                ) : (
-                                    col.label
-                                )}
-                            </TableCell>
-                        ))}
-                        {/* Add more columns as needed */}
-                    </TableRow>
-                </TableHead>
-                <TableBody>
-                    {data.map((t) => (
-                        <TableRow
-                            key={t.id}
-                            hover
-                            sx={{ cursor: onRowClick ? "pointer" : "default" }}
-                            onClick={
-                                onRowClick ? () => onRowClick(t) : undefined
-                            }
-                        >
-                            <TableCell>{t.id}</TableCell>
-                            <TableCell>{t.file_name}</TableCell>
-                            <TableCell>{t.file_recorded_at}</TableCell>
-                            <TableCell>{t.transcript_id}</TableCell>
-                            <TableCell>
-                                <ExportButton
-                                    transcriptId={t.id}
-                                    fileName={t.file_name}
-                                />
-                            </TableCell>
-                            {/* Render other fields and actions */}
+        <>
+            <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            {columns.map((col) => (
+                                <TableCell key={col.id}>
+                                    {col.id !== "actions" ? (
+                                        <TableSortLabel
+                                            active={sort.orderBy === col.id}
+                                            direction={
+                                                sort.orderBy === col.id
+                                                    ? sort.direction
+                                                    : "asc"
+                                            }
+                                            onClick={() => handleSort(col.id)}
+                                        >
+                                            {col.label}
+                                        </TableSortLabel>
+                                    ) : (
+                                        col.label
+                                    )}
+                                </TableCell>
+                            ))}
+                            {/* Add more columns as needed */}
                         </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </TableContainer>
+                    </TableHead>
+                    <TableBody>
+                        {data.map((t) => (
+                            <TableRow
+                                key={t.id}
+                                hover
+                                sx={{
+                                    cursor: onRowClick ? "pointer" : "default",
+                                }}
+                                onClick={
+                                    onRowClick ? () => onRowClick(t) : undefined
+                                }
+                            >
+                                <TableCell>{t.id}</TableCell>
+                                <TableCell>{t.file_name}</TableCell>
+                                <TableCell>{t.file_recorded_at}</TableCell>
+                                <TableCell>{t.transcript_id}</TableCell>
+                                <TableCell>
+                                    <ExportButton
+                                        transcriptId={t.id}
+                                        fileName={t.file_name}
+                                    />
+                                    <DeleteButton
+                                        onDelete={async () => {
+                                            try {
+                                                const msg =
+                                                    await deleteTranscription(
+                                                        t.id
+                                                    );
+                                                removeTranscriptionFromList(
+                                                    t.id
+                                                );
+                                                setSnackbar({
+                                                    open: true,
+                                                    message: msg,
+                                                    error: false,
+                                                });
+                                                return msg;
+                                            } catch (error: any) {
+                                                setSnackbar({
+                                                    open: true,
+                                                    message:
+                                                        error.message ||
+                                                        "Delete failed",
+                                                    error: true,
+                                                });
+                                                throw error;
+                                            }
+                                        }}
+                                    />
+                                </TableCell>
+                                {/* Render other fields and actions */}
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+        </>
     );
 };

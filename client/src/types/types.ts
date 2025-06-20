@@ -178,4 +178,5 @@ export type TranscriptionState = {
     setLoading: (loading: boolean) => void;
     setError: (error: string | null) => void;
     setSort: (sort: SortState) => void;
+    removeTranscriptionFromList: (id: string) => void;
 };

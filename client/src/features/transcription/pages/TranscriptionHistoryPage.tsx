@@ -1,16 +1,6 @@
 // src/features/transcription/pages/TranscriptionHistoryPage.tsx
 
-import {
-    Box,
-    Typography,
-    List,
-    ListItem,
-    ListItemText,
-    CircularProgress,
-    Alert,
-    Paper,
-} from "@mui/material";
-import { useEffect } from "react";
+import { Box, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { useTranscriptionList } from "../hooks/useTranscriptionList";
@@ -20,11 +10,8 @@ import FilterControls from "../components/FilterControls";
 const TranscriptionHistoryPage = () => {
     const navigate = useNavigate();
     const { list, loading, error, setActive } = useTranscriptionStore();
-    const { loadTranscriptions } = useTranscriptionList();
 
-    useEffect(() => {
-        loadTranscriptions();
-    }, [loadTranscriptions]);
+    useTranscriptionList(); // <-- hook auto-fetches
 
     return (
         <Box sx={{ maxWidth: 1200, margin: "0 auto", py: 4 }}>
