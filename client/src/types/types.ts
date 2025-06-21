@@ -180,3 +180,15 @@ export type TranscriptionState = {
     setSort: (sort: SortState) => void;
     removeTranscriptionFromList: (id: string) => void;
 };
+
+export type OnlineTranscription = {
+    transcript_id: string;
+    created_at: string;
+    status: string;
+    project?: string;
+    audio_url: string;
+    audio_duration?: string;
+    speech_model: string;
+    language: string;
+    features?: string[];
+};

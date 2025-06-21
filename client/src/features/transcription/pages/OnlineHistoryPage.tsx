@@ -1,17 +1,31 @@
 // src/features/transcription/pages/OnlineHistoryPage.tsx
 
-import { Typography, Paper, Box } from "@mui/material";
+import * as React from "react";
+import { Box, Paper } from "@mui/material";
+import { mockOnlineTranscriptions } from "../mock/mockOnlineTranscriptions";
+import { OnlineTranscriptionTable } from "../components/OnlineTranscriptionTable";
+import { OnlineTranscriptionSidebar } from "../components/OnlineTranscriptionSidebar";
+import { OnlineTranscription } from "../../../types/types";
 
-const OnlineHistoryPage = () => {
+export const OnlineHistoryPage = () => {
+    const [selected, setSelected] = React.useState<OnlineTranscription | null>(
+        null
+    );
+
     return (
-        <Paper sx={{ p: 4, borderRadius: 3 }}>
-            <Typography variant="h4" gutterBottom>
+        <Paper sx={{ p: 3, borderRadius: 3, position: "relative" }}>
+            <Box mb={2} fontSize={24} fontWeight={600}>
                 Online Transcription History
-            </Typography>
-            <Box mt={2}>
-                {/* Table, sidebar, etc. to be implemented next */}
-                Coming soon...
             </Box>
+            <OnlineTranscriptionTable
+                data={mockOnlineTranscriptions}
+                onDetails={setSelected}
+            />
+            <OnlineTranscriptionSidebar
+                open={!!selected}
+                transcription={selected}
+                onClose={() => setSelected(null)}
+            />
         </Paper>
     );
 };
