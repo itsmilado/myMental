@@ -1,13 +1,12 @@
 // src/features/transcriptions/hooks/useTranscriptionList.ts
 
-import { useCallback, useEffect } from "react";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { fetchUserTranscripts } from "../../auth/api";
 
 export const useTranscriptionList = () => {
     const { setList, setLoading, setError, filters, sort } =
         useTranscriptionStore();
-    const loadTranscriptions = useCallback(async () => {
+    const loadTranscriptions = async () => {
         setLoading(true);
         setError(null);
         try {
@@ -18,13 +17,7 @@ export const useTranscriptionList = () => {
         } finally {
             setLoading(false);
         }
-    }, [filters, sort, setList, setLoading, setError]);
-
-    // Fetch on mount and whenever filters or sort change
-    useEffect(() => {
-        console.log("Fetching user transcriptions", filters, sort);
-        loadTranscriptions();
-    }, [filters, sort, loadTranscriptions]);
+    };
 
     return { loadTranscriptions };
 };

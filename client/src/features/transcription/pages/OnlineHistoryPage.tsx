@@ -1,6 +1,6 @@
 // src/features/transcription/pages/OnlineHistoryPage.tsx
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
     Box,
     Paper,
@@ -10,8 +10,10 @@ import {
     TextField,
     IconButton,
     InputAdornment,
+    Button,
 } from "@mui/material";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import { useAssemblyTranscriptionStore } from "../../../store/useAssemblyTranscriptionStore";
 import { useAssemblyTranscriptionList } from "../hooks/useAssemblyTranscriptionList";
 import { OnlineTranscriptionTable } from "../components/OnlineTranscriptionTable";
@@ -23,7 +25,11 @@ const OnlineHistoryPage = () => {
         useAssemblyTranscriptionStore();
     const [selected, setSelected] = useState<OnlineTranscription | null>(null);
 
-    useAssemblyTranscriptionList();
+    const { loadAssemblyTranscriptions } = useAssemblyTranscriptionList();
+
+    const handleSync = () => {
+        loadAssemblyTranscriptions();
+    };
 
     const handleSearch = () => {
         // searchId state already triggers effect in hook
@@ -31,13 +37,29 @@ const OnlineHistoryPage = () => {
 
     return (
         <Paper sx={{ p: 3, borderRadius: 3, position: "relative" }}>
-            <Box mb={2} fontSize={24} fontWeight={600}>
-                Online Transcription History
+            <Box
+                display="flex"
+                alignItems="center"
+                justifyContent="space-between"
+                mb={2}
+            >
+                <Box fontSize={24} fontWeight={600}>
+                    Online Transcription History
+                </Box>
+                <Button
+                    startIcon={<RefreshIcon />}
+                    onClick={handleSync}
+                    disabled={loading}
+                    variant="outlined"
+                    size="small"
+                >
+                    {loading ? "Syncing..." : "Sync"}
+                </Button>
             </Box>
             <Box display="flex" alignItems="center" mb={2} gap={2}>
                 <TextField
                     size="small"
-                    label="Transcript ID"
+                    label="Search by Transcript ID"
                     value={searchId}
                     onChange={(e) => setSearchId(e.target.value)}
                     onKeyDown={(e) => {
@@ -60,6 +82,7 @@ const OnlineHistoryPage = () => {
                         },
                     }}
                     sx={{ width: 280 }}
+                    disabled={loading || !list.length}
                 />
             </Box>
             {loading ? (
@@ -69,8 +92,11 @@ const OnlineHistoryPage = () => {
             ) : error ? (
                 <Alert severity="error">{error}</Alert>
             ) : list.length === 0 ? (
-                <Typography color="text.secondary">
-                    No online transcriptions found.
+                <Typography
+                    color="text.secondary"
+                    sx={{ py: 6, textAlign: "center" }}
+                >
+                    Please sync to load online transcriptions.
                 </Typography>
             ) : (
                 <OnlineTranscriptionTable data={list} onDetails={setSelected} />
