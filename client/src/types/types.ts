@@ -192,3 +192,14 @@ export type OnlineTranscription = {
     language: string;
     features?: string[];
 };
+
+export type AssemblyTranscriptionState = {
+    list: OnlineTranscription[];
+    loading: boolean;
+    error: string | null;
+    searchId: string;
+    setList: (data: OnlineTranscription[]) => void;
+    setLoading: (loading: boolean) => void;
+    setError: (err: string | null) => void;
+    setSearchId: (id: string) => void;
+};

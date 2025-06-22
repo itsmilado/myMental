@@ -1,3 +1,5 @@
+// /src/store/useTranscriptionStore.ts
+
 import { create } from "zustand";
 import { TranscriptionState } from "../types/types";
 

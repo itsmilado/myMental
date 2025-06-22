@@ -15,6 +15,7 @@ const {
     fetchFilteredTranscriptions,
     exportTranscription,
     deleteDBTranscription,
+    fetchAssemblyAIHistory,
 } = require("../middlewares/transcriptionsHandler");
 
 // Route to handle file upload and transcription
@@ -72,6 +73,13 @@ transcriptionRoutes.delete(
     "/delete/dbTranscription/:id",
     isAuthenticated,
     deleteDBTranscription,
+    errorHandler
+);
+
+transcriptionRoutes.get(
+    "/assemblyai/history",
+    isAuthenticated,
+    fetchAssemblyAIHistory,
     errorHandler
 );
 

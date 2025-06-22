@@ -1,6 +1,5 @@
-// /features/transcription/components/OnlineTranscriptionTable.tsx
+// src/features/transcription/components/OnlineTranscriptionTable.tsx
 
-import * as React from "react";
 import {
     Table,
     TableHead,
@@ -10,6 +9,7 @@ import {
     IconButton,
     Tooltip,
     Box,
+    Link,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
@@ -17,72 +17,89 @@ import { OnlineTranscription } from "../../../types/types";
 
 type Props = {
     data: OnlineTranscription[];
-    onDetails: (transcription: OnlineTranscription) => void;
+    onDetails: (t: OnlineTranscription) => void;
 };
 
-export const OnlineTranscriptionTable: React.FC<Props> = ({
-    data,
-    onDetails,
-}) => {
-    const handleCopy = (id: string) => {
+export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
+    const handleIdCopy = (id: string) => {
         navigator.clipboard.writeText(id);
     };
 
+    const handleUrlCopy = (url: string) => {
+        navigator.clipboard.writeText(url);
+    };
+
+    if (!data.length) {
+        return <Box p={2}>No online transcriptions found.</Box>;
+    }
+
     return (
-        <Box>
-            <Table size="small">
-                <TableHead>
-                    <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell>Transcript ID</TableCell>
-                        <TableCell>Project</TableCell>
-                        <TableCell>Audio URL</TableCell>
-                        <TableCell align="center">Actions</TableCell>
-                    </TableRow>
-                </TableHead>
-                <TableBody>
-                    {data.map((t) => (
-                        <TableRow hover key={t.transcript_id}>
-                            <TableCell>{t.created_at}</TableCell>
-                            <TableCell>{t.status}</TableCell>
-                            <TableCell>
+        <Table size="small">
+            <TableHead>
+                <TableRow>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Transcript ID</TableCell>
+                    <TableCell>Audio Length</TableCell>
+                    <TableCell>Audio URL</TableCell>
+                    <TableCell align="center">Details</TableCell>
+                </TableRow>
+            </TableHead>
+            <TableBody>
+                {data.map((t) => (
+                    <TableRow key={t.transcript_id} hover>
+                        <TableCell>
+                            {new Date(t.created_at).toLocaleString()}
+                        </TableCell>
+                        <TableCell>{t.status}</TableCell>
+                        <TableCell>
+                            <Box display="flex" alignItems="center">
                                 {t.transcript_id}
                                 <Tooltip title="Copy Transcript ID">
                                     <IconButton
                                         size="small"
                                         onClick={() =>
-                                            handleCopy(t.transcript_id)
+                                            handleIdCopy(t.transcript_id)
                                         }
                                         sx={{ ml: 1 }}
                                     >
                                         <ContentCopyIcon fontSize="small" />
                                     </IconButton>
                                 </Tooltip>
-                            </TableCell>
-                            <TableCell>{t.project || "-"}</TableCell>
-                            <TableCell>
-                                <a
-                                    href={t.audio_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >
-                                    Audio
-                                </a>
-                            </TableCell>
-                            <TableCell align="center">
+                            </Box>
+                        </TableCell>
+                        <TableCell>{t.audio_duration || "-"}</TableCell>
+                        <TableCell>
+                            <Link
+                                href={t.audio_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                underline="hover"
+                            >
+                                {t.audio_url}
+                            </Link>
+                            <Tooltip title="Copy Audio URL">
                                 <IconButton
                                     size="small"
-                                    onClick={() => onDetails(t)}
-                                    aria-label="Show details"
+                                    onClick={() => handleUrlCopy(t.audio_url)}
+                                    sx={{ ml: 1 }}
                                 >
-                                    <ChevronRightIcon />
+                                    <ContentCopyIcon fontSize="small" />
                                 </IconButton>
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </Box>
+                            </Tooltip>
+                        </TableCell>
+                        <TableCell align="center">
+                            <IconButton
+                                size="small"
+                                onClick={() => onDetails(t)}
+                                aria-label="Show details"
+                            >
+                                <ChevronRightIcon />
+                            </IconButton>
+                        </TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
     );
 };

@@ -17,6 +17,7 @@ const {
 } = require("../db/transcribeQueries");
 const logger = require("../utils/logger");
 const { assemblyClient } = require("../utils/assemblyaiClient");
+const { fetchAssemblyHistory } = require("../utils/assemblyaiHistory");
 const { exportTranscriptionToFile } = require("../utils/exportService");
 
 /**
@@ -203,6 +204,7 @@ const createTranscription = async (request, response, next) => {
  * Fetch a transcription by its database ID.
  * Logs request, result, and errors.
  */
+
 const fetchTranscriptionById = async (request, response, next) => {
     try {
         logger.info(
@@ -384,48 +386,6 @@ const exportTranscription = async (request, response, next) => {
     }
 };
 
-// Helper functions
-
-/**
- * Helper to store transcription text in the database.
- * Converts utterances to plain text and inserts into DB.
- * @param {Object} transcriptData - Data containing transcript object and metadata.
- * @returns {Object} Inserted transcription record.
- */
-const storeTranscriptionText = async ({ transcriptData }) => {
-    try {
-        let transcriptionText = "";
-        // Concatenate all utterances into a single text block
-        for (let utterance of transcriptData.transcriptObject.utterances) {
-            transcriptionText += `Speaker ${utterance.speaker}: ${utterance.text}\n`;
-        }
-        logger.info(`
-            [transcriptionMiddleware - createTranscription - storeTranscriptionText] => Transcription utterance text done.
-            `);
-
-        const transcriptionDataToInsert = {
-            transcription: transcriptionText,
-            ...transcriptData,
-        };
-        const insertedTranscription = await insertTranscriptionQuery({
-            ...transcriptionDataToInsert,
-        });
-
-        logger.info(
-            `Transcription stored in database. insertedTranscription: ${JSON.stringify(
-                insertedTranscription.transcript_id
-            )} Text: ${insertedTranscription.transcription}`
-        );
-
-        return insertedTranscription;
-    } catch (error) {
-        logger.error(
-            `[transcriptionsMiddleware - storeTranscriptionText] => Error storing transcription: ${error.message}`
-        );
-        throw error;
-    }
-};
-
 const deleteDBTranscription = async (request, response, next) => {
     try {
         const { id } = request.params;
@@ -473,6 +433,80 @@ const deleteDBTranscription = async (request, response, next) => {
     }
 };
 
+const fetchAssemblyAIHistory = async (request, response, next) => {
+    try {
+        const user = request.session.user;
+        const { transcript_id } = request.query;
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`
+        ); // Log the request URL
+        const transcriptions = await fetchAssemblyHistory();
+
+        if (!transcriptions) {
+            response.status(500).json({
+                success: false,
+                message: "Error fetching transcription from API by ID",
+            });
+            throw new Error("Error fetching transcription from API by ID");
+        }
+        logger.info(
+            `[transcriptionsMiddleware - fetchAssemblyAIHistory] => Retrieved API Transcriptions: ${transcriptions}`
+        );
+        response.status(200).json({
+            success: true,
+            message: "API Transcription fetched successfully",
+            data: transcriptions,
+        });
+    } catch (error) {
+        logger.error(
+            `[transcriptionsMiddleware - fetchAssemblyAIHistory] => Error fetching transcriptions: ${error.message}`
+        );
+        next(error);
+    }
+};
+
+// Helper functions
+
+/**
+ * Helper to store transcription text in the database.
+ * Converts utterances to plain text and inserts into DB.
+ * @param {Object} transcriptData - Data containing transcript object and metadata.
+ * @returns {Object} Inserted transcription record.
+ */
+const storeTranscriptionText = async ({ transcriptData }) => {
+    try {
+        let transcriptionText = "";
+        // Concatenate all utterances into a single text block
+        for (let utterance of transcriptData.transcriptObject.utterances) {
+            transcriptionText += `Speaker ${utterance.speaker}: ${utterance.text}\n`;
+        }
+        logger.info(`
+            [transcriptionMiddleware - createTranscription - storeTranscriptionText] => Transcription utterance text done.
+            `);
+
+        const transcriptionDataToInsert = {
+            transcription: transcriptionText,
+            ...transcriptData,
+        };
+        const insertedTranscription = await insertTranscriptionQuery({
+            ...transcriptionDataToInsert,
+        });
+
+        logger.info(
+            `Transcription stored in database. insertedTranscription: ${JSON.stringify(
+                insertedTranscription.transcript_id
+            )} Text: ${insertedTranscription.transcription}`
+        );
+
+        return insertedTranscription;
+    } catch (error) {
+        logger.error(
+            `[transcriptionsMiddleware - storeTranscriptionText] => Error storing transcription: ${error.message}`
+        );
+        throw error;
+    }
+};
+
 // Export all middleware functions for use in routes
 module.exports = {
     createTranscription,
@@ -483,4 +517,5 @@ module.exports = {
     fetchFilteredTranscriptions,
     exportTranscription,
     deleteDBTranscription,
+    fetchAssemblyAIHistory,
 };

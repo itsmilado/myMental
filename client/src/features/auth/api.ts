@@ -9,6 +9,7 @@ import {
     AuthResponse,
     Filters,
     SortState,
+    OnlineTranscription,
 } from "../../types/types";
 
 axios.defaults.withCredentials = true;
@@ -143,4 +144,22 @@ export const deleteTranscription = async (id: string): Promise<string> => {
             error.response?.data?.message || error.message || "Delete failed";
         throw new Error(message);
     }
+};
+
+export const fetchAssemblyTranscriptions = async (
+    transcriptId: string
+): Promise<OnlineTranscription[]> => {
+    const params = transcriptId ? { transcript_id: transcriptId } : {};
+    const response = await axios.get(
+        "http://localhost:5002/transcription/assemblyai/history",
+        { params }
+    );
+
+    if (!response.data?.success) {
+        throw new Error(
+            response.data?.message ||
+                "Failed to fetch AssemblyAI transcriptions"
+        );
+    }
+    return response.data.data as OnlineTranscription[];
 };
