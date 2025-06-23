@@ -14,14 +14,20 @@ import {
     Button,
     Chip,
     Snackbar,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
 } from "@mui/material";
 import RestoreIcon from "@mui/icons-material/Restore";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { OnlineTranscription } from "../../../types/types";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore"; // offline state
 import { useAssemblyTranscriptionStore } from "../../../store/useAssemblyTranscriptionStore";
 import { restoreTranscription } from "../../auth/api";
+import { deleteAssemblyTranscription } from "../../auth/api";
 
 type Props = {
     data: OnlineTranscription[];
@@ -29,8 +35,17 @@ type Props = {
 };
 
 export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
-    const { addTranscription, list } = useTranscriptionStore();
-    const { restoredIds = [], setRestored } = useAssemblyTranscriptionStore();
+    // Offline (restored) list
+    const { addTranscription, list: offlineList } = useTranscriptionStore();
+    // Online/assembly state
+    const {
+        list: onlineList,
+        setList: setOnlineList,
+        restoredIds = [],
+        setRestored,
+    } = useAssemblyTranscriptionStore();
+
+    // Local state for snackbar, restore, delete
     const [snackbar, setSnackbar] = useState<{
         open: boolean;
         msg: string;
@@ -38,17 +53,15 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
     }>({ open: false, msg: "", error: false });
 
     const [loadingRestore, setLoadingRestore] = useState<string | null>(null);
+    const [deleteDialog, setDeleteDialog] = useState<{
+        open: boolean;
+        t: OnlineTranscription | null;
+    }>({ open: false, t: null });
 
-    const handleIdCopy = (id: string) => {
-        navigator.clipboard.writeText(id);
-    };
-
-    const handleUrlCopy = (url: string) => {
-        navigator.clipboard.writeText(url);
-    };
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const isRestored = (transcript_id: string) =>
-        !!list.find((t) => t.transcript_id === transcript_id) ||
+        !!offlineList.find((t) => t.transcript_id === transcript_id) ||
         restoredIds.includes(transcript_id);
 
     const handleRestore = async (t: OnlineTranscription) => {
@@ -70,6 +83,29 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
             });
         } finally {
             setLoadingRestore(null);
+        }
+    };
+
+    const handleDelete = async (t: OnlineTranscription) => {
+        setDeletingId(t.transcript_id);
+        try {
+            await deleteAssemblyTranscription(t.transcript_id);
+            // Remove from onlineList
+            setOnlineList(
+                onlineList.filter(
+                    (item) => item.transcript_id !== t.transcript_id
+                )
+            );
+            setSnackbar({ open: true, msg: "Deleted!", error: false });
+        } catch (err: any) {
+            setSnackbar({
+                open: true,
+                msg: err.message || "Delete failed",
+                error: true,
+            });
+        } finally {
+            setDeletingId(null);
+            setDeleteDialog({ open: false, t: null });
         }
     };
 
@@ -97,6 +133,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                         <TableRow key={t.transcript_id} hover>
                             {/* --- Actions cell --- */}
                             <TableCell>
+                                {/* Restore */}
                                 <Tooltip
                                     title={
                                         isRestored(t.transcript_id)
@@ -126,6 +163,37 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                         )}
                                     </span>
                                 </Tooltip>
+                                {/* Delete */}
+                                {t.audio_url !== "http://deleted_by_user" ? (
+                                    <Tooltip title="Delete transcription">
+                                        <span>
+                                            <IconButton
+                                                color="error"
+                                                onClick={() =>
+                                                    setDeleteDialog({
+                                                        open: true,
+                                                        t,
+                                                    })
+                                                }
+                                                disabled={
+                                                    deletingId ===
+                                                    t.transcript_id
+                                                }
+                                                size="small"
+                                            >
+                                                <DeleteIcon />
+                                            </IconButton>
+                                        </span>
+                                    </Tooltip>
+                                ) : (
+                                    <Tooltip title="Already deleted">
+                                        <span>
+                                            <IconButton disabled size="small">
+                                                <DeleteIcon />
+                                            </IconButton>
+                                        </span>
+                                    </Tooltip>
+                                )}
                             </TableCell>
                             <TableCell>
                                 {new Date(t.created_at).toLocaleString()}
@@ -186,6 +254,35 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                     ))}
                 </TableBody>
             </Table>
+            {/* Delete dialog */}
+            <Dialog
+                open={deleteDialog.open}
+                onClose={() => setDeleteDialog({ open: false, t: null })}
+            >
+                <DialogTitle>Delete Transcription</DialogTitle>
+                <DialogContent>
+                    Are you sure you want to delete this transcription? This
+                    action cannot be undone.
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() =>
+                            setDeleteDialog({ open: false, t: null })
+                        }
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        color="error"
+                        onClick={() => {
+                            if (deleteDialog.t) handleDelete(deleteDialog.t);
+                        }}
+                        disabled={deletingId === deleteDialog.t?.transcript_id}
+                    >
+                        Delete
+                    </Button>
+                </DialogActions>
+            </Dialog>
             <Snackbar
                 open={snackbar.open}
                 autoHideDuration={2500}

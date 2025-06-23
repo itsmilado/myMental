@@ -174,3 +174,21 @@ export const restoreTranscription = async (
     );
     return data.data;
 };
+
+export const deleteAssemblyTranscription = async (
+    transcriptId: string
+): Promise<string> => {
+    try {
+        const response = await axios.delete(
+            `http://localhost:5002/transcription/assemblyai/delete/${transcriptId}`
+        );
+        if (!response.data.success) {
+            throw new Error(response.data.message || "Delete failed");
+        }
+        return response.data.message;
+    } catch (error: any) {
+        const message =
+            error.response?.data?.message || error.message || "Delete failed";
+        throw new Error(message);
+    }
+};
