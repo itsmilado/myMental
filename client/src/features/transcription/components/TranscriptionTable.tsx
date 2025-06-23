@@ -117,7 +117,9 @@ export const TranscriptionTable = ({
                             >
                                 <TableCell>{t.id}</TableCell>
                                 <TableCell>{t.file_name}</TableCell>
-                                <TableCell>{t.file_recorded_at}</TableCell>
+                                <TableCell>
+                                    {new Date(t.created_at).toLocaleString()}
+                                </TableCell>
                                 <TableCell>{t.transcript_id}</TableCell>
                                 <TableCell>
                                     <ExportButton

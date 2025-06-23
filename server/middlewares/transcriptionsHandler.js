@@ -19,6 +19,7 @@ const logger = require("../utils/logger");
 const { assemblyClient } = require("../utils/assemblyaiClient");
 const { fetchAssemblyHistory } = require("../utils/assemblyaiHistory");
 const { exportTranscriptionToFile } = require("../utils/exportService");
+const { request, response } = require("express");
 
 /**
  * Fetch all transcriptions from the database.
@@ -408,7 +409,7 @@ const deleteDBTranscription = async (request, response, next) => {
         if (transcription.user_id !== user.id && user.role !== "admin") {
             return response.status(403).json({
                 success: false,
-                message: "You are not Not Authorized to access this resource!.",
+                message: "You are not Not Authorized to access this resource!",
             });
         }
 
@@ -460,6 +461,50 @@ const fetchAssemblyAIHistory = async (request, response, next) => {
     } catch (error) {
         logger.error(
             `[transcriptionsMiddleware - fetchAssemblyAIHistory] => Error fetching transcriptions: ${error.message}`
+        );
+        next(error);
+    }
+};
+
+const deleteAssemblyAiTranscript = async (request, response, next) => {
+    try {
+        const { transcriptId } = request.params;
+        const userId = request.session.user.id;
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}, params: ${request.params}`
+        ); // Log the request URL
+
+        // Allow only if user is owner or admin
+        if (!userId && request.session.user.role !== "admin") {
+            logger.warn(
+                `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Unauthorized access attempt: ${request.originalUrl} `
+            );
+            return response.status(403).json({
+                success: false,
+                message: "You are not Not Authorized to access this resource!",
+            });
+        }
+        // Delete from AssemblyAI
+        // This permanently removes sensitive transcript data
+        const { status } = await assemblyClient.transcripts.delete(
+            transcriptId
+        );
+        if (status !== "completed") {
+            logger.warn(
+                `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Request to ${request.originalUrl} not successfull.`
+            );
+            throw error;
+        }
+        logger.info(
+            `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Transcript with ID ${transcriptId} deleted from AssemblyAI API `
+        );
+        response.json({
+            success: true,
+            message: `Transcript with ID ${transcriptId} deleted from AssemblyAI API`,
+        });
+    } catch (error) {
+        logger.error(
+            `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Error delete transcript: ${error.message}`
         );
         next(error);
     }
@@ -518,4 +563,5 @@ module.exports = {
     exportTranscription,
     deleteDBTranscription,
     fetchAssemblyAIHistory,
+    deleteAssemblyAiTranscript,
 };

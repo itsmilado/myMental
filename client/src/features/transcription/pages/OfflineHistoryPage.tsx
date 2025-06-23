@@ -1,14 +1,10 @@
 // src/features/transcription/pages/OfflineHistoryPage.tsx
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Box,
     Paper,
     CircularProgress,
     Alert,
-    TextField,
-    IconButton,
-    InputAdornment,
     Button,
     Typography,
 } from "@mui/material";
