@@ -1,7 +1,7 @@
 // /src/store/useTranscriptionStore.ts
-
+// oofline tab state
 import { create } from "zustand";
-import { TranscriptionState } from "../types/types";
+import { TranscriptionState, TranscriptData } from "../types/types";
 
 export const useTranscriptionStore = create<TranscriptionState>((set) => ({
     list: [],
@@ -19,6 +19,10 @@ export const useTranscriptionStore = create<TranscriptionState>((set) => ({
     setLoading: (loading) => set({ loading }),
     setError: (error) => set({ error }),
     setSort: (sort) => set({ sort }),
+    addTranscription: (t: TranscriptData) =>
+        set((state) => ({
+            list: [t, ...state.list],
+        })),
     removeTranscriptionFromList: (id) =>
         set((state) => ({
             list: state.list.filter((t) => t.id !== id),

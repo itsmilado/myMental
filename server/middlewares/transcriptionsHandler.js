@@ -450,13 +450,23 @@ const fetchAssemblyAIHistory = async (request, response, next) => {
             });
             throw new Error("Error fetching transcription from API by ID");
         }
-        logger.info(
-            `[transcriptionsMiddleware - fetchAssemblyAIHistory] => Retrieved API Transcriptions: ${transcriptions}`
-        );
+
+        const results = transcriptions.map((t) => ({
+            transcript_id: t.transcript_id,
+            created_at: t.created_at,
+            status: t.status,
+            audio_url: t.audio_url,
+            audio_duration: t.audio_duration,
+            speech_model: t.speech_model,
+            language: t.language,
+            transcription: flattenTranscription(t.transcript),
+            // more fields if needed, e.g. features
+        }));
+
         response.status(200).json({
             success: true,
             message: "API Transcription fetched successfully",
-            data: transcriptions,
+            data: results,
         });
     } catch (error) {
         logger.error(
@@ -510,6 +520,64 @@ const deleteAssemblyAiTranscript = async (request, response, next) => {
     }
 };
 
+const restoreTranscription = async (request, response, next) => {
+    try {
+        const userId = request.session.user.id;
+        const { transcript_id, transcription, file_recorded_at } = request.body;
+
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}, params: ${request.params}`
+        ); // Log the request URL
+
+        // Check for required data
+        if (!transcript_id || !transcription || !file_recorded_at) {
+            logger.warn(
+                `[transcriptionsMiddleware - restoreTranscription] => Missing fields. transcript_id? "${transcript_id}" or transcription? "${transcription}" or file_recorded_at? "${file_recorded_at}"`
+            );
+            return response
+                .status(400)
+                .json({ success: false, message: "Missing fields" });
+        }
+
+        // Prevent duplicate
+        const existing = await getTranscriptionByApiTranscriptIdQuery(
+            transcript_id
+        );
+        if (existing) {
+            logger.warn(
+                `[transcriptionsMiddleware - restoreTranscription] => Transcript with ID: ${transcript_id} already exsist in databse`
+            );
+            return response
+                .status(409)
+                .json({ success: false, message: "Transcript already exists" });
+        }
+        const file_name = buildRestoredFileName(file_recorded_at);
+        // Insert to DB
+        const inserted = await insertTranscriptionQuery({
+            user_id: userId,
+            file_name,
+            transcript_id,
+            transcription,
+            file_recorded_at,
+        });
+
+        logger.info(
+            `[transcriptionsMiddleware - restoreTranscription] => Transcript with ID ${transcript_id} restored from AssemblyAI API `
+        );
+
+        return response.status(201).json({
+            success: true,
+            message: "Transcript restored to offline successfully",
+            data: inserted,
+        });
+    } catch (error) {
+        logger.error(
+            `[transcriptionsMiddleware - restoreTranscription] => Error restoring transcript with ID: ${transcript_id}, Error: ${error.message}`
+        );
+        next(error);
+    }
+};
+
 // Helper functions
 
 /**
@@ -552,6 +620,24 @@ const storeTranscriptionText = async ({ transcriptData }) => {
     }
 };
 
+const buildRestoredFileName = (dateStr) => {
+    const d = new Date(dateStr);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+    const ss = String(d.getSeconds()).padStart(2, "0");
+    return `restored-${yyyy}${mm}${dd}-${hh}${min}${ss}.txt`;
+};
+
+const flattenTranscription = (transcriptObject) => {
+    if (!transcriptObject || !Array.isArray(transcriptObject.utterances))
+        return "";
+    return transcriptObject.utterances
+        .map((u) => `Speaker ${u.speaker != null ? u.speaker : ""}: ${u.text}`)
+        .join("\n");
+};
 // Export all middleware functions for use in routes
 module.exports = {
     createTranscription,
@@ -564,4 +650,5 @@ module.exports = {
     deleteDBTranscription,
     fetchAssemblyAIHistory,
     deleteAssemblyAiTranscript,
+    restoreTranscription,
 };

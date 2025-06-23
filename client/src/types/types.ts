@@ -178,6 +178,7 @@ export type TranscriptionState = {
     setLoading: (loading: boolean) => void;
     setError: (error: string | null) => void;
     setSort: (sort: SortState) => void;
+    addTranscription: (t: TranscriptData) => void;
     removeTranscriptionFromList: (id: string) => void;
 };
 
@@ -191,6 +192,7 @@ export type OnlineTranscription = {
     speech_model: string;
     language: string;
     features?: string[];
+    transcription: string;
 };
 
 export type AssemblyTranscriptionState = {
@@ -198,8 +200,16 @@ export type AssemblyTranscriptionState = {
     loading: boolean;
     error: string | null;
     searchId: string;
+    restoredIds?: string[];
     setList: (data: OnlineTranscription[]) => void;
     setLoading: (loading: boolean) => void;
     setError: (err: string | null) => void;
     setSearchId: (id: string) => void;
+    setRestored: (transcriptId: string) => void;
+};
+
+export type RestorePayload = {
+    transcript_id: string;
+    transcription: string;
+    file_recorded_at: string;
 };

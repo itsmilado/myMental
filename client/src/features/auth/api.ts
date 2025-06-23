@@ -10,6 +10,7 @@ import {
     Filters,
     SortState,
     OnlineTranscription,
+    RestorePayload,
 } from "../../types/types";
 
 axios.defaults.withCredentials = true;
@@ -162,4 +163,14 @@ export const fetchAssemblyTranscriptions = async (
         );
     }
     return response.data.data as OnlineTranscription[];
+};
+
+export const restoreTranscription = async (
+    payload: RestorePayload
+): Promise<TranscriptData> => {
+    const { data } = await axios.post(
+        "http://localhost:5002/transcription/restore",
+        payload
+    );
+    return data.data;
 };

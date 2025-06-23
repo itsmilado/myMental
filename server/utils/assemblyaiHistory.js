@@ -61,6 +61,7 @@ const fetchAssemblyHistory = async () => {
                 : "",
             speech_model: t.transcript.speech_model || "",
             language: t.transcript.language_code || "",
+            transcript: t.transcript,
             features: [
                 t.transcript.speaker_labels ? "speaker_labels" : null,
                 t.transcript.sentiment_analysis ? "sentiment_analysis" : null,
