@@ -8,6 +8,7 @@ const {
     pollTranscriptionResult,
 } = require("../utils/assemblyaiTranscriber");
 const {
+    insertTranscriptionBackupQuery,
     insertTranscriptionQuery,
     getAllTranscriptionsQuery,
     getTranscriptionByApiTranscriptIdQuery,
@@ -20,6 +21,7 @@ const { assemblyClient } = require("../utils/assemblyaiClient");
 const { fetchAssemblyHistory } = require("../utils/assemblyaiHistory");
 const { exportTranscriptionToFile } = require("../utils/exportService");
 const { request, response } = require("express");
+const { error } = require("winston");
 
 /**
  * Fetch all transcriptions from the database.
@@ -120,6 +122,7 @@ const fetchFilteredTranscriptions = async (request, response, next) => {
 const createTranscription = async (request, response, next) => {
     try {
         const loggedUserId = request.session.user.id;
+        const userRole = request.session.user.role;
         const { path: filePath, filename } = request.file;
         const rawDate = request.body.fileModifiedDate; // safe for DB
         const fileModifiedDate = rawDate ? new Date(rawDate) : "00.00.00";
@@ -133,10 +136,11 @@ const createTranscription = async (request, response, next) => {
             `Incoming request to Transcribe from user_id ${loggedUserId} to "${request.method} ${request.originalUrl}"`
         );
 
-        logger.info(
+        console.log(
             `[transcriptionHandler - createTranscription] => filename, fileModifiedDate in request.file: ${filename} - ${fileModifiedDisplayDate}`
         );
-        logger.info(
+
+        console.log(
             `[Transcription] Received options: ${JSON.stringify(
                 request.body.options
             )}`
@@ -158,7 +162,7 @@ const createTranscription = async (request, response, next) => {
             ...userOptions,
         };
 
-        logger.info(
+        console.log(
             `[createTranscription] transcriptionOptions: ${JSON.stringify(
                 transcriptionOptions
             )}`
@@ -171,6 +175,25 @@ const createTranscription = async (request, response, next) => {
         const transcript = await pollTranscriptionResult(transcriptId);
 
         // Store transcription in the database
+
+        // Create backup
+        const createBackup = await insertTranscriptionBackupQuery({
+            transcript_id: transcriptId, //transcript_id as per API
+            user_id: loggedUserId,
+            user_role: userRole,
+            raw_api_data: transcript, // This is a JS object; pg will handle JSONB
+        });
+
+        // console.log("created backup:", createBackup);
+
+        if (!createBackup) {
+            throw error;
+        }
+
+        logger.info(
+            `[transcriptionHandler - createTranscription] => insertTranscriptionBackupQuery: Transcript's API response for User ${loggedUserId} with role ${userRole} successfully stored. `
+        );
+
         const transcriptData = {
             user_id: loggedUserId,
             file_name: filename,
@@ -605,11 +628,7 @@ const storeTranscriptionText = async ({ transcriptData }) => {
             ...transcriptionDataToInsert,
         });
 
-        logger.info(
-            `Transcription stored in database. insertedTranscription: ${JSON.stringify(
-                insertedTranscription.transcript_id
-            )} Text: ${insertedTranscription.transcription}`
-        );
+        logger.info(`Transcription stored in database.`);
 
         return insertedTranscription;
     } catch (error) {

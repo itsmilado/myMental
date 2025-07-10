@@ -5,7 +5,7 @@ const logger = require("../utils/logger");
 const { pollTranscriptionResult } = require("./assemblyaiTranscriber");
 
 const fetchAssemblyHistory = async () => {
-    const baseUrl = "https://api.assemblyai.com/v2/transcript?limit=20";
+    const baseUrl = "https://api.eu.assemblyai.com/v2/transcript?limit=20";
     const headers = {
         authorization: process.env.ASSEMBLYAI_API_KEY,
     };

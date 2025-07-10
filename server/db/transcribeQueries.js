@@ -11,6 +11,29 @@ const ALLOWED_SORT_FIELDS = [
 ];
 const ALLOWED_DIRECTIONS = ["asc", "desc"];
 
+const insertTranscriptionBackupQuery = async ({
+    transcript_id,
+    user_id,
+    user_role,
+    raw_api_data,
+}) => {
+    try {
+        const insertQuery = `
+            INSERT INTO transcription_backups (transcript_id, user_id, user_role, raw_api_data)
+            VALUES ($1, $2, $3, $4)
+            RETURNING *;
+        `;
+        const insertValues = [transcript_id, user_id, user_role, raw_api_data];
+        const result = await pool.query(insertQuery, insertValues);
+        return result.rows[0];
+    } catch (error) {
+        logger.error(
+            `[transcriptionBackupsQueries > insertTranscriptionBackupQuery] Error: ${error.message}`
+        );
+        throw error;
+    }
+};
+
 const insertTranscriptionQuery = async ({
     user_id,
     file_name,
@@ -209,6 +232,7 @@ const deleteTranscriptionByIdQuery = async (id) => {
 };
 
 module.exports = {
+    insertTranscriptionBackupQuery,
     insertTranscriptionQuery,
     getAllTranscriptionsQuery,
     getTranscriptionByApiTranscriptIdQuery,
