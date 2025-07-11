@@ -21,7 +21,7 @@ const { assemblyClient } = require("../utils/assemblyaiClient");
 const { fetchAssemblyHistory } = require("../utils/assemblyaiHistory");
 const { exportTranscriptionToFile } = require("../utils/exportService");
 const { request, response } = require("express");
-const { error } = require("winston");
+const { error, log } = require("winston");
 
 /**
  * Fetch all transcriptions from the database.
@@ -176,7 +176,7 @@ const createTranscription = async (request, response, next) => {
 
         // Store transcription in the database
 
-        // Create backup
+        // Create response backup
         const createBackup = await insertTranscriptionBackupQuery({
             transcript_id: transcriptId, //transcript_id as per API
             user_id: loggedUserId,
@@ -194,9 +194,12 @@ const createTranscription = async (request, response, next) => {
             `[transcriptionHandler - createTranscription] => insertTranscriptionBackupQuery: Transcript's API response for User ${loggedUserId} with role ${userRole} successfully stored. `
         );
 
+        const { audio_duration } = transcript;
+
         const transcriptData = {
             user_id: loggedUserId,
             file_name: filename,
+            audio_duration: audio_duration,
             transcript_id: transcriptId,
             file_recorded_at: fileModifiedDate,
             transcriptObject: transcript,

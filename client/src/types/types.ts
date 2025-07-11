@@ -123,6 +123,7 @@ export type TranscriptData = {
     transcript_id: string; // AssemblyAI API ID
     file_name: string;
     file_recorded_at: string; // YYYY-MM-DD
+    audio_duration: string;
     transcription: string; // plain text
     created_at: string;
 };

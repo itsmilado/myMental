@@ -27,6 +27,7 @@ type Props = {
 const columns = [
     { id: "id", label: "ID" },
     { id: "file_name", label: "File Name" },
+    { id: "audio_duration", label: "Audio Length" },
     { id: "file_recorded_at", label: "Date" },
     { id: "transcript_id", label: "API ID (AssemblyAI)" },
     { id: "actions", label: "Actions" }, // <- New Actions column
@@ -59,6 +60,15 @@ export const TranscriptionTable = ({
         } else {
             setSort({ orderBy: col as any, direction: "asc" });
         }
+    };
+
+    const formatDuration = (dur: any): string => {
+        if (!dur) return "";
+        if (typeof dur === "string") return dur;
+        const h = String(dur.hours ?? 0).padStart(2, "0");
+        const m = String(dur.minutes ?? 0).padStart(2, "0");
+        const s = String(Math.floor(dur.seconds ?? 0)).padStart(2, "0");
+        return `${h}:${m}:${s}`;
     };
 
     if (loading)
@@ -117,6 +127,9 @@ export const TranscriptionTable = ({
                             >
                                 <TableCell>{t.id}</TableCell>
                                 <TableCell>{t.file_name}</TableCell>
+                                <TableCell>
+                                    {formatDuration(t.audio_duration)}
+                                </TableCell>
                                 <TableCell>
                                     {new Date(t.created_at).toLocaleString()}
                                 </TableCell>

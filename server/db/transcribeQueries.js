@@ -37,16 +37,18 @@ const insertTranscriptionBackupQuery = async ({
 const insertTranscriptionQuery = async ({
     user_id,
     file_name,
+    audio_duration,
     transcript_id,
     transcription,
     file_recorded_at,
 }) => {
     try {
         const insertQuery =
-            "INSERT INTO transcriptions (user_id, file_name, transcript_id, transcription, file_recorded_at) VALUES ($1, $2, $3, $4, $5) RETURNING *";
+            "INSERT INTO transcriptions (user_id, file_name, audio_duration, transcript_id, transcription, file_recorded_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *";
         const insertValues = [
             user_id,
             file_name,
+            audio_duration,
             transcript_id,
             transcription,
             file_recorded_at,
@@ -70,8 +72,10 @@ const insertTranscriptionQuery = async ({
 const getAllTranscriptionsQuery = async () => {
     try {
         logger.info("[transcribeQueries > getAllTranscriptionsQuery] - Start");
-        const fetchQuery =
-            "SELECT * FROM transcriptions ORDER BY file_recorded_at DESC";
+        const fetchQuery = `SELECT id,
+            *,
+            to_char(audio_duration, 'HH24:MI:SS') AS audio_duration
+            FROM transcriptions ORDER BY file_recorded_at DESC`;
         const { rows } = await pool.query(fetchQuery);
 
         if (rows.length === 0) {
@@ -80,9 +84,11 @@ const getAllTranscriptionsQuery = async () => {
             );
             return [];
         }
+
         logger.info(
             `[transcribeQueries > getAllTranscriptionsQuery] - Fetched ${rows.length} transcriptions`
         );
+
         return rows;
     } catch (error) {
         logger.error(
