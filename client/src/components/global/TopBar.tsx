@@ -52,9 +52,9 @@ const TopBar = () => {
         // localStorage.removeItem("user");
         navigate("/");
     };
-    const pageTitle = path
-        ? path.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase())
-        : "Dashboard";
+    // const pageTitle = path
+    //     ? path.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase())
+    //     : "Dashboard";
 
     return (
         <AppBar
@@ -67,7 +67,9 @@ const TopBar = () => {
         >
             <Toolbar sx={{ justifyContent: "space-between" }}>
                 <Typography variant="h6" fontWeight="bold">
-                    {pageTitle}
+                    {user?.first_name
+                        ? `Welcome, ${user.first_name}!`
+                        : "Welcome!"}
                 </Typography>
 
                 <Box display="flex" alignItems="center" gap={2}>
