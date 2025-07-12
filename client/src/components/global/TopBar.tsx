@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
     AppBar,
     Avatar,
@@ -15,7 +15,6 @@ import { LightMode, DarkMode } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { tokens } from "../../theme/theme";
 import { useColorMode } from "../../theme/theme";
-import { User } from "../../types/types";
 import { logoutUser } from "../../features/auth/api";
 import { useAuthStore } from "../../store/useAuthStore";
 import ProfileDialog from "../../features/profile/components/ProfileDialog";
@@ -31,9 +30,6 @@ const TopBar = () => {
     const [openProfileDialog, setOpenProfileDialog] = useState(false);
 
     const user = useAuthStore((state) => state.user);
-    const location = useLocation();
-    const path = location.pathname.split("/").pop();
-
     const handleMenuOpen = (event: React.MouseEvent<HTMLElement>): void => {
         setAnchorEl(event.currentTarget);
     };
@@ -52,9 +48,6 @@ const TopBar = () => {
         // localStorage.removeItem("user");
         navigate("/");
     };
-    // const pageTitle = path
-    //     ? path.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase())
-    //     : "Dashboard";
 
     return (
         <AppBar

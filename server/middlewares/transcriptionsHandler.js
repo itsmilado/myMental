@@ -194,13 +194,35 @@ const createTranscription = async (request, response, next) => {
             `[transcriptionHandler - createTranscription] => insertTranscriptionBackupQuery: Transcript's API response for User ${loggedUserId} with role ${userRole} successfully stored. `
         );
 
-        const { audio_duration } = transcript;
+        const {
+            audio_duration,
+            language_code,
+            speech_model,
+            entity_detection,
+            sentiment_analysis,
+            speaker_labels,
+            speakers_expected,
+            punctuate,
+            format_text,
+        } = transcript;
+
+        const resTranscriptOptions = {
+            language_code: language_code,
+            speech_model: speech_model,
+            entity_detection: entity_detection,
+            sentiment_analysis: sentiment_analysis,
+            speaker_labels: speaker_labels,
+            speakers_expected: speakers_expected,
+            punctuate: punctuate,
+            format_text: format_text,
+        };
 
         const transcriptData = {
             user_id: loggedUserId,
             file_name: filename,
             audio_duration: audio_duration,
             transcript_id: transcriptId,
+            options: resTranscriptOptions,
             file_recorded_at: fileModifiedDate,
             transcriptObject: transcript,
         };

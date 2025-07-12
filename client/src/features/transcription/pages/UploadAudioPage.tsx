@@ -23,6 +23,7 @@ const defaultTranscriptionOptions: TranscriptionOptions = {
     speech_model: "slam-1",
     language_code: "en-US",
     format_text: false,
+    punctuate: false,
     entity_detection: false,
 };
 
@@ -47,6 +48,8 @@ export const UploadAudioPage = () => {
         if (options.speaker_labels) userOptions.speaker_labels = true;
         if (options.sentiment_analysis) userOptions.sentiment_analysis = true;
         if (options.entity_detection) userOptions.entity_detection = true;
+        if (options.punctuate) userOptions.punctuate = true;
+        if (options.format_text) userOptions.format_text = true;
         if (options.speakers_expected !== 2) {
             userOptions.speakers_expected = options.speakers_expected;
         }
@@ -181,7 +184,9 @@ export const UploadAudioPage = () => {
                             }))
                         }
                     >
-                        {modelLanguages[options.speech_model].map((lang) => (
+                        {modelLanguages[
+                            options.speech_model as keyof typeof modelLanguages
+                        ].map((lang) => (
                             <MenuItem key={lang} value={lang}>
                                 {lang}
                             </MenuItem>

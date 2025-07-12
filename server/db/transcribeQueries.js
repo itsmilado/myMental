@@ -40,17 +40,19 @@ const insertTranscriptionQuery = async ({
     audio_duration,
     transcript_id,
     transcription,
+    options,
     file_recorded_at,
 }) => {
     try {
         const insertQuery =
-            "INSERT INTO transcriptions (user_id, file_name, audio_duration, transcript_id, transcription, file_recorded_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *";
+            "INSERT INTO transcriptions (user_id, file_name, audio_duration, transcript_id, transcription, options, file_recorded_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *";
         const insertValues = [
             user_id,
             file_name,
             audio_duration,
             transcript_id,
             transcription,
+            options,
             file_recorded_at,
         ];
 

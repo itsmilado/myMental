@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     Box,
+    Divider,
+    Chip,
     Typography,
     Button,
     Paper,
@@ -18,6 +20,7 @@ import { DeleteButton } from "../components/DeleteButton";
 import { deleteTranscription } from "../../auth/api";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CloseIcon from "@mui/icons-material/Close";
+import { TranscriptionOptions } from "../../../types/types";
 
 const TranscriptionDetailPage = () => {
     const { id } = useParams<{ id: string }>();
@@ -63,6 +66,19 @@ const TranscriptionDetailPage = () => {
         );
     }
 
+    const { options, audio_duration } = transcription;
+
+    const featureChips: { label: string; key: keyof TranscriptionOptions }[] = [
+        { label: "Speaker Labels", key: "speaker_labels" },
+        { label: "Speakers Expected", key: "speakers_expected" },
+        { label: "Sentiment Analysis", key: "sentiment_analysis" },
+        { label: "Speech Model", key: "speech_model" },
+        { label: "Language Code", key: "language_code" },
+        { label: "Punctuate", key: "punctuate" },
+        { label: "Format Text", key: "format_text" },
+        { label: "Entity Detection", key: "entity_detection" },
+    ];
+
     // Delete handler
     const handleDelete = async () => {
         try {
@@ -80,6 +96,14 @@ const TranscriptionDetailPage = () => {
             });
             throw error;
         }
+    };
+    const formatDuration = (dur: any): string => {
+        if (!dur) return "";
+        if (typeof dur === "string") return dur;
+        const h = String(dur.hours ?? 0).padStart(2, "0");
+        const m = String(dur.minutes ?? 0).padStart(2, "0");
+        const s = String(Math.floor(dur.seconds ?? 0)).padStart(2, "0");
+        return `${h}:${m}:${s}`;
     };
     return (
         <Box sx={{ maxWidth: 1000, mx: "auto", py: 4 }}>
@@ -139,9 +163,42 @@ const TranscriptionDetailPage = () => {
                         </>
                     )}
                 </Stack>
-                <Typography variant="body2" gutterBottom>
-                    Recorded at: {transcription.file_recorded_at}
-                </Typography>
+                <>
+                    <Typography variant="body2" gutterBottom>
+                        Audio Duration: {formatDuration(audio_duration) || "-"}
+                    </Typography>
+                    <Typography variant="body2" gutterBottom>
+                        Language: {options?.language_code || "-"}
+                    </Typography>
+                    <Typography variant="body2" gutterBottom>
+                        Speech Model: {options?.speech_model || "-"}
+                    </Typography>
+                    <Typography variant="body2" gutterBottom>
+                        Speaker Labels: {options?.speaker_labels ? "True" : "-"}
+                    </Typography>
+                    <Typography variant="body2" gutterBottom>
+                        Speakers Expected: {options?.speakers_expected || "-"}
+                    </Typography>
+                    <Typography variant="body2" gutterBottom>
+                        Entity Detection:{" "}
+                        {options?.entity_detection ? "True" : "-"}
+                    </Typography>
+                    <Typography variant="body2" gutterBottom>
+                        Sentiment Analysis:{" "}
+                        {options?.sentiment_analysis ? "True" : "-"}
+                    </Typography>
+                    <Typography variant="body2" gutterBottom>
+                        Format Text: {options?.format_text ? "True" : "-"}
+                    </Typography>
+                    <Typography variant="body2" gutterBottom>
+                        Punctuate: {options?.punctuate ? "True" : "-"}
+                    </Typography>
+                    <Typography variant="body2" gutterBottom>
+                        Recorded at: {transcription.file_recorded_at}
+                    </Typography>
+
+                    <Divider sx={{ mb: 2 }} />
+                </>
 
                 <Typography variant="subtitle2" sx={{ mt: 2 }}>
                     Transcription:

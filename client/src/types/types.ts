@@ -126,16 +126,18 @@ export type TranscriptData = {
     audio_duration: string;
     transcription: string; // plain text
     created_at: string;
+    options: TranscriptionOptions;
 };
 
 export type TranscriptionOptions = {
-    speaker_labels: boolean;
-    speakers_expected: number;
-    sentiment_analysis: boolean;
-    speech_model: string;
-    language_code: string;
-    format_text: boolean;
-    entity_detection: boolean;
+    speaker_labels?: boolean;
+    speakers_expected?: number;
+    sentiment_analysis?: boolean;
+    speech_model?: string;
+    language_code?: string;
+    format_text?: boolean;
+    punctuate?: boolean;
+    entity_detection?: boolean;
 };
 
 export interface TranscriptionPayload {
