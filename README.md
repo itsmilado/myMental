@@ -32,6 +32,7 @@
 
 ## 📁 Project Structure
 
+<pre lang="md">
 myMental/
 ├── client/ # React frontend
 │ ├── src/
@@ -58,7 +59,7 @@ myMental/
 │ ├── utils/
 │ └── server.js
 └── README.md
-
+</pre>
 ---
 
 ## 🌿 Git Workflow
