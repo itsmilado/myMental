@@ -1,6 +1,10 @@
 # 🧠 MyMental & BüroAssist
 
-**MyMental & BüroAssist** is a privacy-first productivity and mental wellness app. It combines AI-powered tools for managing mental health notes, bureaucratic documents, tasks, and appointments. Designed as a personal showcase project, it demonstrates full-stack development skills using modern tools and best practices.
+**MyMental** is a privacy-first productivity and mental wellness app.<br>
+It helps to keep track of mental health notes, important documents, tasks, and appointments, all in one place. Some features use AI, but you’re always in control of your data.<br>
+This is my personal project to learn, experiment, and show what I can build with a modern full-stack setup (Node.js, React, PostgreSQL, and more). Everything here is open source and a work in progress.<br>
+Currently, I’m working on:<br>
+[feat/transcribe] branch - feel free to peek or open an issue.
 
 ---
 
@@ -66,11 +70,11 @@ myMental/
 
 ### 🔧 Branching Strategy
 
--   `main` — production-ready code
--   `dev` — integration of tested features
--   `feature/*` — specific features (e.g., `feature/auth-ui`)
--   `bugfix/*` — specific fixes
--   `hotfix/*` — urgent fixes to production
+-   `main` - production-ready code
+-   `dev` - integration of tested features
+-   `feature/*` - specific features (e.g., `feature/auth-ui`)
+-   `bugfix/*` - specific fixes
+-   `hotfix/*` - urgent fixes to production
 
 ### 🧾 Commit Format (Conventional Commits)
 
