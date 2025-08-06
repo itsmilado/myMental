@@ -2,9 +2,9 @@
 
 **MyMental** is a privacy-first productivity and mental wellness app.<br>
 It helps to keep track of mental health notes, important documents, tasks, and appointments, all in one place. Some features use AI, but you’re always in control of your data.<br>
-This is my personal project to learn, experiment, and show what I can build with a modern full-stack setup (Node.js, React, PostgreSQL, and more). Everything here is open source and a work in progress.<br>
-Currently, I’m working on:<br>
-[feat/transcribe] branch - feel free to peek or open an issue.
+This is my personal project to learn, experiment, and show what I can build with a modern full-stack setup (Node.js, React, PostgreSQL, and more). Everything here is open source and a work in progress.<br><br>
+### Currently, I’m working on:<br>
+feat/transcribe branch - feel free to peek or open an issue.
 
 ---
 
