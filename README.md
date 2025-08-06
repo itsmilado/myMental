@@ -78,18 +78,18 @@ myMental/
 
 ### 🧾 Commit Format (Conventional Commits)
 
--   `feat:` – new features
--   `fix:` – bug fixes
--   `refactor:` – internal code refactors
--   `docs:` – documentation updates
--   `style:` – formatting only
--   `test:` – test-related updates
+-   `feat:` - new features
+-   `fix:` - bug fixes
+-   `refactor:` - internal code refactors
+-   `docs:` - documentation updates
+-   `style:` - formatting only
+-   `test:` - test-related updates
 
 ---
 
 ## 🛣️ Roadmap
 
-### ✅ Phase 1 – MVP
+### ✅ Phase 1 - MVP
 
 -   Audio transcription upload (AssemblyAI)
 -   Session-based login/register
@@ -97,7 +97,7 @@ myMental/
 -   Transcription viewer with download/search
 -   Profile management
 
-### 🧠 Phase 2 – AI Integration
+### 🧠 Phase 2 - AI Integration
 
 -   Legal document viewer + OCR & translation
 -   Task + calendar manager (CRUD + reminders)
@@ -105,7 +105,7 @@ myMental/
 -   Summary generation for transcripts
 -   Persona-based assistant (coach, legal advisor)
 
-### 🌐 Phase 3 – Polish & Performance
+### 🌐 Phase 3 - Polish & Performance
 
 -   RAG search (`pgvector` + Ollama fallback)
 -   Multilingual UI (i18next)
