@@ -1,4 +1,4 @@
-# 🧠 MyMental & BüroAssist
+# 🧠 MyMental
 
 **MyMental** is a privacy-first productivity and mental wellness app.<br>
 It helps to keep track of mental health notes, important documents, tasks, and appointments, all in one place. Some features use AI, but you’re always in control of your data.<br>
