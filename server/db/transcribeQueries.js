@@ -137,8 +137,8 @@ const getFilteredTranscriptionsQuery = async (filters) => {
             where.push(`file_recorded_at <= $${params.length}`);
         }
 
-        let orderBy = "file_recorded_at";
-        let direction = "DESC";
+        let orderBy = "id";
+        let direction = "Asc";
         if (
             filters.order_by &&
             ALLOWED_SORT_FIELDS.includes(filters.order_by)

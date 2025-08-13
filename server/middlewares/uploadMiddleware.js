@@ -24,20 +24,13 @@ const storage = multer.diskStorage({
             ? new Date(fileModifiedDate)
             : new Date();
 
-        const fileModifiedDisplayDate = safeDate
-            .toLocaleDateString("en-GB")
-            .replace(/\//g, ".");
+        const fileModifiedDisplayDate = formatISOToCustomDate(fileModifiedDate);
         const now = new Date();
         const currentDate = now.toLocaleDateString("en-GB").replace(/\//g, ".");
-        const currentTime = now.toLocaleTimeString("en-GB", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: false,
-        });
 
         // Create new filename
-        const newFileName = `${originalName} - ${fileModifiedDisplayDate} - ${currentDate}_${currentTime}${path.extname(
+        const safeName = originalName.replace(/[^\w]+/g, "_");
+        const newFileName = `${safeName}_Recorded(${fileModifiedDisplayDate})_Transcribed(${currentDate})${path.extname(
             file.originalname
         )}`;
         cb(null, newFileName);
@@ -108,6 +101,20 @@ const uploadMiddleware = (req, res, next) => {
 
         next();
     });
+};
+
+// Format date for display
+const formatISOToCustomDate = (isoString) => {
+    const date = new Date(isoString);
+    const pad = (n) => String(n).padStart(2, "0");
+
+    const day = pad(date.getDate());
+    const month = pad(date.getMonth() + 1); // Months are zero-based
+    const year = String(date.getFullYear()).slice(-2);
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+
+    return `${day}.${month}.${year}_${hours}:${minutes}`;
 };
 
 module.exports = uploadMiddleware;

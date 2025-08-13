@@ -10,14 +10,11 @@ if (!fs.existsSync(transcriptionDir)) {
     fs.mkdirSync(transcriptionDir, { recursive: true });
 }
 
-const saveTranscriptionToFile = (
-    filename,
-    transcriptText,
-    fileModifiedDate
-) => {
+const saveTranscriptionToFile = (filename, transcriptText) => {
     try {
         const originalName = path.parse(filename).name;
-        const transcriptionFileName = `${originalName} - ${fileModifiedDate}.txt`;
+        const safeName = originalName.replace(/[^\w]+/g, "_");
+        const transcriptionFileName = `${safeName}.txt`;
         logger.info(
             `[saveTranscriptionToFile] => FileName: ${transcriptionFileName}`
         );

@@ -127,23 +127,8 @@ const createTranscription = async (request, response, next) => {
         const rawDate = request.body.fileModifiedDate; // safe for DB
         const fileModifiedDate = rawDate ? new Date(rawDate) : "00.00.00";
 
-        // Format date for display
-        const fileModifiedDisplayDate = fileModifiedDate
-            .toLocaleString("en-GB")
-            .replace(/\//g, ".");
-
         logger.info(
             `Incoming request to Transcribe from user_id ${loggedUserId} to "${request.method} ${request.originalUrl}"`
-        );
-
-        console.log(
-            `[transcriptionHandler - createTranscription] => filename, fileModifiedDate in request.file: ${filename} - ${fileModifiedDisplayDate}`
-        );
-
-        console.log(
-            `[Transcription] Received options: ${JSON.stringify(
-                request.body.options
-            )}`
         );
 
         // Parse user options from request body
@@ -161,12 +146,6 @@ const createTranscription = async (request, response, next) => {
             audio_url: uploadUrl,
             ...userOptions,
         };
-
-        console.log(
-            `[createTranscription] transcriptionOptions: ${JSON.stringify(
-                transcriptionOptions
-            )}`
-        );
 
         // Request a transcription from AssemblyAI
         const transcriptId = await requestTranscription(transcriptionOptions);
@@ -233,8 +212,7 @@ const createTranscription = async (request, response, next) => {
         // Save the transcription to a file
         const storedTxtfilePath = saveTranscriptionToFile(
             filename,
-            insertedTranscription.transcription,
-            fileModifiedDisplayDate
+            insertedTranscription.transcription
         );
 
         // Send response to client
