@@ -9,6 +9,8 @@ const {
     getAllUsersQuery,
     getUserByEmailQuery,
 } = require("../db/usersQueries");
+const { request } = require("express");
+const { log } = require("winston");
 
 const createUsers = async (request, response, next) => {
     try {
@@ -185,6 +187,45 @@ const getAllProfiles = async (request, response, next) => {
     }
 };
 
+const getCurrentUser = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`
+        );
+
+        // Check if there is a user in the session
+        if (!request.session || !request.session.user) {
+            return response.status(401).json({
+                success: false,
+                message: "Not authenticated",
+            });
+        }
+
+        const { id } = request.session.user;
+
+        const user = await getUserByIdQuery({ id });
+        if (!user) {
+            return response.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+        logger.info(`User is Logged-in with id : ${id} `);
+        const userData = serializeUserInfo(user);
+
+        return response.status(200).json({
+            success: true,
+            message: "User is authenticated",
+            userData,
+        });
+    } catch (error) {
+        logger.error(
+            `[usersRoutesHandler > getCurrentUser] => Error getting current user: ${error.message}`
+        );
+        next(error);
+    }
+};
+
 // Helper function to filter sensitive fields
 const filterSensitiveFields = (body, fieldsToHide) => {
     const filteredBody = { ...body };
@@ -215,5 +256,6 @@ module.exports = {
     userLoggedOut,
     getUserInfo,
     getAllProfiles,
+    getCurrentUser,
     // checkloggedIn,
 };
