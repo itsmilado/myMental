@@ -106,7 +106,7 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
 
         try {
             const response = await loginUser(email, password);
-            console.log("Sign-in Data:", response.userData);
+            console.log("Sign-in Data:", response);
             if (!response.success) {
                 setPasswordError(true);
                 setPasswordErrorMessage("Invalid email or password.");

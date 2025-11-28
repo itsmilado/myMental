@@ -38,6 +38,11 @@ export const loginUser = async (
     return response.data as AuthResponse;
 };
 
+export const fetchCurrentUser = async (): Promise<AuthResponse> => {
+    const response = await axios.get("http://localhost:5002/users/me");
+    return response.data as AuthResponse;
+};
+
 export const logoutUser = async () => {
     await axios.post("http://localhost:5002/users/logout");
 };

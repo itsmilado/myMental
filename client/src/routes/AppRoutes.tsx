@@ -1,3 +1,5 @@
+// src/routes/AppRoutes.tsx
+
 import { Routes, Route } from "react-router-dom";
 import SignIn from "../features/auth/pages/Sign-In";
 import SignUp from "../features/auth/pages/SignUp";
