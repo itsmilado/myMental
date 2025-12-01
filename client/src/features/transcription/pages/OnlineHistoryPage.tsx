@@ -19,8 +19,12 @@ import { useAssemblyTranscriptionList } from "../hooks/useAssemblyTranscriptionL
 import { OnlineTranscriptionTable } from "../components/OnlineTranscriptionTable";
 import { OnlineTranscriptionSidebar } from "../components/OnlineTranscriptionSidebar";
 import { OnlineTranscription } from "../../../types/types";
+import { useTheme } from "@mui/material/styles";
+import { tokens } from "../../../theme/theme";
 
 const OnlineHistoryPage = () => {
+    const theme = useTheme();
+    const colors = tokens(theme.palette.mode);
     const { list, loading, error, searchId, setSearchId } =
         useAssemblyTranscriptionStore();
     const [selected, setSelected] = useState<OnlineTranscription | null>(null);
@@ -52,6 +56,14 @@ const OnlineHistoryPage = () => {
                     disabled={loading}
                     variant="outlined"
                     size="small"
+                    sx={{
+                        color: colors.grey[100],
+                        borderColor: colors.grey[300],
+                        "&:hover": {
+                            borderColor: colors.grey[200],
+                            backgroundColor: theme.palette.action.hover,
+                        },
+                    }}
                 >
                     {loading ? "Syncing..." : "Sync"}
                 </Button>

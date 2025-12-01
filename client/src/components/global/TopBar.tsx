@@ -59,7 +59,11 @@ const TopBar = () => {
             }}
         >
             <Toolbar sx={{ justifyContent: "space-between" }}>
-                <Typography variant="h6" fontWeight="bold">
+                <Typography
+                    variant="h6"
+                    fontWeight="bold"
+                    sx={{ color: colors.grey[100] }}
+                >
                     {user?.first_name
                         ? `Welcome, ${user.first_name}!`
                         : "Welcome!"}

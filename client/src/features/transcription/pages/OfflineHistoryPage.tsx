@@ -9,12 +9,16 @@ import {
     Typography,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import { useTheme } from "@mui/material/styles";
+import { tokens } from "../../../theme/theme";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { useTranscriptionList } from "../hooks/useTranscriptionList";
 import { TranscriptionTable } from "../components/TranscriptionTable";
 import FilterControls from "../components/FilterControls";
 
 const OfflineHistoryPage = () => {
+    const theme = useTheme();
+    const colors = tokens(theme.palette.mode);
     const navigate = useNavigate();
     const { list, loading, error, setActive } = useTranscriptionStore();
     const { loadTranscriptions } = useTranscriptionList();
@@ -32,7 +36,6 @@ const OfflineHistoryPage = () => {
             >
                 <Box fontSize={24} fontWeight={600}>
                     Offline Transcription History
-                    <FilterControls />
                 </Box>
                 <Button
                     startIcon={<RefreshIcon />}
@@ -40,10 +43,19 @@ const OfflineHistoryPage = () => {
                     disabled={loading}
                     variant="outlined"
                     size="small"
+                    sx={{
+                        color: colors.grey[100],
+                        borderColor: colors.grey[300],
+                        "&:hover": {
+                            borderColor: colors.grey[200],
+                            backgroundColor: theme.palette.action.hover,
+                        },
+                    }}
                 >
                     {loading ? "Syncing..." : "Sync"}
                 </Button>
             </Box>
+            <FilterControls />
             <Box display="flex" alignItems="center" mb={2} gap={2}></Box>
             {loading ? (
                 <Box display="flex" justifyContent="center" py={5}>

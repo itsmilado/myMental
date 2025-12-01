@@ -21,8 +21,12 @@ import { deleteTranscription } from "../../auth/api";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CloseIcon from "@mui/icons-material/Close";
 import { TranscriptionOptions } from "../../../types/types";
+import { useTheme } from "@mui/material/styles";
+import { tokens } from "../../../theme/theme";
 
 const TranscriptionDetailPage = () => {
+    const theme = useTheme();
+    const colors = tokens(theme.palette.mode);
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { list, active, setActive, removeTranscriptionFromList } =
@@ -118,7 +122,15 @@ const TranscriptionDetailPage = () => {
                         startIcon={<ArrowBackIcon />}
                         onClick={() => {
                             setActive(null);
-                            navigate(-1);
+                            navigate("/dashboard/transcriptions/history");
+                        }}
+                        sx={{
+                            color: colors.grey[100],
+                            borderColor: colors.grey[300],
+                            "&:hover": {
+                                borderColor: colors.grey[200],
+                                backgroundColor: theme.palette.action.hover,
+                            },
                         }}
                     >
                         Back

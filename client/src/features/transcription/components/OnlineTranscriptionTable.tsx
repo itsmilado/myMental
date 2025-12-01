@@ -28,6 +28,8 @@ import { useTranscriptionStore } from "../../../store/useTranscriptionStore"; //
 import { useAssemblyTranscriptionStore } from "../../../store/useAssemblyTranscriptionStore";
 import { restoreTranscription } from "../../auth/api";
 import { deleteAssemblyTranscription } from "../../auth/api";
+import { useTheme } from "@mui/material/styles";
+import { tokens } from "../../../theme/theme";
 
 type Props = {
     data: OnlineTranscription[];
@@ -35,6 +37,8 @@ type Props = {
 };
 
 export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
+    const theme = useTheme();
+    const colors = tokens(theme.palette.mode);
     // Offline (restored) list
     const { addTranscription, list: offlineList } = useTranscriptionStore();
     // Online/assembly state
@@ -148,6 +152,18 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                                 startIcon={<RestoreIcon />}
                                                 onClick={() => handleRestore(t)}
                                                 disabled={!!loadingRestore}
+                                                sx={{
+                                                    color: colors.grey[100],
+                                                    borderColor:
+                                                        colors.grey[300],
+                                                    "&:hover": {
+                                                        borderColor:
+                                                            colors.grey[200],
+                                                        backgroundColor:
+                                                            theme.palette.action
+                                                                .hover,
+                                                    },
+                                                }}
                                             >
                                                 {loadingRestore ===
                                                 t.transcript_id
@@ -219,27 +235,22 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                             </TableCell>
                             <TableCell>{t.audio_duration || "-"}</TableCell>
                             <TableCell>
-                                <Link
-                                    href={t.audio_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    underline="hover"
-                                >
+                                <Box display="flex" alignItems="center">
                                     {t.audio_url}
-                                </Link>
-                                <Tooltip title="Copy Audio URL">
-                                    <IconButton
-                                        size="small"
-                                        onClick={() =>
-                                            navigator.clipboard.writeText(
-                                                t.audio_url
-                                            )
-                                        }
-                                        sx={{ ml: 1 }}
-                                    >
-                                        <ContentCopyIcon fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
+                                    <Tooltip title="Copy Audio URL">
+                                        <IconButton
+                                            size="small"
+                                            onClick={() =>
+                                                navigator.clipboard.writeText(
+                                                    t.audio_url
+                                                )
+                                            }
+                                            sx={{ ml: 1 }}
+                                        >
+                                            <ContentCopyIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Box>
                             </TableCell>
                             <TableCell align="center">
                                 <IconButton

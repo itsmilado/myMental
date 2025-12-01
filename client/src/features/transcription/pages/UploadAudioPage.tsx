@@ -15,6 +15,8 @@ import { useState } from "react";
 import { uploadAudio } from "../../auth/api";
 import { TranscriptionOptions, TranscriptData } from "../../../types/types";
 import { formatDateTime } from "../../../utils/formatDate";
+import { useTheme } from "@mui/material/styles";
+import { tokens } from "../../../theme/theme";
 
 const defaultTranscriptionOptions: TranscriptionOptions = {
     speaker_labels: false,
@@ -34,6 +36,8 @@ const modelLanguages: Record<string, string[]> = {
 };
 
 export const UploadAudioPage = () => {
+    const theme = useTheme();
+    const colors = tokens(theme.palette.mode);
     const [file, setFile] = useState<File | null>(null);
     const [options, setOptions] = useState<TranscriptionOptions>(
         defaultTranscriptionOptions
@@ -72,7 +76,18 @@ export const UploadAudioPage = () => {
         <Paper sx={{ p: 4, display: "flex", flexDirection: "column", gap: 2 }}>
             <Typography variant="h5">Transcribe Audio</Typography>
 
-            <Button variant="outlined" component="label">
+            <Button
+                variant="outlined"
+                component="label"
+                sx={{
+                    color: colors.grey[100],
+                    borderColor: colors.grey[300],
+                    "&:hover": {
+                        borderColor: colors.grey[200],
+                        backgroundColor: theme.palette.action.hover,
+                    },
+                }}
+            >
                 Select Audio File
                 <input
                     hidden
@@ -100,6 +115,18 @@ export const UploadAudioPage = () => {
                                     speaker_labels: e.target.checked,
                                 }))
                             }
+                            sx={{
+                                // thumb color when checked
+                                "& .MuiSwitch-switchBase.Mui-checked": {
+                                    color: colors.greenAccent[500],
+                                },
+                                // track color when checked
+                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
+                                    {
+                                        backgroundColor:
+                                            colors.greenAccent[500],
+                                    },
+                            }}
                         />
                     }
                     label="Speaker Labels"
@@ -114,6 +141,18 @@ export const UploadAudioPage = () => {
                                     sentiment_analysis: e.target.checked,
                                 }))
                             }
+                            sx={{
+                                // thumb color when checked
+                                "& .MuiSwitch-switchBase.Mui-checked": {
+                                    color: colors.greenAccent[500],
+                                },
+                                // track color when checked
+                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
+                                    {
+                                        backgroundColor:
+                                            colors.greenAccent[500],
+                                    },
+                            }}
                         />
                     }
                     label="Sentiment Analysis"
@@ -128,6 +167,18 @@ export const UploadAudioPage = () => {
                                     entity_detection: e.target.checked,
                                 }))
                             }
+                            sx={{
+                                // thumb color when checked
+                                "& .MuiSwitch-switchBase.Mui-checked": {
+                                    color: colors.greenAccent[500],
+                                },
+                                // track color when checked
+                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
+                                    {
+                                        backgroundColor:
+                                            colors.greenAccent[500],
+                                    },
+                            }}
                         />
                     }
                     label="Entity Detection"
@@ -143,8 +194,45 @@ export const UploadAudioPage = () => {
                         }))
                     }
                     size="small"
+                    sx={{
+                        "& .MuiInputLabel-root.Mui-focused": {
+                            color: colors.greenAccent[500],
+                        },
+                        "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
+                            {
+                                borderColor: colors.greenAccent[500],
+                            },
+                    }}
                 />
-                <FormControl size="small" fullWidth>
+                <FormControl
+                    size="small"
+                    fullWidth
+                    sx={{
+                        // label base
+                        "& .MuiInputLabel-root": {
+                            color: colors.grey[100],
+                        },
+                        // label when focused
+                        "& .MuiInputLabel-root.Mui-focused": {
+                            color: colors.greenAccent[500],
+                        },
+                        // outline (default)
+                        "& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline":
+                            {
+                                borderColor: colors.grey[300],
+                            },
+                        // outline on hover
+                        "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline":
+                            {
+                                borderColor: colors.grey[200],
+                            },
+                        // outline when focused
+                        "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
+                            {
+                                borderColor: colors.greenAccent[500],
+                            },
+                    }}
+                >
                     <InputLabel id="model-select-label">
                         Speech Model
                     </InputLabel>
@@ -162,14 +250,55 @@ export const UploadAudioPage = () => {
                         }
                     >
                         {Object.keys(modelLanguages).map((model) => (
-                            <MenuItem key={model} value={model}>
+                            <MenuItem
+                                key={model}
+                                value={model}
+                                sx={{
+                                    color: colors.grey[100],
+                                    "&.Mui-selected": {
+                                        backgroundColor: colors.primary[400],
+                                        color: colors.greenAccent[500],
+                                    },
+                                    "&.Mui-selected:hover": {
+                                        backgroundColor: colors.primary[300],
+                                    },
+                                }}
+                            >
                                 {model}
                             </MenuItem>
                         ))}
                     </Select>
                 </FormControl>
 
-                <FormControl size="small" fullWidth>
+                <FormControl
+                    size="small"
+                    fullWidth
+                    sx={{
+                        // label base
+                        "& .MuiInputLabel-root": {
+                            color: colors.grey[100],
+                        },
+                        // label when focused
+                        "& .MuiInputLabel-root.Mui-focused": {
+                            color: colors.greenAccent[500],
+                        },
+                        // outline (default)
+                        "& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline":
+                            {
+                                borderColor: colors.grey[300],
+                            },
+                        // outline on hover
+                        "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline":
+                            {
+                                borderColor: colors.grey[200],
+                            },
+                        // outline when focused
+                        "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
+                            {
+                                borderColor: colors.greenAccent[500],
+                            },
+                    }}
+                >
                     <InputLabel id="language-select-label">
                         Language Code
                     </InputLabel>
@@ -187,7 +316,20 @@ export const UploadAudioPage = () => {
                         {modelLanguages[
                             options.speech_model as keyof typeof modelLanguages
                         ].map((lang) => (
-                            <MenuItem key={lang} value={lang}>
+                            <MenuItem
+                                key={lang}
+                                value={lang}
+                                sx={{
+                                    color: colors.grey[100],
+                                    "&.Mui-selected": {
+                                        backgroundColor: colors.primary[400],
+                                        color: colors.greenAccent[500],
+                                    },
+                                    "&.Mui-selected:hover": {
+                                        backgroundColor: colors.primary[300],
+                                    },
+                                }}
+                            >
                                 {lang}
                             </MenuItem>
                         ))}
