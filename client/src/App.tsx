@@ -49,7 +49,7 @@ function App() {
             <ThemeProvider theme={theme}>
                 <CssBaseline />
                 <Box display="flex">
-                    <Box flexGrow={1} p={3}>
+                    <Box flexGrow={1} p={0}>
                         {checkingAuth ? (
                             <Box
                                 display="flex"
