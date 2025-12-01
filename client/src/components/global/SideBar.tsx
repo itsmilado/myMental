@@ -10,6 +10,8 @@ import {
     ListItemText,
     Divider,
     Collapse,
+    IconButton,
+    Tooltip,
 } from "@mui/material";
 import {
     Home as HomeIcon,
@@ -33,6 +35,8 @@ import {
     Event as EventIcon,
     Alarm as AlarmIcon,
     HolidayVillage as HolidayVillageIcon,
+    ChevronLeft,
+    ChevronRight,
 } from "@mui/icons-material";
 import { tokens } from "../../theme/theme";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -184,28 +188,41 @@ const Sidebar = () => {
     return (
         <Box
             width={isCollapsed ? "80px" : "260px"}
-            height="100vh"
             display="flex"
             flexDirection="column"
             bgcolor={colors.primary[400]}
             sx={{ borderRight: `1px solid ${colors.grey[100]}`, px: 2, py: 3 }}
         >
             {/* Collapse Button */}
-            <Box display="flex" justifyContent="flex-end" mb={2}>
-                <ListItemButton
-                    onClick={() => setIsCollapsed(!isCollapsed)}
-                    sx={{
-                        borderRadius: "8px",
-                        backgroundColor: colors.blueAccent[600],
-                        "&:hover": {
-                            backgroundColor: colors.blueAccent[700],
-                        },
-                    }}
+            <Box
+                display="flex"
+                alignItems="center"
+                justifyContent="flex-end"
+                mb={3}
+                sx={{ px: isCollapsed ? 0 : 1 }} // slight spacing when expanded
+            >
+                <Tooltip
+                    title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                 >
-                    <ListItemIcon sx={{ color: colors.grey[100] }}>
-                        {isCollapsed ? "▶" : "◀"}
-                    </ListItemIcon>
-                </ListItemButton>
+                    <IconButton
+                        onClick={() => setIsCollapsed((prev) => !prev)}
+                        size="small"
+                        sx={{
+                            borderRadius: "999px",
+                            border: `1px solid ${colors.grey[300]}`,
+                            backgroundColor: colors.primary[400],
+                            "&:hover": {
+                                backgroundColor: colors.primary[300],
+                            },
+                        }}
+                    >
+                        {isCollapsed ? (
+                            <ChevronRight sx={{ color: colors.grey[100] }} />
+                        ) : (
+                            <ChevronLeft sx={{ color: colors.grey[100] }} />
+                        )}
+                    </IconButton>
+                </Tooltip>
             </Box>
 
             {/* Avatar and Username */}
@@ -278,7 +295,9 @@ const SidebarItemComponent = ({
                     },
                 }}
             >
-                <ListItemIcon sx={{ color: "gray" }}>{item.icon}</ListItemIcon>
+                <ListItemIcon sx={{ color: colors.grey[100], minWidth: 40 }}>
+                    {item.icon}
+                </ListItemIcon>
                 {!isCollapsed && (
                     <ListItemText
                         primary={
@@ -316,13 +335,17 @@ const SidebarItemComponent = ({
                                 <ListItemIcon sx={{ color: "gray" }}>
                                     {subItem.icon}
                                 </ListItemIcon>
-                                <ListItemText
-                                    primary={
-                                        <Typography color={colors.grey[100]}>
-                                            {subItem.text}
-                                        </Typography>
-                                    }
-                                />
+                                {!isCollapsed && (
+                                    <ListItemText
+                                        primary={
+                                            <Typography
+                                                color={colors.grey[100]}
+                                            >
+                                                {subItem.text}
+                                            </Typography>
+                                        }
+                                    />
+                                )}
                             </ListItemButton>
                         ))}
                     </List>
