@@ -20,8 +20,306 @@ const logger = require("../utils/logger");
 const { assemblyClient } = require("../utils/assemblyaiClient");
 const { fetchAssemblyHistory } = require("../utils/assemblyaiHistory");
 const { exportTranscriptionToFile } = require("../utils/exportService");
-const { request, response } = require("express");
 const { error, log } = require("winston");
+// imports for SSE + job ids
+const { EventEmitter } = require("events");
+const { randomUUID } = require("crypto");
+
+// --- SSE + Job Management for transcribing Audio (Upload Step Progress) ---
+
+const TRANSCRIPTION_STEPS = {
+    INIT: "init",
+    UPLOAD: "upload",
+    TRANSCRIBE: "transcribe",
+    SAVE_DB: "save_db",
+    SAVE_FILE: "save_file",
+    COMPLETE: "complete",
+};
+
+const createInitialStepsState = () => ({
+    [TRANSCRIPTION_STEPS.INIT]: { status: "pending", error: null },
+    [TRANSCRIPTION_STEPS.UPLOAD]: { status: "pending", error: null },
+    [TRANSCRIPTION_STEPS.TRANSCRIBE]: { status: "pending", error: null },
+    [TRANSCRIPTION_STEPS.SAVE_DB]: { status: "pending", error: null },
+    [TRANSCRIPTION_STEPS.SAVE_FILE]: { status: "pending", error: null },
+    [TRANSCRIPTION_STEPS.COMPLETE]: { status: "pending", error: null },
+});
+
+/**
+ * status: "pending" | "in_progress" | "success" | "error"
+ */
+const setStepStatus = (steps, stepKey, status, errorMessage = null) => {
+    if (!steps[stepKey]) return;
+    steps[stepKey] = {
+        status,
+        error: errorMessage,
+    };
+};
+
+/**
+ * In-memory job registry (per-process)
+ * jobs[jobId] = { steps, emitter, result, error, createdAt }
+ */
+const transcriptionJobs = {};
+
+/**
+ * SSE-enabled entry point:
+ *  - expects multipart form with file (field: "audio") + options + fileModifiedDate
+ *  - creates a jobId and starts runTranscriptionJob in the background
+ *  - returns { jobId } immediately
+ */
+const startTranscriptionJob = async (request, response, next) => {
+    try {
+        const user = request.session.user;
+        if (!user || !user.id) {
+            return response.status(401).json({
+                success: false,
+                message: "User not authenticated",
+            });
+        }
+
+        const file = request.file;
+        if (!file || !file.path || !file.filename) {
+            return response.status(400).json({
+                success: false,
+                message: "No audio file provided",
+            });
+        }
+
+        // Parse options from multipart body
+        let userOptions = {};
+        if (request.body.options) {
+            userOptions =
+                typeof request.body.options === "string"
+                    ? JSON.parse(request.body.options)
+                    : request.body.options;
+        }
+
+        const rawDate = request.body.fileModifiedDate || null;
+
+        const jobId = randomUUID();
+        const emitter = new EventEmitter();
+        const steps = createInitialStepsState();
+
+        transcriptionJobs[jobId] = {
+            id: jobId,
+            emitter,
+            steps,
+            result: null,
+            error: null,
+            createdAt: Date.now(),
+        };
+
+        logger.info(
+            `[startTranscriptionJob] => Created job ${jobId} for user ${user.id}`
+        );
+
+        // fire & forget: run worker in background
+        runTranscriptionJob({
+            jobId,
+            user,
+            filePath: file.path,
+            filename: file.filename,
+            rawDate,
+            userOptions,
+        }).catch((err) => {
+            logger.error(
+                `[startTranscriptionJob] => Unhandled error in job ${jobId}: ${err.message}`
+            );
+        });
+
+        // 202 Accepted: processing is happening asynchronously
+        return response.status(202).json({
+            success: true,
+            jobId,
+        });
+    } catch (error) {
+        logger.error(
+            `[startTranscriptionJob] => Error starting job: ${error.message}`
+        );
+        next(error);
+    }
+};
+
+/**
+ * SSE endpoint to stream progress for a given jobId.
+ * Client uses EventSource(`/transcription/progress/${jobId}`)
+ */
+const streamTranscriptionProgress = (request, response, next) => {
+    try {
+        const { jobId } = request.params;
+        const job = transcriptionJobs[jobId];
+
+        if (!job) {
+            return response
+                .status(404)
+                .json({ success: false, message: "Job not found" });
+        }
+
+        const { emitter, steps } = job;
+
+        // SSE headers
+        response.setHeader("Content-Type", "text/event-stream");
+        response.setHeader("Cache-Control", "no-cache");
+        response.setHeader("Connection", "keep-alive");
+        if (response.flushHeaders) {
+            response.flushHeaders();
+        }
+
+        const sendStep = (payload) => {
+            response.write(`event: step\n`);
+            response.write(`data: ${JSON.stringify(payload)}\n\n`);
+        };
+
+        const sendCompleted = (payload) => {
+            response.write(`event: completed\n`);
+            response.write(`data: ${JSON.stringify(payload)}\n\n`);
+        };
+
+        const sendErrorEvent = (payload) => {
+            response.write(`event: error\n`);
+            response.write(`data: ${JSON.stringify(payload)}\n\n`);
+        };
+
+        // send current state immediately (so UI can render initial steps)
+        sendStep({
+            jobId,
+            step: null,
+            status: null,
+            error: null,
+            steps,
+        });
+
+        // subscribe to emitter
+        emitter.on("step", sendStep);
+        emitter.on("completed", sendCompleted);
+        emitter.on("error", sendErrorEvent);
+
+        // cleanup on client disconnect
+        request.on("close", () => {
+            emitter.removeListener("step", sendStep);
+            emitter.removeListener("completed", sendCompleted);
+            emitter.removeListener("error", sendErrorEvent);
+            response.end();
+        });
+    } catch (error) {
+        logger.error(
+            `[streamTranscriptionProgress] => Error streaming SSE: ${error.message}`
+        );
+        next(error);
+    }
+};
+
+/**
+ * Create a new transcription from an uploaded audio file.
+ * Handles file upload, transcription request, polling, DB storage, and file export.
+ * Logs all major steps and errors.
+ */
+const createTranscription = async (request, response, next) => {
+    try {
+        const loggedUserId = request.session.user.id;
+        const userRole = request.session.user.role;
+        const { path: filePath, filename } = request.file;
+        const rawDate = request.body.fileModifiedDate; // safe for DB
+        const fileModifiedDate = rawDate ? new Date(rawDate) : "00.00.00";
+
+        logger.info(
+            `Incoming request to Transcribe from user_id ${loggedUserId} to "${request.method} ${request.originalUrl}"`
+        );
+
+        // Parse user options from request body
+        let userOptions = {};
+        userOptions =
+            typeof request.body.options === "string"
+                ? JSON.parse(request.body.options)
+                : request.body.options;
+
+        // Upload the audio file to AssemblyAI API
+        const uploadUrl = await uploadAudioFile(filePath);
+
+        // Prepare transcription options for API
+        const transcriptionOptions = {
+            audio_url: uploadUrl,
+            ...userOptions,
+        };
+
+        // Request a transcription from AssemblyAI
+        const transcriptId = await requestTranscription(transcriptionOptions);
+
+        // Poll for transcription result
+        const transcript = await pollTranscriptionResult(transcriptId);
+
+        // Store transcription in the database
+
+        // Create response backup
+        const createBackup = await insertTranscriptionBackupQuery({
+            transcript_id: transcriptId, //transcript_id as per API
+            user_id: loggedUserId,
+            user_role: userRole,
+            raw_api_data: transcript, // This is a JS object; pg will handle JSONB
+        });
+
+        if (!createBackup) {
+            throw error;
+        }
+
+        logger.info(
+            `[transcriptionHandler - createTranscription] => insertTranscriptionBackupQuery: Transcript's API response for User ${loggedUserId} with role ${userRole} successfully stored. `
+        );
+
+        const {
+            audio_duration,
+            language_code,
+            speech_model,
+            entity_detection,
+            sentiment_analysis,
+            speaker_labels,
+            speakers_expected,
+            punctuate,
+            format_text,
+        } = transcript;
+
+        const resTranscriptOptions = {
+            language_code: language_code,
+            speech_model: speech_model,
+            entity_detection: entity_detection,
+            sentiment_analysis: sentiment_analysis,
+            speaker_labels: speaker_labels,
+            speakers_expected: speakers_expected,
+            punctuate: punctuate,
+            format_text: format_text,
+        };
+
+        const transcriptData = {
+            user_id: loggedUserId,
+            file_name: filename,
+            audio_duration: audio_duration,
+            transcript_id: transcriptId,
+            options: resTranscriptOptions,
+            file_recorded_at: fileModifiedDate,
+            transcriptObject: transcript,
+        };
+        const insertedTranscription = await storeTranscriptionText({
+            transcriptData,
+        });
+
+        // Save the transcription to a file
+        const storedTxtfilePath = saveTranscriptionToFile(
+            filename,
+            insertedTranscription.transcription
+        );
+
+        // Send response to client
+        response.status(200).json({
+            success: true,
+            message: `Transcription created and stored successfully at: ${storedTxtfilePath}`,
+            TranscriptData: insertedTranscription,
+        });
+    } catch (error) {
+        logger.error(`[createTranscription] => Error: ${error.message}`);
+        next(error);
+    }
+};
 
 /**
  * Fetch all transcriptions from the database.
@@ -110,119 +408,6 @@ const fetchFilteredTranscriptions = async (request, response, next) => {
         logger.error(
             `[transcriptionsMiddleware - getAllTranscriptions] => Error fetching transcriptions: ${error.message}`
         );
-        next(error);
-    }
-};
-
-/**
- * Create a new transcription from an uploaded audio file.
- * Handles file upload, transcription request, polling, DB storage, and file export.
- * Logs all major steps and errors.
- */
-const createTranscription = async (request, response, next) => {
-    try {
-        const loggedUserId = request.session.user.id;
-        const userRole = request.session.user.role;
-        const { path: filePath, filename } = request.file;
-        const rawDate = request.body.fileModifiedDate; // safe for DB
-        const fileModifiedDate = rawDate ? new Date(rawDate) : "00.00.00";
-
-        logger.info(
-            `Incoming request to Transcribe from user_id ${loggedUserId} to "${request.method} ${request.originalUrl}"`
-        );
-
-        // Parse user options from request body
-        let userOptions = {};
-        userOptions =
-            typeof request.body.options === "string"
-                ? JSON.parse(request.body.options)
-                : request.body.options;
-
-        // Upload the audio file to AssemblyAI API
-        const uploadUrl = await uploadAudioFile(filePath);
-
-        // Prepare transcription options for API
-        const transcriptionOptions = {
-            audio_url: uploadUrl,
-            ...userOptions,
-        };
-
-        // Request a transcription from AssemblyAI
-        const transcriptId = await requestTranscription(transcriptionOptions);
-
-        // Poll for transcription result
-        const transcript = await pollTranscriptionResult(transcriptId);
-
-        // Store transcription in the database
-
-        // Create response backup
-        const createBackup = await insertTranscriptionBackupQuery({
-            transcript_id: transcriptId, //transcript_id as per API
-            user_id: loggedUserId,
-            user_role: userRole,
-            raw_api_data: transcript, // This is a JS object; pg will handle JSONB
-        });
-
-        // console.log("created backup:", createBackup);
-
-        if (!createBackup) {
-            throw error;
-        }
-
-        logger.info(
-            `[transcriptionHandler - createTranscription] => insertTranscriptionBackupQuery: Transcript's API response for User ${loggedUserId} with role ${userRole} successfully stored. `
-        );
-
-        const {
-            audio_duration,
-            language_code,
-            speech_model,
-            entity_detection,
-            sentiment_analysis,
-            speaker_labels,
-            speakers_expected,
-            punctuate,
-            format_text,
-        } = transcript;
-
-        const resTranscriptOptions = {
-            language_code: language_code,
-            speech_model: speech_model,
-            entity_detection: entity_detection,
-            sentiment_analysis: sentiment_analysis,
-            speaker_labels: speaker_labels,
-            speakers_expected: speakers_expected,
-            punctuate: punctuate,
-            format_text: format_text,
-        };
-
-        const transcriptData = {
-            user_id: loggedUserId,
-            file_name: filename,
-            audio_duration: audio_duration,
-            transcript_id: transcriptId,
-            options: resTranscriptOptions,
-            file_recorded_at: fileModifiedDate,
-            transcriptObject: transcript,
-        };
-        const insertedTranscription = await storeTranscriptionText({
-            transcriptData,
-        });
-
-        // Save the transcription to a file
-        const storedTxtfilePath = saveTranscriptionToFile(
-            filename,
-            insertedTranscription.transcription
-        );
-
-        // Send response to client
-        response.status(200).json({
-            success: true,
-            message: `Transcription created and stored successfully at: ${storedTxtfilePath}`,
-            TranscriptData: insertedTranscription,
-        });
-    } catch (error) {
-        logger.error(`[createTranscription] => Error: ${error.message}`);
         next(error);
     }
 };
@@ -607,6 +792,215 @@ const restoreTranscription = async (request, response, next) => {
 // Helper functions
 
 /**
+ * Internal worker that runs the full transcription pipeline for one jobId.
+ * Emits step events via job.emitter for SSE clients.
+ */
+const runTranscriptionJob = async ({
+    jobId,
+    user,
+    filePath,
+    filename,
+    rawDate,
+    userOptions,
+}) => {
+    const job = transcriptionJobs[jobId];
+    if (!job) {
+        logger.warn(
+            `[runTranscriptionJob] => Job ${jobId} no longer exists in registry`
+        );
+        return;
+    }
+
+    const { emitter, steps } = job;
+
+    const emitStep = (stepKey, status, errorMessage = null) => {
+        setStepStatus(steps, stepKey, status, errorMessage);
+        emitter.emit("step", {
+            jobId,
+            step: stepKey,
+            status,
+            error: errorMessage,
+            steps,
+        });
+    };
+
+    try {
+        const loggedUserId = user.id;
+        const userRole = user.role;
+
+        // ----------------- INIT -----------------
+        emitStep(TRANSCRIPTION_STEPS.INIT, "in_progress");
+
+        if (!loggedUserId) {
+            const msg = "User not authenticated";
+            emitStep(TRANSCRIPTION_STEPS.INIT, "error", msg);
+            setStepStatus(steps, TRANSCRIPTION_STEPS.COMPLETE, "error", msg);
+            emitter.emit("error", { jobId, steps, message: msg });
+            return;
+        }
+
+        if (!filePath || !filename) {
+            const msg = "No audio file provided";
+            emitStep(TRANSCRIPTION_STEPS.INIT, "error", msg);
+            setStepStatus(steps, TRANSCRIPTION_STEPS.COMPLETE, "error", msg);
+            emitter.emit("error", { jobId, steps, message: msg });
+            return;
+        }
+
+        const fileModifiedDate = rawDate ? new Date(rawDate) : "00.00.00";
+        const fileModifiedDisplayDate =
+            fileModifiedDate instanceof Date &&
+            !isNaN(fileModifiedDate.getTime())
+                ? fileModifiedDate.toLocaleString("en-GB").replace(/\//g, ".")
+                : "00.00.00";
+
+        logger.info(
+            `Incoming SSE transcription job ${jobId} from user_id ${loggedUserId}`
+        );
+
+        console.log(
+            `[runTranscriptionJob] => jobId=${jobId}, filename=${filename}, fileModifiedDate=${fileModifiedDisplayDate}`
+        );
+        console.log(
+            `[runTranscriptionJob] Received options: ${JSON.stringify(
+                userOptions
+            )}`
+        );
+
+        emitStep(TRANSCRIPTION_STEPS.INIT, "success");
+
+        // ----------------- UPLOAD -----------------
+        emitStep(TRANSCRIPTION_STEPS.UPLOAD, "in_progress");
+
+        const uploadUrl = await uploadAudioFile(filePath);
+
+        emitStep(TRANSCRIPTION_STEPS.UPLOAD, "success");
+
+        // ----------------- TRANSCRIBE -----------------
+        emitStep(TRANSCRIPTION_STEPS.TRANSCRIBE, "in_progress");
+
+        const transcriptionOptions = {
+            audio_url: uploadUrl,
+            ...userOptions,
+        };
+
+        console.log(
+            `[runTranscriptionJob] transcriptionOptions: ${JSON.stringify(
+                transcriptionOptions
+            )}`
+        );
+
+        const transcriptId = await requestTranscription(transcriptionOptions);
+        const transcript = await pollTranscriptionResult(transcriptId);
+
+        emitStep(TRANSCRIPTION_STEPS.TRANSCRIBE, "success");
+
+        // ----------------- SAVE_DB -----------------
+        emitStep(TRANSCRIPTION_STEPS.SAVE_DB, "in_progress");
+
+        const createBackup = await insertTranscriptionBackupQuery({
+            transcript_id: transcriptId, // as per API
+            user_id: loggedUserId,
+            user_role: userRole,
+            raw_api_data: transcript,
+        });
+
+        if (!createBackup) {
+            throw new Error(
+                "Failed to insert transcription backup into database"
+            );
+        }
+
+        logger.info(
+            `[runTranscriptionJob] => insertTranscriptionBackupQuery: Transcript's API response for User ${loggedUserId} stored`
+        );
+
+        const {
+            audio_duration,
+            language_code,
+            speech_model,
+            entity_detection,
+            sentiment_analysis,
+            speaker_labels,
+            speakers_expected,
+            punctuate,
+            format_text,
+        } = transcript;
+
+        const resTranscriptOptions = {
+            language_code,
+            speech_model,
+            entity_detection,
+            sentiment_analysis,
+            speaker_labels,
+            speakers_expected,
+            punctuate,
+            format_text,
+        };
+
+        const transcriptData = {
+            user_id: loggedUserId,
+            file_name: filename,
+            audio_duration,
+            transcript_id: transcriptId,
+            options: resTranscriptOptions,
+            file_recorded_at: fileModifiedDate,
+            transcriptObject: transcript,
+        };
+
+        const insertedTranscription = await storeTranscriptionText({
+            transcriptData,
+        });
+
+        emitStep(TRANSCRIPTION_STEPS.SAVE_DB, "success");
+
+        // ----------------- SAVE_FILE -----------------
+        emitStep(TRANSCRIPTION_STEPS.SAVE_FILE, "in_progress");
+
+        const storedTxtfilePath = saveTranscriptionToFile(
+            filename,
+            insertedTranscription.transcription,
+            fileModifiedDisplayDate
+        );
+
+        emitStep(TRANSCRIPTION_STEPS.SAVE_FILE, "success");
+
+        // ----------------- COMPLETE -----------------
+        setStepStatus(steps, TRANSCRIPTION_STEPS.COMPLETE, "success", null);
+        job.result = insertedTranscription;
+
+        emitter.emit("completed", {
+            jobId,
+            steps,
+            message: `Transcription created and stored successfully at: ${storedTxtfilePath}`,
+            TranscriptData: insertedTranscription,
+        });
+
+        logger.info(
+            `[runTranscriptionJob] => job ${jobId} completed successfully`
+        );
+    } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        logger.error(`[runTranscriptionJob] => Error in job ${jobId}: ${msg}`);
+        job.error = msg;
+
+        // mark complete as error
+        setStepStatus(steps, TRANSCRIPTION_STEPS.COMPLETE, "error", msg);
+
+        emitter.emit("error", {
+            jobId,
+            steps,
+            message: msg,
+        });
+    } finally {
+        // Cleanup job from memory after 10 minutes
+        setTimeout(() => {
+            delete transcriptionJobs[jobId];
+        }, 10 * 60 * 1000);
+    }
+};
+
+/**
  * Helper to store transcription text in the database.
  * Converts utterances to plain text and inserts into DB.
  * @param {Object} transcriptData - Data containing transcript object and metadata.
@@ -614,19 +1008,54 @@ const restoreTranscription = async (request, response, next) => {
  */
 const storeTranscriptionText = async ({ transcriptData }) => {
     try {
+        const transcript = transcriptData.transcriptObject || {};
         let transcriptionText = "";
-        // Concatenate all utterances into a single text block
-        for (let utterance of transcriptData.transcriptObject.utterances) {
-            transcriptionText += `Speaker ${utterance.speaker}: ${utterance.text}\n`;
+
+        // 1) Preferred: utterances array (speaker-separated text)
+        if (
+            transcript &&
+            Array.isArray(transcript.utterances) &&
+            transcript.utterances.length > 0
+        ) {
+            transcriptionText = transcript.utterances
+                .map((utterance) => {
+                    const speakerLabel =
+                        utterance.speaker !== undefined &&
+                        utterance.speaker !== null
+                            ? `Speaker ${utterance.speaker}`
+                            : "Speaker";
+                    return `${speakerLabel}: ${utterance.text}`;
+                })
+                .join("\n");
         }
-        logger.info(`
-            [transcriptionMiddleware - createTranscription - storeTranscriptionText] => Transcription utterance text done.
-            `);
+        // 2) Fallback: top-level text (if utterances is null - basic texts)
+        else if (
+            typeof transcript.text === "string" &&
+            transcript.text.trim().length > 0
+        ) {
+            transcriptionText = transcript.text;
+        }
+        // 3) Extra fallback: if field is named "transcript"
+        else if (
+            typeof transcript.transcript === "string" &&
+            transcript.transcript.trim().length > 0
+        ) {
+            transcriptionText = transcript.transcript;
+        }
+        // 4) Last resort: stringify the object so transcript data is not lost
+        else {
+            transcriptionText = JSON.stringify(transcript, null, 2);
+        }
+
+        logger.info(
+            `[transcriptionMiddleware - createTranscription - storeTranscriptionText] => Transcription text prepared (length=${transcriptionText.length}).`
+        );
 
         const transcriptionDataToInsert = {
             transcription: transcriptionText,
             ...transcriptData,
         };
+
         const insertedTranscription = await insertTranscriptionQuery({
             ...transcriptionDataToInsert,
         });
@@ -660,6 +1089,7 @@ const flattenTranscription = (transcriptObject) => {
         .map((u) => `Speaker ${u.speaker != null ? u.speaker : ""}: ${u.text}`)
         .join("\n");
 };
+
 // Export all middleware functions for use in routes
 module.exports = {
     createTranscription,
@@ -673,4 +1103,6 @@ module.exports = {
     fetchAssemblyAIHistory,
     deleteAssemblyAiTranscript,
     restoreTranscription,
+    startTranscriptionJob,
+    streamTranscriptionProgress,
 };

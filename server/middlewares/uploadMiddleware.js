@@ -20,11 +20,12 @@ const storage = multer.diskStorage({
         // Get original filename without extension
         const originalName = path.parse(file.originalname).name;
         const { fileModifiedDate } = req.body;
-        const safeDate = fileModifiedDate
-            ? new Date(fileModifiedDate)
-            : new Date();
+        const parsed =
+            fileModifiedDate && !Number.isNaN(Date.parse(fileModifiedDate))
+                ? new Date(fileModifiedDate)
+                : new Date(); // fallback to "now"
 
-        const fileModifiedDisplayDate = formatISOToCustomDate(fileModifiedDate);
+        const fileModifiedDisplayDate = formatISOToCustomDate(parsed);
         const now = new Date();
         const currentDate = now.toLocaleDateString("en-GB").replace(/\//g, ".");
 
@@ -97,7 +98,7 @@ const uploadMiddleware = (req, res, next) => {
             });
         }
 
-        logger.info(`File successfully uploaded: ${req.file.filename}`);
+        logger.info(`File successfully uploaded to API: ${req.file.filename}`);
 
         next();
     });
@@ -105,7 +106,11 @@ const uploadMiddleware = (req, res, next) => {
 
 // Format date for display
 const formatISOToCustomDate = (isoString) => {
-    const date = new Date(isoString);
+    const date = isoString instanceof Date ? isoString : new Date(isoString);
+    if (Number.isNaN(date.getTime())) {
+        // hard fallback to something safe
+        return "00.00.00_00:00";
+    }
     const pad = (n) => String(n).padStart(2, "0");
 
     const day = pad(date.getDate());

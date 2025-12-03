@@ -74,10 +74,11 @@ const insertTranscriptionQuery = async ({
 const getAllTranscriptionsQuery = async () => {
     try {
         logger.info("[transcribeQueries > getAllTranscriptionsQuery] - Start");
+
         const fetchQuery = `SELECT id,
             *,
             to_char(audio_duration, 'HH24:MI:SS') AS audio_duration
-            FROM transcriptions ORDER BY file_recorded_at DESC`;
+            FROM transcriptions ORDER BY id DESC`;
         const { rows } = await pool.query(fetchQuery);
 
         if (rows.length === 0) {

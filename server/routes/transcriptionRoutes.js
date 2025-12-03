@@ -18,9 +18,28 @@ const {
     fetchAssemblyAIHistory,
     deleteAssemblyAiTranscript,
     restoreTranscription,
+    startTranscriptionJob,
+    streamTranscriptionProgress,
 } = require("../middlewares/transcriptionsHandler");
 
-// Route to handle file upload and transcription
+// Start a transcription job (returns { jobId } immediately)
+transcriptionRoutes.post(
+    "/start",
+    isAuthenticated,
+    uploadMiddleware, // still need file from multipart form
+    startTranscriptionJob,
+    errorHandler
+);
+
+// Stream live progress for a given jobId via Server-Sent Events
+transcriptionRoutes.get(
+    "/progress/:jobId",
+    isAuthenticated,
+    streamTranscriptionProgress,
+    errorHandler
+);
+
+// Route to handle file upload and transcription (legacy, non-SSE)
 transcriptionRoutes.post(
     "/upload",
     isAuthenticated,
