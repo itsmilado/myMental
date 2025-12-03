@@ -172,7 +172,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                             </Button>
                                         ) : (
                                             <Chip
-                                                label="Restored"
+                                                label="Synced"
                                                 color="success"
                                                 size="small"
                                             />
