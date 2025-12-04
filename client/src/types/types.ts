@@ -117,6 +117,15 @@ export type ProfileDialogProps = {
     onClose: () => void;
 };
 
+export type SortState = {
+    orderBy: "file_recorded_at" | "file_name" | "status";
+    direction: "asc" | "desc";
+};
+
+// transcription related types
+
+// ----- UploadAudioPage.tsx -----
+
 export type TranscriptData = {
     id: string; // local DB ID
     user_id: string;
@@ -140,6 +149,49 @@ export type TranscriptionOptions = {
     entity_detection?: boolean;
 };
 
+export type TranscriptionStepKey =
+    | "init"
+    | "upload"
+    | "transcribe"
+    | "save_db"
+    | "save_file"
+    | "complete";
+
+type TranscriptionStepStatus = "pending" | "in_progress" | "success" | "error";
+
+export type TranscriptionStepsState = Record<
+    TranscriptionStepKey,
+    TranscriptionStepState
+>;
+
+export interface TranscriptionStepState {
+    status: TranscriptionStepStatus;
+    error: string | null;
+}
+
+export interface StepEventPayload {
+    jobId: string;
+    step: TranscriptionStepKey | null;
+    status: TranscriptionStepStatus | null;
+    error: string | null;
+    steps: TranscriptionStepsState;
+}
+
+export interface CompletedEventPayload {
+    jobId: string;
+    steps: TranscriptionStepsState;
+    message: string;
+    TranscriptData: TranscriptData;
+}
+
+export interface ErrorEventPayload {
+    jobId?: string;
+    steps?: TranscriptionStepsState;
+    error: string;
+}
+
+// -----------------------------------
+
 export interface TranscriptionPayload {
     file: File;
     fileModifiedDate: string; // formatted as YYYY-MM-DD
@@ -161,11 +213,6 @@ export type Filters = {
     // model?: string;
     // language?: string;
     // dateRange?: { from: string; to: string };
-};
-
-export type SortState = {
-    orderBy: "file_recorded_at" | "file_name" | "status";
-    direction: "asc" | "desc";
 };
 
 export type TranscriptionState = {

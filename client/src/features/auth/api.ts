@@ -15,10 +15,17 @@ import {
 
 axios.defaults.withCredentials = true;
 
+const TRANSCRIPTION_BASE_URL = "http://localhost:5002/transcription";
+
+export interface StartTranscriptionResponse {
+    success: boolean;
+    jobId: string;
+}
+
 export const getUser = async (id: string): Promise<User> => {
     try {
         const response = await axios.get<User>(
-            `http://localhost:5000/users/${id}`
+            `http://localhost:5002/users/${id}`
         );
         return response.data;
     } catch (error) {
@@ -64,15 +71,15 @@ export const signupUser = async (
     return response.data as AuthResponse;
 };
 
-export const uploadAudio = async (
+// SSE-based background job starter
+export const startTranscriptionJob = async (
     file: File,
     options: Partial<TranscriptionOptions>
-): Promise<transcriptUploadResponse> => {
+): Promise<StartTranscriptionResponse> => {
     const formData = new FormData();
 
     const modified = new Date(file.lastModified);
-    const fileModifiedDate = modified.toISOString(); // e.g. "2018-12-13T00:00:00.000Z"
-    console.log("File Modified Date:", fileModifiedDate);
+    const fileModifiedDate = modified.toISOString();
 
     formData.append("fileModifiedDate", fileModifiedDate);
     formData.append("options", JSON.stringify(options));
@@ -81,8 +88,8 @@ export const uploadAudio = async (
     });
     formData.append("audioFile", file);
 
-    const response = await axios.post<transcriptUploadResponse>(
-        "http://localhost:5002/transcription/upload",
+    const { data } = await axios.post<StartTranscriptionResponse>(
+        `${TRANSCRIPTION_BASE_URL}/start`,
         formData,
         {
             headers: {
@@ -90,7 +97,12 @@ export const uploadAudio = async (
             },
         }
     );
-    return response.data;
+
+    return data;
+};
+
+export const getTranscriptionProgressUrl = (jobId: string): string => {
+    return `${TRANSCRIPTION_BASE_URL}/progress/${jobId}`;
 };
 
 // fetch all transcripts for a user

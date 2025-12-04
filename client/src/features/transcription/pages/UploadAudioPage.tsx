@@ -10,20 +10,89 @@ import {
     MenuItem,
     InputLabel,
     FormControl,
+    Stepper,
+    Step,
+    StepLabel,
+    LinearProgress,
+    Alert,
 } from "@mui/material";
-import { useState } from "react";
-import { uploadAudio } from "../../auth/api";
-import { TranscriptionOptions, TranscriptData } from "../../../types/types";
+import { useState, useRef, useEffect } from "react";
+import {
+    startTranscriptionJob,
+    getTranscriptionProgressUrl,
+} from "../../auth/api";
+
+import {
+    TranscriptionOptions,
+    TranscriptData,
+    TranscriptionStepKey,
+    TranscriptionStepsState,
+    StepEventPayload,
+    CompletedEventPayload,
+    ErrorEventPayload,
+} from "../../../types/types";
 import { formatDateTime } from "../../../utils/formatDate";
 import { useTheme } from "@mui/material/styles";
 import { tokens } from "../../../theme/theme";
+
+const TRANSCRIPTION_STEP_ORDER: TranscriptionStepKey[] = [
+    "init",
+    "upload",
+    "transcribe",
+    "save_db",
+    "save_file",
+    "complete",
+];
+
+const createInitialStepsState = (): TranscriptionStepsState => ({
+    init: { status: "pending", error: null },
+    upload: { status: "pending", error: null },
+    transcribe: { status: "pending", error: null },
+    save_db: { status: "pending", error: null },
+    save_file: { status: "pending", error: null },
+    complete: { status: "pending", error: null },
+});
+
+const getActiveStepIndexFromSteps = (
+    steps: TranscriptionStepsState,
+    order: TranscriptionStepKey[] = TRANSCRIPTION_STEP_ORDER
+): number => {
+    let lastIndex = 0;
+    order.forEach((key, index) => {
+        const step = steps[key];
+        if (!step) return;
+        if (step.status === "success" || step.status === "in_progress") {
+            lastIndex = index;
+        }
+    });
+    return lastIndex;
+};
+
+const labelForStepKey = (key: TranscriptionStepKey): string => {
+    switch (key) {
+        case "init":
+            return "Initialize";
+        case "upload":
+            return "Upload";
+        case "transcribe":
+            return "Transcribe";
+        case "save_db":
+            return "Save to Database";
+        case "save_file":
+            return "Save File";
+        case "complete":
+            return "Complete";
+        default:
+            return key;
+    }
+};
 
 const defaultTranscriptionOptions: TranscriptionOptions = {
     speaker_labels: false,
     speakers_expected: 2,
     sentiment_analysis: false,
     speech_model: "slam-1",
-    language_code: "en-US",
+    language_code: "en_us",
     format_text: false,
     punctuate: false,
     entity_detection: false,
@@ -45,16 +114,48 @@ export const UploadAudioPage = () => {
     const [results, setResults] = useState<TranscriptData | null>(null);
     const [loading, setLoading] = useState(false);
 
-    const handleUpload = async () => {
-        if (!file) return;
+    const [jobId, setJobId] = useState<string | null>(null);
+    const [stepsState, setStepsState] = useState<TranscriptionStepsState>(
+        createInitialStepsState
+    );
+    const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const eventSourceRef = useRef<EventSource | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
+            }
+        };
+    }, []);
+
+    const handleUpload = async (): Promise<void> => {
+        if (!file) {
+            return;
+        }
+
+        // Clean up any previous EventSource
+        if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+        }
+
         setLoading(true);
+        setErrorMessage(null);
+        setResults(null);
+        setStepsState(createInitialStepsState());
+        setActiveStepIndex(0);
+        setJobId(null);
+
         const userOptions: Partial<TranscriptionOptions> = {};
+
         if (options.speaker_labels) userOptions.speaker_labels = true;
         if (options.sentiment_analysis) userOptions.sentiment_analysis = true;
         if (options.entity_detection) userOptions.entity_detection = true;
         if (options.punctuate) userOptions.punctuate = true;
         if (options.format_text) userOptions.format_text = true;
-        if (options.speakers_expected !== 2) {
+        if (options.speaker_labels) {
             userOptions.speakers_expected = options.speakers_expected;
         }
         userOptions.speech_model = options.speech_model;
@@ -63,11 +164,83 @@ export const UploadAudioPage = () => {
         try {
             console.log("userOptions:", userOptions);
 
-            const response = await uploadAudio(file, userOptions);
-            setResults(response.TranscriptData);
-        } catch (err) {
-            console.error("Upload error:", err);
-        } finally {
+            // 1) Start background job
+            const startResponse = await startTranscriptionJob(
+                file,
+                userOptions
+            );
+            const newJobId = startResponse.jobId;
+            setJobId(newJobId);
+
+            // 2) Open SSE connection for progress
+            const url = getTranscriptionProgressUrl(newJobId);
+            const eventSource = new EventSource(url, { withCredentials: true });
+            eventSourceRef.current = eventSource;
+
+            eventSource.addEventListener("step", (event: MessageEvent) => {
+                const payload = JSON.parse(event.data) as StepEventPayload;
+                setStepsState(payload.steps);
+                setActiveStepIndex(
+                    getActiveStepIndexFromSteps(
+                        payload.steps,
+                        TRANSCRIPTION_STEP_ORDER
+                    )
+                );
+            });
+
+            eventSource.addEventListener("completed", (event: MessageEvent) => {
+                const payload = JSON.parse(event.data) as CompletedEventPayload;
+                setStepsState(payload.steps);
+                setActiveStepIndex(
+                    getActiveStepIndexFromSteps(
+                        payload.steps,
+                        TRANSCRIPTION_STEP_ORDER
+                    )
+                );
+                setResults(payload.TranscriptData);
+                setLoading(false);
+                eventSource.close();
+                eventSourceRef.current = null;
+            });
+
+            eventSource.addEventListener("error", (event: MessageEvent) => {
+                try {
+                    if (event.data) {
+                        const payload = JSON.parse(
+                            event.data as string
+                        ) as ErrorEventPayload;
+                        setErrorMessage(
+                            payload.error ||
+                                "An error occurred during transcription."
+                        );
+                        if (payload.steps) {
+                            setStepsState(payload.steps);
+                            setActiveStepIndex(
+                                getActiveStepIndexFromSteps(
+                                    payload.steps,
+                                    TRANSCRIPTION_STEP_ORDER
+                                )
+                            );
+                        }
+                    } else {
+                        setErrorMessage(
+                            "An error occurred during transcription (no data)."
+                        );
+                    }
+                } catch {
+                    setErrorMessage("An error occurred during transcription.");
+                }
+                setLoading(false);
+                eventSource.close();
+                eventSourceRef.current = null;
+            });
+        } catch (error) {
+            console.error("Upload error:", error);
+            setErrorMessage(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to start transcription job."
+            );
             setLoading(false);
         }
     };
@@ -75,6 +248,70 @@ export const UploadAudioPage = () => {
     return (
         <Paper sx={{ p: 4, display: "flex", flexDirection: "column", gap: 2 }}>
             <Typography variant="h5">Transcribe Audio</Typography>
+
+            <Box mt={2} mb={3}>
+                <Stepper
+                    activeStep={activeStepIndex}
+                    alternativeLabel
+                    sx={{
+                        "& .MuiStepLabel-label": {
+                            color: colors.grey[300],
+                        },
+                        "& .MuiStepLabel-label.Mui-active": {
+                            color: colors.greenAccent[500],
+                            fontWeight: 600,
+                        },
+                        "& .MuiStepLabel-label.Mui-completed": {
+                            color: colors.greenAccent[400],
+                        },
+                        "& .MuiStepIcon-root": {
+                            color: colors.grey[500],
+                        },
+                        "& .MuiStepIcon-root.Mui-active": {
+                            color: colors.greenAccent[500],
+                        },
+                        "& .MuiStepIcon-root.Mui-completed": {
+                            color: colors.greenAccent[500],
+                        },
+                        "& .MuiStepLabel-root.Mui-error .MuiStepLabel-label": {
+                            color: theme.palette.error.main,
+                        },
+                        "& .MuiStepLabel-root.Mui-error .MuiStepIcon-root": {
+                            color: theme.palette.error.main,
+                        },
+                    }}
+                >
+                    {TRANSCRIPTION_STEP_ORDER.map((key) => (
+                        <Step key={key}>
+                            <StepLabel
+                                error={stepsState[key].status === "error"}
+                            >
+                                {labelForStepKey(key)}
+                            </StepLabel>
+                        </Step>
+                    ))}
+                </Stepper>
+
+                {loading && (
+                    <Box mt={2}>
+                        <LinearProgress
+                            sx={{
+                                "& .MuiLinearProgress-bar": {
+                                    backgroundColor: colors.greenAccent[500],
+                                },
+                            }}
+                        />
+                    </Box>
+                )}
+
+                {errorMessage && (
+                    <Box mt={2}>
+                        <Alert severity="error" variant="outlined">
+                            {errorMessage}
+                        </Alert>
+                    </Box>
+                )}
+            </Box>
 
             <Button
                 variant="outlined"
@@ -187,6 +424,7 @@ export const UploadAudioPage = () => {
                     label="Speakers Expected"
                     type="number"
                     value={options.speakers_expected}
+                    disabled={!options.speaker_labels}
                     onChange={(e) =>
                         setOptions((o) => ({
                             ...o,
