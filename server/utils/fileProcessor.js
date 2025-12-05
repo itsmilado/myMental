@@ -45,6 +45,56 @@ const saveTranscriptionToFile = (filename, transcriptText) => {
     }
 };
 
+const getTranscriptionFilePath = (fileName) => {
+    const originalName = path.parse(fileName).name;
+    const safeName = originalName.replace(/[^\w]+/g, "_");
+    const transcriptionFileName = `${safeName}.txt`;
+    return path.join(transcriptionDir, transcriptionFileName);
+};
+
+const deleteTranscriptionTxtFile = (fileName) => {
+    try {
+        const transcriptionFilePath = getTranscriptionFilePath(fileName);
+        if (fs.existsSync(transcriptionFilePath)) {
+            fs.unlinkSync(transcriptionFilePath);
+            logger.info(
+                `[deleteTranscriptionTxtFile] Deleted transcription file: ${transcriptionFilePath}`
+            );
+        } else {
+            logger.info(
+                `[deleteTranscriptionTxtFile] File does not exist, skipping: ${transcriptionFilePath}`
+            );
+        }
+    } catch (error) {
+        logger.error(
+            `[deleteTranscriptionTxtFile] Error deleting transcription file: ${error.message}`
+        );
+    }
+};
+
+const deleteAudioFileCopy = (fileName) => {
+    try {
+        const uploadDir = path.join(__dirname, "../uploads");
+        const audioPath = path.join(uploadDir, fileName);
+        if (fs.existsSync(audioPath)) {
+            fs.unlinkSync(audioPath);
+            logger.info(
+                `[deleteAudioFileCopy] Deleted audio file copy: ${audioPath}`
+            );
+        } else {
+            logger.info(
+                `[deleteAudioFileCopy] Audio file not found, skipping: ${audioPath}`
+            );
+        }
+    } catch (error) {
+        logger.error(
+            `[deleteAudioFileCopy] Error deleting audio file: ${error.message}`
+        );
+    }
+};
+
 module.exports = {
     saveTranscriptionToFile,
+    deleteTranscriptionTxtFile,
+    deleteAudioFileCopy,
 };

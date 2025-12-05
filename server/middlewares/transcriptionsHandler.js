@@ -1,7 +1,12 @@
 // middleWares/transcriptionMiddleWare.js
-
+const path = require("path");
+const fs = require("fs");
 // Import required modules and utilities
-const { saveTranscriptionToFile } = require("../utils/fileProcessor");
+const {
+    saveTranscriptionToFile,
+    deleteTranscriptionTxtFile,
+    deleteAudioFileCopy,
+} = require("../utils/fileProcessor");
 const uploadAudioFile = require("../utils/assemblyaiUploader");
 const {
     requestTranscription,
@@ -607,6 +612,12 @@ const deleteDBTranscription = async (request, response, next) => {
             `Incoming request to ${request.method} ${request.originalUrl}`
         ); // Log the request URL
 
+        const {
+            deleteFromAssembly = false,
+            deleteTxtFile = false,
+            deleteAudioFile = false,
+        } = request.body || {};
+
         const transcription = await getTranscriptionByIdQuery(id);
         if (!transcription) {
             logger.error(
@@ -624,7 +635,15 @@ const deleteDBTranscription = async (request, response, next) => {
             });
         }
 
-        // Only delete from DB
+        const results = {
+            dbDeleted: false,
+            assemblyDeleted: false,
+            txtDeleted: false,
+            audioDeleted: false,
+        };
+
+        // 1) delete from DB (always, this is the primary action)
+
         const transcriptionDeleted = await deleteTranscriptionByIdQuery(id);
         if (!transcriptionDeleted) {
             logger.error(
@@ -632,13 +651,56 @@ const deleteDBTranscription = async (request, response, next) => {
             );
             next(error);
         }
+
+        results.dbDeleted = true;
+
         logger.info(
             `[deleteTranscription] User ${user.id} deleted transcription ${id} from database`
         );
+
         // remove associated local files here
-        response.json({
+
+        // 2) optionally delete txt file
+
+        if (deleteTxtFile) {
+            deleteTranscriptionTxtFile(transcription.file_name);
+            results.txtDeleted = true; // best-effort, errors just logged
+        }
+
+        // 3) optionally delete audio file copy
+
+        if (deleteAudioFile) {
+            deleteAudioFileCopy(transcription.file_name);
+            results.audioDeleted = true;
+        }
+
+        // 4) optionally delete from AssemblyAI
+
+        if (deleteFromAssembly && transcription.transcript_id) {
+            try {
+                const { status } = await assemblyClient.transcripts.delete(
+                    transcription.transcript_id
+                );
+                if (status === "completed") {
+                    results.assemblyDeleted = true;
+                    logger.info(
+                        `[deleteTranscription] Transcript ${transcription.transcript_id} deleted from AssemblyAI`
+                    );
+                } else {
+                    logger.warn(
+                        `[deleteTranscription] AssemblyAI delete for ${transcription.transcript_id} returned status: ${status}`
+                    );
+                }
+            } catch (err) {
+                logger.error(
+                    `[deleteTranscription] Error deleting from AssemblyAI: ${err.message}`
+                );
+            }
+        }
+        return response.json({
             success: true,
             message: `transcription with ID ${id} successfully deleted.`,
+            results,
         });
     } catch (error) {
         next(error);
