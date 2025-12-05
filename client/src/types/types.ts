@@ -118,7 +118,7 @@ export type ProfileDialogProps = {
 };
 
 export type SortState = {
-    orderBy: "file_recorded_at" | "file_name" | "status";
+    orderBy: "id" | "file_recorded_at" | "file_name" | "status";
     direction: "asc" | "desc";
 };
 

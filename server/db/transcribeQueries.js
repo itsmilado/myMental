@@ -139,7 +139,7 @@ const getFilteredTranscriptionsQuery = async (filters) => {
         }
 
         let orderBy = "id";
-        let direction = "Asc";
+        let direction = "DESC";
         if (
             filters.order_by &&
             ALLOWED_SORT_FIELDS.includes(filters.order_by)
