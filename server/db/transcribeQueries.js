@@ -16,19 +16,69 @@ const insertTranscriptionBackupQuery = async ({
     user_id,
     user_role,
     raw_api_data,
+    file_name,
 }) => {
     try {
         const insertQuery = `
-            INSERT INTO transcription_backups (transcript_id, user_id, user_role, raw_api_data)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO transcription_backups (transcript_id, user_id, user_role, raw_api_data, file_name)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING *;
         `;
-        const insertValues = [transcript_id, user_id, user_role, raw_api_data];
+        const insertValues = [
+            transcript_id,
+            user_id,
+            user_role,
+            raw_api_data,
+            file_name,
+        ];
         const result = await pool.query(insertQuery, insertValues);
         return result.rows[0];
     } catch (error) {
         logger.error(
             `[transcriptionBackupsQueries > insertTranscriptionBackupQuery] Error: ${error.message}`
+        );
+        throw error;
+    }
+};
+
+// Get file_name (and optionally more) for a list of transcript_ids
+
+const getBackupsByTranscriptIdsQuery = async (transcriptIds = []) => {
+    if (!Array.isArray(transcriptIds) || transcriptIds.length === 0) {
+        return [];
+    }
+
+    try {
+        const query = `
+            SELECT transcript_id, file_name
+            FROM transcription_backups
+            WHERE transcript_id = ANY($1)
+        `;
+        const values = [transcriptIds];
+        const { rows } = await pool.query(query, values);
+        return rows; // [{ transcript_id, file_name }, ...]
+    } catch (error) {
+        logger.error(
+            `[transcribeQueries > getBackupsByTranscriptIdsQuery] => Error fetching backups: ${error.message}`
+        );
+        throw error;
+    }
+};
+
+const getBackupWithRawByTranscriptIdQuery = async (transcript_id) => {
+    try {
+        const query = `
+            SELECT transcript_id, file_name, raw_api_data
+            FROM transcription_backups
+            WHERE transcript_id = $1
+            LIMIT 1
+        `;
+        const values = [transcript_id];
+        const { rows } = await pool.query(query, values);
+        return rows[0] || null;
+    } catch (error) {
+        logger.error(
+            `[transcribeQueries > getBackupWithRawByTranscriptIdQuery] => Error: ${error.message}`
         );
         throw error;
     }
@@ -248,4 +298,6 @@ module.exports = {
     getTranscriptionByIdQuery,
     getFilteredTranscriptionsQuery,
     deleteTranscriptionByIdQuery,
+    getBackupsByTranscriptIdsQuery,
+    getBackupWithRawByTranscriptIdQuery,
 };

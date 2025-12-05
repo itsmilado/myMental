@@ -243,6 +243,7 @@ export type OnlineTranscription = {
     language: string;
     features?: string[];
     transcription: string;
+    file_name?: string | null;
 };
 
 export type AssemblyTranscriptionState = {
@@ -260,6 +261,8 @@ export type AssemblyTranscriptionState = {
 
 export type RestorePayload = {
     transcript_id: string;
-    transcription: string;
+    // transcription: string;
     file_recorded_at: string;
+    file_name?: string | null;
+    audio_duration?: string;
 };

@@ -72,8 +72,10 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
         try {
             const data = await restoreTranscription({
                 transcript_id: t.transcript_id,
-                transcription: t.transcription,
+                // transcription: t.transcription,
                 file_recorded_at: t.created_at,
+                file_name: t.file_name,
+                audio_duration: t.audio_duration,
             });
             addTranscription(data);
             setRestored(t.transcript_id);
@@ -123,6 +125,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                     <TableRow>
                         {/* --- Actions column inserted here --- */}
                         <TableCell>Actions</TableCell>
+                        <TableCell>File Name</TableCell>
                         <TableCell>Date</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Transcript ID</TableCell>
@@ -210,6 +213,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                     </Tooltip>
                                 )}
                             </TableCell>
+                            <TableCell>{t.file_name || "-"}</TableCell>
                             <TableCell>
                                 {new Date(t.created_at).toLocaleString()}
                             </TableCell>

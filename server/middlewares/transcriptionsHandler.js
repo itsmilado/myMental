@@ -1,6 +1,5 @@
 // middleWares/transcriptionMiddleWare.js
-const path = require("path");
-const fs = require("fs");
+
 // Import required modules and utilities
 const {
     saveTranscriptionToFile,
@@ -20,6 +19,8 @@ const {
     getTranscriptionByIdQuery,
     getFilteredTranscriptionsQuery,
     deleteTranscriptionByIdQuery,
+    getBackupsByTranscriptIdsQuery,
+    getBackupWithRawByTranscriptIdQuery,
 } = require("../db/transcribeQueries");
 const logger = require("../utils/logger");
 const { assemblyClient } = require("../utils/assemblyaiClient");
@@ -710,19 +711,43 @@ const deleteDBTranscription = async (request, response, next) => {
 const fetchAssemblyAIHistory = async (request, response, next) => {
     try {
         const user = request.session.user;
-        const { transcript_id } = request.query;
+
         logger.info(
             `Incoming request to ${request.method} ${request.originalUrl}`
-        ); // Log the request URL
+        );
+
+        // 1) Get history from AssemblyAI helper
+
         const transcriptions = await fetchAssemblyHistory();
 
         if (!transcriptions) {
             response.status(500).json({
                 success: false,
-                message: "Error fetching transcription from API by ID",
+                message: "Error fetching transcription from Assembly API",
             });
-            throw new Error("Error fetching transcription from API by ID");
+            throw new Error(
+                "Error fetching transcription from Assembly API (history)"
+            );
         }
+
+        // 2) Collect transcript_ids
+
+        const transcriptIds = transcriptions
+            .map((t) => t.transcript_id)
+            .filter(Boolean);
+
+        // 3) Fetch backup metadata (file_name) for IDs
+
+        let backupMap = new Map();
+
+        if (transcriptIds.length > 0) {
+            const backups = await getBackupsByTranscriptIdsQuery(transcriptIds);
+            backupMap = new Map(
+                backups.map((b) => [b.transcript_id, b.file_name])
+            );
+        }
+
+        // 4) Build response + attach file_name from backups
 
         const results = transcriptions.map((t) => ({
             transcript_id: t.transcript_id,
@@ -733,7 +758,7 @@ const fetchAssemblyAIHistory = async (request, response, next) => {
             speech_model: t.speech_model,
             language: t.language,
             transcription: flattenTranscription(t.transcript),
-            // more fields if needed, e.g. features
+            file_name: backupMap.get(t.transcript_id) || null,
         }));
 
         response.status(200).json({
@@ -795,47 +820,126 @@ const deleteAssemblyAiTranscript = async (request, response, next) => {
 
 const restoreTranscription = async (request, response, next) => {
     try {
-        const userId = request.session.user.id;
-        const { transcript_id, transcription, file_recorded_at } = request.body;
+        const user = request.session.user;
+        const userId = user?.id;
+
+        const { transcript_id, file_recorded_at, file_name, audio_duration } =
+            request.body;
 
         logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}, params: ${request.params}`
-        ); // Log the request URL
+            `Incoming request to ${request.method} ${
+                request.originalUrl
+            }, body: ${JSON.stringify({
+                transcript_id,
+                file_recorded_at,
+                file_name,
+                hasAudioDuration: audio_duration != null,
+            })}`
+        );
 
-        // Check for required data
-        if (!transcript_id || !transcription || !file_recorded_at) {
+        if (!userId) {
             logger.warn(
-                `[transcriptionsMiddleware - restoreTranscription] => Missing fields. transcript_id? "${transcript_id}" or transcription? "${transcription}" or file_recorded_at? "${file_recorded_at}"`
+                `[transcriptionsMiddleware - restoreTranscription] => Unauthorized restore attempt`
             );
-            return response
-                .status(400)
-                .json({ success: false, message: "Missing fields" });
+            return response.status(401).json({
+                success: false,
+                message: "User not authenticated",
+            });
         }
 
-        // Prevent duplicate
+        // Required fields
+        if (!transcript_id || !file_recorded_at || !file_name) {
+            logger.warn(
+                `[transcriptionsMiddleware - restoreTranscription] => Missing fields. transcript_id? "${transcript_id}" file_recorded_at? "${file_recorded_at}" file_name? "${file_name}"`
+            );
+            return response.status(400).json({
+                success: false,
+                message: "Missing required fields",
+            });
+        }
+
+        // Prevent duplicate offline row
         const existing = await getTranscriptionByApiTranscriptIdQuery(
             transcript_id
         );
         if (existing) {
             logger.warn(
-                `[transcriptionsMiddleware - restoreTranscription] => Transcript with ID: ${transcript_id} already exsist in databse`
+                `[transcriptionsMiddleware - restoreTranscription] => Transcript with ID: ${transcript_id} already exists in database`
             );
-            return response
-                .status(409)
-                .json({ success: false, message: "Transcript already exists" });
+            return response.status(409).json({
+                success: false,
+                message: "Transcript already exists",
+            });
         }
-        const file_name = buildRestoredFileName(file_recorded_at);
-        // Insert to DB
+
+        // Fetch backup with raw_api_data
+        const backup = await getBackupWithRawByTranscriptIdQuery(transcript_id);
+        if (!backup) {
+            logger.warn(
+                `[transcriptionsMiddleware - restoreTranscription] => No backup found for transcript_id: ${transcript_id}`
+            );
+            return response.status(404).json({
+                success: false,
+                message: "No backup found for this transcript",
+            });
+        }
+
+        const raw = backup.raw_api_data;
+
+        // --- Build transcription text robustly from raw_api_data ---
+        let transcriptionText = "";
+
+        if (raw) {
+            // 1) Direct text on root
+            if (typeof raw.text === "string" && raw.text.trim().length > 0) {
+                transcriptionText = raw.text.trim();
+            }
+            // 2) Nested transcript.text
+            else if (
+                raw.transcript &&
+                typeof raw.transcript.text === "string" &&
+                raw.transcript.text.trim().length > 0
+            ) {
+                transcriptionText = raw.transcript.text.trim();
+            }
+            // 3) utterances array on root
+            else if (Array.isArray(raw.utterances) && raw.utterances.length) {
+                transcriptionText = raw.utterances
+                    .map((u) => (u.text || "").trim())
+                    .filter(Boolean)
+                    .join(" ");
+            }
+            // 4) utterances under transcript
+            else if (
+                raw.transcript &&
+                Array.isArray(raw.transcript.utterances) &&
+                raw.transcript.utterances.length
+            ) {
+                transcriptionText = raw.transcript.utterances
+                    .map((u) => (u.text || "").trim())
+                    .filter(Boolean)
+                    .join(" ");
+            }
+        }
+
+        if (!transcriptionText) {
+            logger.warn(
+                `[transcriptionsMiddleware - restoreTranscription] => Could not derive transcription text from backup.raw_api_data for transcript_id: ${transcript_id}`
+            );
+        }
+
+        // Insert restored transcription into offline table
         const inserted = await insertTranscriptionQuery({
             user_id: userId,
-            file_name,
+            file_name, // original from client/backups
             transcript_id,
-            transcription,
+            transcription: transcriptionText,
             file_recorded_at,
+            audio_duration: audio_duration ?? null,
         });
 
         logger.info(
-            `[transcriptionsMiddleware - restoreTranscription] => Transcript with ID ${transcript_id} restored from AssemblyAI API `
+            `[transcriptionsMiddleware - restoreTranscription] => Transcript with ID ${transcript_id} restored to offline successfully for user ${userId}`
         );
 
         return response.status(201).json({
@@ -845,7 +949,7 @@ const restoreTranscription = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - restoreTranscription] => Error restoring transcript with ID: ${transcript_id}, Error: ${error.message}`
+            `[transcriptionsMiddleware - restoreTranscription] => Error restoring transcript: ${error.message}`
         );
         next(error);
     }
@@ -965,6 +1069,7 @@ const runTranscriptionJob = async ({
             user_id: loggedUserId,
             user_role: userRole,
             raw_api_data: transcript,
+            file_name: filename,
         });
 
         if (!createBackup) {

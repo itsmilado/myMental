@@ -26,6 +26,7 @@ CREATE TABLE transcriptions (
 
 CREATE TABLE transcription_backups (
   id SERIAL PRIMARY KEY,
+  file_name TEXT;
   transcript_id VARCHAR(255) UNIQUE NOT NULL,
   user_id INTEGER NOT NULL REFERENCES users(id),
   user_role VARCHAR(50) NOT NULL,
