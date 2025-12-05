@@ -134,7 +134,11 @@ export const TranscriptionTable = ({
                                     {new Date(t.created_at).toLocaleString()}
                                 </TableCell>
                                 <TableCell>{t.transcript_id}</TableCell>
-                                <TableCell>
+                                <TableCell
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                    }}
+                                >
                                     <ExportButton
                                         transcriptId={t.id}
                                         fileName={t.file_name}
