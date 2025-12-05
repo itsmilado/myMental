@@ -10,6 +10,8 @@ import {
     Paper,
     CircularProgress,
     Box,
+    Snackbar,
+    Alert,
 } from "@mui/material";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { TranscriptData } from "../../../types/types";
@@ -30,9 +32,7 @@ const columns = [
     { id: "audio_duration", label: "Audio Length" },
     { id: "file_recorded_at", label: "Date" },
     { id: "transcript_id", label: "API ID (AssemblyAI)" },
-    { id: "actions", label: "Actions" }, // <- New Actions column
-
-    // Add status, model, etc. as needed
+    { id: "actions", label: "Actions" },
 ];
 
 export const TranscriptionTable = ({
@@ -45,6 +45,7 @@ export const TranscriptionTable = ({
     const removeTranscriptionFromList = useTranscriptionStore(
         (s) => s.removeTranscriptionFromList
     );
+
     const [snackbar, setSnackbar] = useState<{
         open: boolean;
         message: string;
@@ -110,7 +111,6 @@ export const TranscriptionTable = ({
                                     )}
                                 </TableCell>
                             ))}
-                            {/* Add more columns as needed */}
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -140,11 +140,21 @@ export const TranscriptionTable = ({
                                         fileName={t.file_name}
                                     />
                                     <DeleteButton
-                                        onDelete={async () => {
+                                        onDelete={async ({
+                                            deleteFromAssembly,
+                                            deleteServerFiles,
+                                        }) => {
                                             try {
                                                 const msg =
                                                     await deleteTranscription(
-                                                        t.id
+                                                        t.id,
+                                                        {
+                                                            deleteFromAssembly,
+                                                            deleteTxtFile:
+                                                                deleteServerFiles,
+                                                            deleteAudioFile:
+                                                                deleteServerFiles,
+                                                        }
                                                     );
                                                 removeTranscriptionFromList(
                                                     t.id
@@ -159,7 +169,7 @@ export const TranscriptionTable = ({
                                                 setSnackbar({
                                                     open: true,
                                                     message:
-                                                        error.message ||
+                                                        error?.message ||
                                                         "Delete failed",
                                                     error: true,
                                                 });
@@ -168,12 +178,29 @@ export const TranscriptionTable = ({
                                         }}
                                     />
                                 </TableCell>
-                                {/* Render other fields and actions */}
                             </TableRow>
                         ))}
                     </TableBody>
                 </Table>
             </TableContainer>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={2500}
+                onClose={() =>
+                    setSnackbar((prev) => ({ ...prev, open: false }))
+                }
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            >
+                <Alert
+                    onClose={() =>
+                        setSnackbar((prev) => ({ ...prev, open: false }))
+                    }
+                    severity={snackbar.error ? "error" : "success"}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </>
     );
 };

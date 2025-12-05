@@ -4,40 +4,68 @@ import {
     Dialog,
     DialogTitle,
     DialogActions,
+    DialogContent,
+    DialogContentText,
     Button,
     Tooltip,
     CircularProgress,
-    Snackbar,
-    Alert,
+    FormGroup,
+    FormControlLabel,
+    Checkbox,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 
-type Props = {
-    onDelete: () => Promise<string>; // called on confirm
-    label?: string;
-    onSuccess?: (message: string) => void;
+export type DeleteTargets = {
+    deleteFromDb: boolean; // always true for now
+    deleteFromAssembly: boolean;
+    deleteServerFiles: boolean;
 };
 
-export const DeleteButton = ({ onDelete, label = "Delete" }: Props) => {
+type Props = {
+    /**
+     * Called when user confirms delete.
+     * get the user-selected targets; return the backend message string.
+     */
+    onDelete: (targets: DeleteTargets) => Promise<string>;
+    label?: string;
+    /**
+     * Initial state for "delete from AssemblyAI"
+     */
+    defaultDeleteFromAssembly?: boolean;
+    /**
+     * Initial state for "delete server-side files"
+     */
+    defaultDeleteServerFiles?: boolean;
+};
+
+export const DeleteButton = ({
+    onDelete,
+    label = "Delete",
+    defaultDeleteFromAssembly = true,
+    defaultDeleteServerFiles = true,
+}: Props) => {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [snackbar, setSnackbar] = useState<{
-        open: boolean;
-        message: string;
-        error?: boolean;
-    }>({ open: false, message: "" });
+    const [deleteFromAssembly, setDeleteFromAssembly] = useState(
+        defaultDeleteFromAssembly
+    );
+    const [deleteServerFiles, setDeleteServerFiles] = useState(
+        defaultDeleteServerFiles
+    );
 
     const handleConfirm = async () => {
         setLoading(true);
         try {
-            const message = await onDelete();
-            setSnackbar({ open: true, message: message });
-        } catch (error: any) {
-            setSnackbar({
-                open: true,
-                message: error.message || "Delete failed",
-                error: true,
+            await onDelete({
+                deleteFromDb: true,
+                deleteFromAssembly,
+                deleteServerFiles,
             });
+        } catch (error) {
+            // Parent onDelete should already show any error message (snackbar, etc.)
+            // swallow the error to avoid unhandled rejections.
+            // eslint-disable-next-line no-console
+            console.error("Delete failed:", error);
         } finally {
             setLoading(false);
             setOpen(false);
@@ -60,10 +88,44 @@ export const DeleteButton = ({ onDelete, label = "Delete" }: Props) => {
                     </IconButton>
                 </span>
             </Tooltip>
-            <Dialog open={open} onClose={() => setOpen(false)}>
-                <DialogTitle>
-                    Are you sure you want to delete this transcription?
-                </DialogTitle>
+
+            <Dialog open={open} onClose={() => !loading && setOpen(false)}>
+                <DialogTitle>Delete transcription</DialogTitle>
+                <DialogContent>
+                    <DialogContentText sx={{ mb: 2 }}>
+                        Choose what you want to delete. The record in the app
+                        database will always be removed.
+                    </DialogContentText>
+
+                    <FormGroup>
+                        <FormControlLabel
+                            control={<Checkbox checked disabled />}
+                            label="Delete from app database (required)"
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={deleteFromAssembly}
+                                    onChange={(e) =>
+                                        setDeleteFromAssembly(e.target.checked)
+                                    }
+                                />
+                            }
+                            label="Delete from AssemblyAI (API)"
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={deleteServerFiles}
+                                    onChange={(e) =>
+                                        setDeleteServerFiles(e.target.checked)
+                                    }
+                                />
+                            }
+                            label="Delete server-side audio / transcript files"
+                        />
+                    </FormGroup>
+                </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setOpen(false)} disabled={loading}>
                         Cancel
@@ -73,23 +135,10 @@ export const DeleteButton = ({ onDelete, label = "Delete" }: Props) => {
                         onClick={handleConfirm}
                         disabled={loading}
                     >
-                        Delete
+                        {loading ? "Deleting..." : "Delete"}
                     </Button>
                 </DialogActions>
             </Dialog>
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={2500}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
-                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-            >
-                <Alert
-                    onClose={() => setSnackbar({ ...snackbar, open: false })}
-                    severity={snackbar.error ? "error" : "success"}
-                >
-                    {snackbar.message}
-                </Alert>
-            </Snackbar>
         </>
     );
 };

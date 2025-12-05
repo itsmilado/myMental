@@ -84,9 +84,20 @@ const TranscriptionDetailPage = () => {
     ];
 
     // Delete handler
-    const handleDelete = async () => {
+    const handleDelete = async ({
+        deleteFromAssembly,
+        deleteServerFiles,
+    }: {
+        deleteFromAssembly: boolean;
+        deleteServerFiles: boolean;
+        deleteFromDb: boolean; // passed but unused here
+    }) => {
         try {
-            const msg = await deleteTranscription(transcription.id);
+            const msg = await deleteTranscription(transcription.id, {
+                deleteFromAssembly,
+                deleteTxtFile: deleteServerFiles,
+                deleteAudioFile: deleteServerFiles,
+            });
             removeTranscriptionFromList(transcription.id);
             setSnackbar({ open: true, message: msg });
             // Navigate AFTER success, and DO NOT call setActive(null)
@@ -95,12 +106,13 @@ const TranscriptionDetailPage = () => {
         } catch (error: any) {
             setSnackbar({
                 open: true,
-                message: error.message || "Delete failed",
+                message: error?.message || "Delete failed",
                 error: true,
             });
             throw error;
         }
     };
+
     const formatDuration = (dur: any): string => {
         if (!dur) return "";
         if (typeof dur === "string") return dur;

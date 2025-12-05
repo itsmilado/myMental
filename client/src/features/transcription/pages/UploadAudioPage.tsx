@@ -20,7 +20,11 @@ import { useState, useRef, useEffect } from "react";
 import {
     startTranscriptionJob,
     getTranscriptionProgressUrl,
+    deleteTranscription,
 } from "../../auth/api";
+
+import { ExportButton } from "../components/ExportButton";
+import { DeleteButton } from "../components/DeleteButton";
 
 import {
     TranscriptionOptions,
@@ -585,12 +589,54 @@ export const UploadAudioPage = () => {
 
             {results && (
                 <Box mt={4}>
-                    <Typography variant="h6" mt={2} mb={2}>
-                        {results.file_name}
+                    <Typography variant="h6" mt={2} mb={1}>
+                        New transcription created
                     </Typography>
-                    <Typography variant="body2" mb={2}>
-                        Recorded at: {formatDateTime(results.file_recorded_at)}
-                    </Typography>
+
+                    <Box
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        mb={2}
+                        gap={2}
+                    >
+                        <Box>
+                            <Typography variant="subtitle1">
+                                {results.file_name}
+                            </Typography>
+                            <Typography variant="body2">
+                                Recorded at:{" "}
+                                {formatDateTime(results.file_recorded_at)}
+                            </Typography>
+                        </Box>
+
+                        <Box display="flex" alignItems="center" gap={1}>
+                            <ExportButton
+                                transcriptId={results.id}
+                                fileName={results.file_name}
+                            />
+                            <DeleteButton
+                                label="Delete result"
+                                onDelete={async ({
+                                    deleteFromAssembly,
+                                    deleteServerFiles,
+                                }) => {
+                                    const msg = await deleteTranscription(
+                                        results.id,
+                                        {
+                                            deleteFromAssembly,
+                                            deleteTxtFile: deleteServerFiles,
+                                            deleteAudioFile: deleteServerFiles,
+                                        }
+                                    );
+                                    // Remove the result from view once it’s deleted
+                                    setResults(null);
+                                    return msg;
+                                }}
+                            />
+                        </Box>
+                    </Box>
+
                     <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
                         {results.transcription}
                     </Typography>

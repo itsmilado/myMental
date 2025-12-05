@@ -3,7 +3,6 @@
 import axios from "axios";
 import {
     User,
-    transcriptUploadResponse,
     TranscriptionOptions,
     TranscriptData,
     AuthResponse,
@@ -21,6 +20,12 @@ export interface StartTranscriptionResponse {
     success: boolean;
     jobId: string;
 }
+
+export type DeleteTranscriptionOptions = {
+    deleteFromAssembly?: boolean;
+    deleteTxtFile?: boolean;
+    deleteAudioFile?: boolean;
+};
 
 export const getUser = async (id: string): Promise<User> => {
     try {
@@ -148,18 +153,27 @@ export const exportTranscription = async (
     return { blob: res.data, fileName };
 };
 
-export const deleteTranscription = async (id: string): Promise<string> => {
+export const deleteTranscription = async (
+    id: string,
+    options?: DeleteTranscriptionOptions
+): Promise<string> => {
     try {
+        // NOTE: axios.delete with a body must use `data` inside the config object
         const response = await axios.delete(
-            `http://localhost:5002/transcription/delete/dbTranscription/${id}`
+            `http://localhost:5002/transcription/delete/dbTranscription/${id}`,
+            {
+                data: options ?? {},
+            }
         );
-        if (!response.data.success) {
-            throw new Error(response.data.message || "Delete failed");
+
+        if (!response.data?.success) {
+            throw new Error(response.data?.message || "Delete failed");
         }
-        return response.data.message;
+
+        return response.data.message as string;
     } catch (error: any) {
         const message =
-            error.response?.data?.message || error.message || "Delete failed";
+            error?.response?.data?.message || error.message || "Delete failed";
         throw new Error(message);
     }
 };
