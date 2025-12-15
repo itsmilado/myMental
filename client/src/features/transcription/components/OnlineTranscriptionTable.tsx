@@ -208,7 +208,11 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                             }
                         >
                             <TableCell>{formatDate(t.created_at)}</TableCell>
-                            <TableCell>{t.status}</TableCell>
+                            <TableCell>
+                                {t.audio_url === "http://deleted_by_user"
+                                    ? "deleted"
+                                    : t.status}
+                            </TableCell>
                             <TableCell>{cleanFileName(t.file_name)}</TableCell>
                             <TableCell>{t.audio_duration || "-"}</TableCell>
                             <TableCell>
