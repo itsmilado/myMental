@@ -1,6 +1,6 @@
 // src/features/transcription/components/OnlineTranscriptionTable.tsx
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     Table,
     TableHead,
@@ -17,11 +17,15 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
+    TablePagination,
+    CircularProgress,
 } from "@mui/material";
 import RestoreIcon from "@mui/icons-material/Restore";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DeleteIcon from "@mui/icons-material/Delete";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+
 import { OnlineTranscription } from "../../../types/types";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore"; // offline state
 import { useAssemblyTranscriptionStore } from "../../../store/useAssemblyTranscriptionStore";
@@ -41,12 +45,8 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
     // Offline (restored) list
     const { addTranscription, list: offlineList } = useTranscriptionStore();
     // Online/assembly state
-    const {
-        list: onlineList,
-        setList: setOnlineList,
-        restoredIds = [],
-        setRestored,
-    } = useAssemblyTranscriptionStore();
+    const { list: onlineList, setList: setOnlineList } =
+        useAssemblyTranscriptionStore();
 
     // Local state for snackbar, restore, delete
     const [snackbar, setSnackbar] = useState<{
@@ -56,6 +56,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
     }>({ open: false, msg: "", error: false });
 
     const [loadingRestore, setLoadingRestore] = useState<string | null>(null);
+
     const [deleteDialog, setDeleteDialog] = useState<{
         open: boolean;
         t: OnlineTranscription | null;
@@ -63,9 +64,64 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
 
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
+    // Pagination: 20 rows per page
+    const [page, setPage] = useState(0);
+
+    const rowsPerPage = 15;
+    const handleChangePage = (_event: unknown, newPage: number) => {
+        setPage(newPage);
+    };
+
+    const paginatedData = data.slice(
+        page * rowsPerPage,
+        page * rowsPerPage + rowsPerPage
+    );
+
+    // Reset page if data length shrinks below current page
+    useEffect(() => {
+        if (page > 0 && page * rowsPerPage >= data.length) {
+            setPage(0);
+        }
+    }, [data.length, page, rowsPerPage]);
+
+    const shorten = (value: string | null | undefined, max: number) => {
+        if (!value) return "-";
+        return value.length > max ? `${value.slice(0, max)}…` : value;
+    };
+
+    const shortenTranscriptId = (value: string | null | undefined): string => {
+        if (!value) return "-";
+        if (value.length <= 12) return value;
+
+        const start = value.slice(0, 6);
+        const end = value.slice(-6);
+        return `${start}…${end}`;
+    };
+
+    const cleanFileName = (fileName: string | null | undefined) => {
+        if (!fileName) return "-";
+
+        // Remove suffix like: _Transcribed(Date) before the extension
+        return fileName.replace(/_Transcribed\([^)]*\)(?=\.)/, "");
+    };
+
+    const formatDate = (value: string | null | undefined) => {
+        if (!value) return "-";
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return value; // fallback to raw if invalid
+
+        const day = String(d.getDate()).padStart(2, "0");
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const year = d.getFullYear();
+        const hours = String(d.getHours()).padStart(2, "0");
+        const minutes = String(d.getMinutes()).padStart(2, "0");
+
+        // dd.MM.yyyy HH:mm
+        return `${day}.${month}.${year}_${hours}:${minutes}`;
+    };
+
     const isRestored = (transcript_id: string) =>
-        !!offlineList.find((t) => t.transcript_id === transcript_id) ||
-        restoredIds.includes(transcript_id);
+        !!offlineList.find((t) => t.transcript_id === transcript_id);
 
     const handleRestore = async (t: OnlineTranscription) => {
         setLoadingRestore(t.transcript_id);
@@ -78,7 +134,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                 audio_duration: t.audio_duration,
             });
             addTranscription(data);
-            setRestored(t.transcript_id);
+
             setSnackbar({ open: true, msg: "Restored!", error: false });
         } catch (err: any) {
             setSnackbar({
@@ -124,19 +180,94 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                 <TableHead>
                     <TableRow>
                         {/* --- Actions column inserted here --- */}
-                        <TableCell>Actions</TableCell>
-                        <TableCell>File Name</TableCell>
                         <TableCell>Date</TableCell>
                         <TableCell>Status</TableCell>
-                        <TableCell>Transcript ID</TableCell>
+                        <TableCell>File Name</TableCell>
                         <TableCell>Audio Length</TableCell>
+                        <TableCell>Transcript ID</TableCell>
                         <TableCell>Audio URL</TableCell>
+                        <TableCell>Actions</TableCell>
                         <TableCell align="center">Details</TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>
-                    {data.map((t) => (
-                        <TableRow key={t.transcript_id} hover>
+                    {paginatedData.map((t) => (
+                        <TableRow
+                            key={t.transcript_id}
+                            hover
+                            sx={
+                                t.audio_url === "http://deleted_by_user"
+                                    ? {
+                                          backgroundColor: "action.hover",
+                                          "& td": {
+                                              fontStyle: "italic",
+                                              opacity: 0.8,
+                                          },
+                                      }
+                                    : undefined
+                            }
+                        >
+                            <TableCell>{formatDate(t.created_at)}</TableCell>
+                            <TableCell>{t.status}</TableCell>
+                            <TableCell>{cleanFileName(t.file_name)}</TableCell>
+                            <TableCell>{t.audio_duration || "-"}</TableCell>
+                            <TableCell>
+                                <Chip
+                                    variant="outlined"
+                                    sx={{
+                                        backgroundColor: "action.hover",
+                                        px: 1,
+                                        maxWidth: 260,
+                                        borderRadius: "6px",
+                                        "& .MuiChip-label": {
+                                            px: 0,
+                                        },
+                                    }}
+                                    label={
+                                        <Box
+                                            display="flex"
+                                            alignItems="center"
+                                            justifyContent="space-between"
+                                            width="100%"
+                                        >
+                                            <Box
+                                                component="span"
+                                                sx={{
+                                                    fontFamily: "monospace",
+                                                    fontSize: "0.8rem",
+                                                    mr: 1,
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    whiteSpace: "nowrap",
+                                                }}
+                                            >
+                                                {shortenTranscriptId(
+                                                    t.transcript_id
+                                                )}
+                                            </Box>
+                                            <Tooltip title="Copy Transcript ID">
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() =>
+                                                        navigator.clipboard.writeText(
+                                                            t.transcript_id
+                                                        )
+                                                    }
+                                                >
+                                                    <ContentCopyIcon fontSize="inherit" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Box>
+                                    }
+                                />
+                            </TableCell>
+                            <TableCell>
+                                <Box display="flex" alignItems="center">
+                                    {t.audio_url === "http://deleted_by_user"
+                                        ? "deleted_by_user"
+                                        : shorten(t.audio_url, 40)}
+                                </Box>
+                            </TableCell>
                             {/* --- Actions cell --- */}
                             <TableCell>
                                 {/* Restore */}
@@ -149,35 +280,44 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                 >
                                     <span>
                                         {!isRestored(t.transcript_id) ? (
-                                            <Button
+                                            <IconButton
                                                 size="small"
-                                                startIcon={<RestoreIcon />}
                                                 onClick={() => handleRestore(t)}
-                                                disabled={!!loadingRestore}
+                                                disabled={
+                                                    loadingRestore ===
+                                                        t.transcript_id ||
+                                                    t.audio_url ===
+                                                        "http://deleted_by_user"
+                                                }
                                                 sx={{
-                                                    color: colors.grey[100],
-                                                    borderColor:
-                                                        colors.grey[300],
-                                                    "&:hover": {
-                                                        borderColor:
-                                                            colors.grey[200],
-                                                        backgroundColor:
-                                                            theme.palette.action
-                                                                .hover,
-                                                    },
+                                                    borderRadius: "6px",
+
+                                                    padding: "2px",
                                                 }}
                                             >
                                                 {loadingRestore ===
-                                                t.transcript_id
-                                                    ? "Restoring..."
-                                                    : "Restore"}
-                                            </Button>
+                                                t.transcript_id ? (
+                                                    <CircularProgress
+                                                        size={16}
+                                                    />
+                                                ) : (
+                                                    <RestoreIcon fontSize="small" />
+                                                )}
+                                            </IconButton>
                                         ) : (
-                                            <Chip
-                                                label="Synced"
-                                                color="success"
-                                                size="small"
-                                            />
+                                            <Tooltip title="Already restored">
+                                                <IconButton
+                                                    size="small"
+                                                    disabled
+                                                    sx={{
+                                                        borderRadius: "6px",
+                                                        color: "success.main",
+                                                        padding: "2px",
+                                                    }}
+                                                >
+                                                    <CheckCircleIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
                                         )}
                                     </span>
                                 </Tooltip>
@@ -213,48 +353,6 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                     </Tooltip>
                                 )}
                             </TableCell>
-                            <TableCell>{t.file_name || "-"}</TableCell>
-                            <TableCell>
-                                {new Date(t.created_at).toLocaleString()}
-                            </TableCell>
-                            <TableCell>{t.status}</TableCell>
-                            <TableCell>
-                                <Box display="flex" alignItems="center">
-                                    {t.transcript_id}
-                                    <Tooltip title="Copy Transcript ID">
-                                        <IconButton
-                                            size="small"
-                                            onClick={() =>
-                                                navigator.clipboard.writeText(
-                                                    t.transcript_id
-                                                )
-                                            }
-                                            sx={{ ml: 1 }}
-                                        >
-                                            <ContentCopyIcon fontSize="small" />
-                                        </IconButton>
-                                    </Tooltip>
-                                </Box>
-                            </TableCell>
-                            <TableCell>{t.audio_duration || "-"}</TableCell>
-                            <TableCell>
-                                <Box display="flex" alignItems="center">
-                                    {t.audio_url}
-                                    <Tooltip title="Copy Audio URL">
-                                        <IconButton
-                                            size="small"
-                                            onClick={() =>
-                                                navigator.clipboard.writeText(
-                                                    t.audio_url
-                                                )
-                                            }
-                                            sx={{ ml: 1 }}
-                                        >
-                                            <ContentCopyIcon fontSize="small" />
-                                        </IconButton>
-                                    </Tooltip>
-                                </Box>
-                            </TableCell>
                             <TableCell align="center">
                                 <IconButton
                                     size="small"
@@ -268,6 +366,14 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                     ))}
                 </TableBody>
             </Table>
+            <TablePagination
+                component="div"
+                count={data.length}
+                page={page}
+                onPageChange={handleChangePage}
+                rowsPerPage={rowsPerPage}
+                rowsPerPageOptions={[rowsPerPage]}
+            />
             {/* Delete dialog */}
             <Dialog
                 open={deleteDialog.open}
