@@ -730,6 +730,8 @@ const fetchAssemblyAIHistory = async (request, response, next) => {
             );
         }
 
+        // console.log("aai transcription", transcriptions);
+
         // 2) Collect transcript_ids
 
         const transcriptIds = transcriptions
@@ -760,6 +762,8 @@ const fetchAssemblyAIHistory = async (request, response, next) => {
             transcription: flattenTranscription(t.transcript),
             file_name: backupMap.get(t.transcript_id) || null,
         }));
+
+        // console.log("aai results transcription", results);
 
         response.status(200).json({
             success: true,
@@ -1250,11 +1254,32 @@ const buildRestoredFileName = (dateStr) => {
 };
 
 const flattenTranscription = (transcriptObject) => {
-    if (!transcriptObject || !Array.isArray(transcriptObject.utterances))
-        return "";
-    return transcriptObject.utterances
-        .map((u) => `Speaker ${u.speaker != null ? u.speaker : ""}: ${u.text}`)
-        .join("\n");
+    if (!transcriptObject) return "";
+
+    // 1) Prefer utterances if available
+    if (
+        Array.isArray(transcriptObject.utterances) &&
+        transcriptObject.utterances.length > 0
+    ) {
+        return transcriptObject.utterances
+            .map(
+                (u) =>
+                    `Speaker ${u.speaker != null ? u.speaker : ""}: ${
+                        u.text || ""
+                    }`
+            )
+            .join("\n");
+    }
+
+    // 2) Fallback: plain text field from AssemblyAI
+    if (
+        typeof transcriptObject.text === "string" &&
+        transcriptObject.text.trim().length > 0
+    ) {
+        return transcriptObject.text;
+    }
+
+    return "";
 };
 
 // Export all middleware functions for use in routes
