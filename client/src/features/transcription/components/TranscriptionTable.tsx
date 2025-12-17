@@ -1,18 +1,24 @@
-import { useState } from "react";
+// src/features/transcription/components/transcriptionTable.tsx
+
+import { useState, useEffect } from "react";
 import {
     Table,
     TableBody,
     TableCell,
-    TableContainer,
     TableHead,
     TableRow,
     TableSortLabel,
-    Paper,
     CircularProgress,
     Box,
     Snackbar,
     Alert,
+    Chip,
+    IconButton,
+    Tooltip,
+    TablePagination,
 } from "@mui/material";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { TranscriptData } from "../../../types/types";
 import { ExportButton } from "./ExportButton";
@@ -25,15 +31,6 @@ type Props = {
     error: string | null;
     onRowClick?: (t: TranscriptData) => void;
 };
-
-const columns = [
-    { id: "id", label: "ID" },
-    { id: "file_name", label: "File Name" },
-    { id: "audio_duration", label: "Audio Length" },
-    { id: "file_recorded_at", label: "Date" },
-    { id: "transcript_id", label: "API ID (AssemblyAI)" },
-    { id: "actions", label: "Actions" },
-];
 
 export const TranscriptionTable = ({
     data,
@@ -72,6 +69,51 @@ export const TranscriptionTable = ({
         return `${h}:${m}:${s}`;
     };
 
+    const shortenTranscriptId = (value: string | null | undefined): string => {
+        if (!value) return "-";
+        if (value.length <= 12) return value;
+
+        const start = value.slice(0, 6);
+        const end = value.slice(-6);
+        return `${start}…${end}`;
+    };
+
+    const cleanFileName = (fileName: string | null | undefined) => {
+        if (!fileName) return "-";
+
+        // Remove suffix like: _Transcribed(Date) before the extension
+        return fileName.replace(/_Transcribed\([^)]*\)(?=\.)/, "");
+    };
+
+    const formatDate = (value: string | null | undefined) => {
+        if (!value) return "-";
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return value; // fallback to raw if invalid
+
+        const day = String(d.getDate()).padStart(2, "0");
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const year = d.getFullYear();
+        const hours = String(d.getHours()).padStart(2, "0");
+        const minutes = String(d.getMinutes()).padStart(2, "0");
+
+        // dd.MM.yyyy HH:mm
+        return `${day}.${month}.${year}_${hours}:${minutes}`;
+    };
+
+    const rowsPerPage = 15;
+    const [page, setPage] = useState(0);
+
+    useEffect(() => {
+        // If data shrinks (delete), avoid landing on an empty page
+        const maxPage = Math.max(0, Math.ceil(data.length / rowsPerPage) - 1);
+        if (page > maxPage) setPage(maxPage);
+    }, [data.length, page]);
+
+    const paginatedData = data.slice(
+        page * rowsPerPage,
+        page * rowsPerPage + rowsPerPage
+    );
+
     if (loading)
         return (
             <Box
@@ -88,105 +130,180 @@ export const TranscriptionTable = ({
 
     return (
         <>
-            <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
-                <Table>
-                    <TableHead>
-                        <TableRow>
-                            {columns.map((col) => (
-                                <TableCell key={col.id}>
-                                    {col.id !== "actions" ? (
-                                        <TableSortLabel
-                                            active={sort.orderBy === col.id}
-                                            direction={
-                                                sort.orderBy === col.id
-                                                    ? sort.direction
-                                                    : "asc"
-                                            }
-                                            onClick={() => handleSort(col.id)}
-                                        >
-                                            {col.label}
-                                        </TableSortLabel>
-                                    ) : (
-                                        col.label
-                                    )}
-                                </TableCell>
-                            ))}
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {data.map((t) => (
-                            <TableRow
-                                key={t.id}
-                                hover
-                                sx={{
-                                    cursor: onRowClick ? "pointer" : "default",
-                                }}
-                                onClick={
-                                    onRowClick ? () => onRowClick(t) : undefined
+            <Table size="small">
+                <TableHead>
+                    <TableRow>
+                        <TableCell>
+                            <TableSortLabel
+                                active={sort.orderBy === "id"}
+                                direction={
+                                    sort.orderBy === "id"
+                                        ? sort.direction
+                                        : "asc"
                                 }
+                                onClick={() => handleSort("id")}
                             >
-                                <TableCell>{t.id}</TableCell>
-                                <TableCell>{t.file_name}</TableCell>
-                                <TableCell>
-                                    {formatDuration(t.audio_duration)}
-                                </TableCell>
-                                <TableCell>
-                                    {new Date(t.created_at).toLocaleString()}
-                                </TableCell>
-                                <TableCell>{t.transcript_id}</TableCell>
-                                <TableCell
-                                    onClick={(e) => {
-                                        e.stopPropagation();
+                                ID
+                            </TableSortLabel>
+                        </TableCell>
+                        <TableCell align="center">
+                            <TableSortLabel
+                                active={sort.orderBy === "file_recorded_at"}
+                                direction={
+                                    sort.orderBy === "file_recorded_at"
+                                        ? sort.direction
+                                        : "asc"
+                                }
+                                onClick={() => handleSort("file_recorded_at")}
+                            >
+                                Date
+                            </TableSortLabel>
+                        </TableCell>
+                        <TableCell>File Name</TableCell>
+                        <TableCell align="center">Audio Length</TableCell>
+                        <TableCell align="center">
+                            API ID (AssemblyAI)
+                        </TableCell>
+                        <TableCell align="center">Actions</TableCell>
+                    </TableRow>
+                </TableHead>
+
+                <TableBody>
+                    {paginatedData.map((t) => (
+                        <TableRow
+                            key={t.id}
+                            hover
+                            sx={{
+                                cursor: onRowClick ? "pointer" : "default",
+                            }}
+                            onClick={
+                                onRowClick ? () => onRowClick(t) : undefined
+                            }
+                        >
+                            <TableCell>{t.id}</TableCell>
+                            <TableCell align="center">
+                                {formatDate(t.created_at)}
+                            </TableCell>
+                            <TableCell>{cleanFileName(t.file_name)}</TableCell>
+                            <TableCell align="center">
+                                {formatDuration(t.audio_duration)}
+                            </TableCell>
+                            <TableCell
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                }}
+                                align="center"
+                            >
+                                <Chip
+                                    variant="outlined"
+                                    sx={{
+                                        backgroundColor: "action.hover",
+                                        px: 1,
+                                        maxWidth: 260,
+                                        borderRadius: "6px",
+                                        "& .MuiChip-label": {
+                                            px: 0,
+                                        },
                                     }}
-                                >
-                                    <ExportButton
-                                        transcriptId={t.id}
-                                        fileName={t.file_name}
-                                    />
-                                    <DeleteButton
-                                        onDelete={async ({
-                                            deleteFromAssembly,
-                                            deleteServerFiles,
-                                        }) => {
-                                            try {
-                                                const msg =
-                                                    await deleteTranscription(
-                                                        t.id,
-                                                        {
-                                                            deleteFromAssembly,
-                                                            deleteTxtFile:
-                                                                deleteServerFiles,
-                                                            deleteAudioFile:
-                                                                deleteServerFiles,
-                                                        }
-                                                    );
-                                                removeTranscriptionFromList(
-                                                    t.id
+                                    label={
+                                        <Box
+                                            display="flex"
+                                            alignItems="center"
+                                            justifyContent="space-between"
+                                            width="100%"
+                                        >
+                                            <Box
+                                                component="span"
+                                                sx={{
+                                                    fontFamily: "monospace",
+                                                    fontSize: "0.8rem",
+                                                    mr: 1,
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    whiteSpace: "nowrap",
+                                                }}
+                                            >
+                                                {shortenTranscriptId(
+                                                    t.transcript_id
+                                                )}
+                                            </Box>
+                                            <Tooltip title="Copy Transcript ID">
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() =>
+                                                        navigator.clipboard.writeText(
+                                                            t.transcript_id
+                                                        )
+                                                    }
+                                                >
+                                                    <ContentCopyIcon fontSize="inherit" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Box>
+                                    }
+                                />
+                            </TableCell>
+
+                            <TableCell
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                }}
+                                align="center"
+                            >
+                                <ExportButton
+                                    transcriptId={t.id}
+                                    fileName={t.file_name}
+                                />
+                                <DeleteButton
+                                    onDelete={async ({
+                                        deleteFromAssembly,
+                                        deleteServerFiles,
+                                    }) => {
+                                        try {
+                                            const msg =
+                                                await deleteTranscription(
+                                                    t.id,
+                                                    {
+                                                        deleteFromAssembly,
+                                                        deleteTxtFile:
+                                                            deleteServerFiles,
+                                                        deleteAudioFile:
+                                                            deleteServerFiles,
+                                                    }
                                                 );
-                                                setSnackbar({
-                                                    open: true,
-                                                    message: msg,
-                                                    error: false,
-                                                });
-                                                return msg;
-                                            } catch (error: any) {
-                                                setSnackbar({
-                                                    open: true,
-                                                    message:
-                                                        error?.message ||
-                                                        "Delete failed",
-                                                    error: true,
-                                                });
-                                                throw error;
-                                            }
-                                        }}
-                                    />
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+                                            removeTranscriptionFromList(t.id);
+                                            setSnackbar({
+                                                open: true,
+                                                message: msg,
+                                                error: false,
+                                            });
+                                            return msg;
+                                        } catch (error: any) {
+                                            setSnackbar({
+                                                open: true,
+                                                message:
+                                                    error?.message ||
+                                                    "Delete failed",
+                                                error: true,
+                                            });
+                                            throw error;
+                                        }
+                                    }}
+                                />
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+
+            <TablePagination
+                component="div"
+                count={data.length}
+                page={page}
+                onPageChange={(_, newPage) => setPage(newPage)}
+                rowsPerPage={rowsPerPage}
+                rowsPerPageOptions={[rowsPerPage]}
+            />
 
             <Snackbar
                 open={snackbar.open}

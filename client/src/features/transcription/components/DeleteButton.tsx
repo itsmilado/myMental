@@ -105,7 +105,6 @@ export const DeleteButton = ({
                         <FormControlLabel
                             control={
                                 <Checkbox
-                                    checked={deleteFromAssembly}
                                     onChange={(e) =>
                                         setDeleteFromAssembly(e.target.checked)
                                     }
@@ -116,7 +115,6 @@ export const DeleteButton = ({
                         <FormControlLabel
                             control={
                                 <Checkbox
-                                    checked={deleteServerFiles}
                                     onChange={(e) =>
                                         setDeleteServerFiles(e.target.checked)
                                     }
