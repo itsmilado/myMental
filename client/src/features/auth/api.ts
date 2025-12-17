@@ -196,6 +196,16 @@ export const fetchAssemblyTranscriptions = async (
     return response.data.data as OnlineTranscription[];
 };
 
+export const fetchTranscriptionById = async (
+    id: string
+): Promise<TranscriptData> => {
+    const res = await axios.get(
+        `http://localhost:5002/transcription/by_id/${id}`
+    );
+    if (res.data?.success) return res.data.data as TranscriptData;
+    throw new Error(res.data?.message || "Failed to fetch transcription");
+};
+
 export const restoreTranscription = async (
     payload: RestorePayload
 ): Promise<TranscriptData> => {

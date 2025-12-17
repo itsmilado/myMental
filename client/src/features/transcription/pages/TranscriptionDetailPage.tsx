@@ -1,36 +1,25 @@
 // src/features/transcription/pages/TranscriptionDetailPage.tsx
 
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import {
-    Box,
-    Divider,
-    Chip,
-    Typography,
-    Button,
-    Paper,
-    IconButton,
-    Stack,
-    Snackbar,
-    Alert,
-} from "@mui/material";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Box, CircularProgress, Snackbar, Alert } from "@mui/material";
+
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
-import { ExportButton } from "../components/ExportButton";
-import { DeleteButton } from "../components/DeleteButton";
-import { deleteTranscription } from "../../auth/api";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import CloseIcon from "@mui/icons-material/Close";
-import { TranscriptionOptions } from "../../../types/types";
-import { useTheme } from "@mui/material/styles";
-import { tokens } from "../../../theme/theme";
+import { deleteTranscription, fetchTranscriptionById } from "../../auth/api";
+import { TranscriptionDetailContent } from "../components/TranscriptionDetailContent";
+
+import type { TranscriptData } from "../../../types/types";
 
 const TranscriptionDetailPage = () => {
-    const theme = useTheme();
-    const colors = tokens(theme.palette.mode);
-    const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { list, active, setActive, removeTranscriptionFromList } =
+    const { id } = useParams<{ id: string }>();
+
+    const { list, loading, setActive, removeTranscriptionFromList } =
         useTranscriptionStore();
+
+    const [transcription, setTranscription] = useState<TranscriptData | null>(
+        null
+    );
 
     const [snackbar, setSnackbar] = useState<{
         open: boolean;
@@ -38,204 +27,130 @@ const TranscriptionDetailPage = () => {
         error?: boolean;
     }>({ open: false, message: "" });
 
-    // Find the transcription with the given id
-    const transcription = active || list.find((t) => t.transcript_id === id);
+    /**
+     * Resolve transcription from store by route id
+     */
+    useEffect(() => {
+        if (!id) return;
 
-    if (!transcription) {
-        return (
-            <Box p={3}>
-                <Typography variant="h4" color="error">
-                    Transcription not found
-                </Typography>
-                <Button
-                    startIcon={<ArrowBackIcon />}
-                    onClick={() => {
-                        setActive(null);
-                        navigate(-1);
-                    }}
-                >
-                    back
-                </Button>
-                <IconButton
-                    onClick={() => {
-                        setActive(null);
-                        navigate("/dashboard/transcriptions/history");
-                    }}
-                    size="large"
-                    aria-label="close"
-                >
-                    <CloseIcon />
-                </IconButton>
-            </Box>
-        );
-    }
+        const found = list.find((t) => String(t.id) === String(id));
 
-    const { options, audio_duration } = transcription;
+        if (found) {
+            setActive(found);
+            setTranscription(found);
+            return;
+        }
 
-    const featureChips: { label: string; key: keyof TranscriptionOptions }[] = [
-        { label: "Speaker Labels", key: "speaker_labels" },
-        { label: "Speakers Expected", key: "speakers_expected" },
-        { label: "Sentiment Analysis", key: "sentiment_analysis" },
-        { label: "Speech Model", key: "speech_model" },
-        { label: "Language Code", key: "language_code" },
-        { label: "Punctuate", key: "punctuate" },
-        { label: "Format Text", key: "format_text" },
-        { label: "Entity Detection", key: "entity_detection" },
-    ];
+        // If not in store (common on refresh), fetch by id
+        (async () => {
+            try {
+                const data = await fetchTranscriptionById(id);
 
-    // Delete handler
+                setActive(data);
+                setTranscription(data);
+            } catch {
+                setActive(null);
+                navigate("/dashboard/transcriptions/history");
+            }
+        })();
+    }, [id, list, navigate, setActive]);
+
+    /**
+     * If item disappears (deleted / refreshed), leave the page
+     */
+    useEffect(() => {
+        if (!id || !transcription) return;
+
+        // On refresh, list can be empty (not yet loaded). Don't redirect in that case.
+        if (list.length === 0) return;
+
+        const stillExists = list.some((t) => String(t.id) === String(id));
+
+        if (!stillExists) {
+            setActive(null);
+            navigate("/dashboard/transcriptions/history");
+        }
+    }, [list, id, transcription, navigate, setActive]);
+
+    /**
+     * DELETE handler
+     */
     const handleDelete = async ({
         deleteFromAssembly,
         deleteServerFiles,
     }: {
         deleteFromAssembly: boolean;
         deleteServerFiles: boolean;
-        deleteFromDb: boolean; // passed but unused here
-    }) => {
+        deleteFromDb: boolean;
+    }): Promise<string> => {
         try {
-            const msg = await deleteTranscription(transcription.id, {
+            const msg = await deleteTranscription(transcription!.id, {
                 deleteFromAssembly,
                 deleteTxtFile: deleteServerFiles,
                 deleteAudioFile: deleteServerFiles,
             });
-            removeTranscriptionFromList(transcription.id);
-            setSnackbar({ open: true, message: msg });
-            // Navigate AFTER success, and DO NOT call setActive(null)
-            navigate("/dashboard/transcriptions/history", { replace: true });
-            return msg;
-        } catch (error: any) {
+
+            removeTranscriptionFromList(transcription!.id);
+
             setSnackbar({
                 open: true,
-                message: error?.message || "Delete failed",
-                error: true,
+                message: msg || "Deleted",
+                error: false,
             });
+
+            setActive(null);
+            navigate("/dashboard/transcriptions/history");
+
+            return msg || "Deleted";
+        } catch (error: any) {
+            const failMsg = error?.message || "Delete failed";
+            setSnackbar({ open: true, message: failMsg, error: true });
             throw error;
         }
     };
 
-    const formatDuration = (dur: any): string => {
-        if (!dur) return "";
-        if (typeof dur === "string") return dur;
-        const h = String(dur.hours ?? 0).padStart(2, "0");
-        const m = String(dur.minutes ?? 0).padStart(2, "0");
-        const s = String(Math.floor(dur.seconds ?? 0)).padStart(2, "0");
-        return `${h}:${m}:${s}`;
-    };
+    /**
+     * Loading state
+     */
+    if (loading || !transcription) {
+        return (
+            <Box
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                minHeight={300}
+            >
+                <CircularProgress />
+            </Box>
+        );
+    }
+
     return (
-        <Box sx={{ maxWidth: 1000, mx: "auto", py: 4 }}>
-            <Paper sx={{ p: 3, borderRadius: 3 }}>
-                <Box
-                    display="flex"
-                    justifyContent="space-between"
-                    alignItems="center"
-                    mb={2}
-                >
-                    <Button
-                        startIcon={<ArrowBackIcon />}
-                        onClick={() => {
-                            setActive(null);
-                            navigate("/dashboard/transcriptions/history");
-                        }}
-                        sx={{
-                            color: colors.grey[100],
-                            borderColor: colors.grey[300],
-                            "&:hover": {
-                                borderColor: colors.grey[200],
-                                backgroundColor: theme.palette.action.hover,
-                            },
-                        }}
-                    >
-                        Back
-                    </Button>
-                    <IconButton
-                        onClick={() => {
-                            setActive(null);
-                            navigate("/dashboard/transcriptions/history");
-                        }}
-                        size="large"
-                        aria-label="close"
-                    >
-                        <CloseIcon />
-                    </IconButton>
-                </Box>
-                <Stack direction="row" spacing={2} alignItems="center" mb={2}>
-                    <Typography variant="h5" gutterBottom>
-                        {transcription.file_name}
-                    </Typography>
-                    <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        gutterBottom
-                    >
-                        ID (DB): {transcription.id}
-                    </Typography>
-                    <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        gutterBottom
-                    >
-                        API ID (AssemblyAI): {transcription.transcript_id}
-                    </Typography>
+        <Box sx={{ py: 2 }}>
+            <TranscriptionDetailContent
+                // mode="page"
+                transcription={transcription}
+                showActions={true}
+                onBack={() => {
+                    setActive(null);
+                    navigate("/dashboard/transcriptions/history/offline");
+                }}
+                onClose={() => {
+                    setActive(null);
+                    navigate("/dashboard/transcriptions/history/offline");
+                }}
+                onOpenFullPage={undefined}
+                onDelete={handleDelete}
+            />
 
-                    {active && (
-                        <>
-                            <ExportButton
-                                transcriptId={active.id}
-                                fileName={active.file_name}
-                            />
-                            <DeleteButton onDelete={handleDelete} />
-                        </>
-                    )}
-                </Stack>
-                <>
-                    <Typography variant="body2" gutterBottom>
-                        Audio Duration: {formatDuration(audio_duration) || "-"}
-                    </Typography>
-                    <Typography variant="body2" gutterBottom>
-                        Language: {options?.language_code || "-"}
-                    </Typography>
-                    <Typography variant="body2" gutterBottom>
-                        Speech Model: {options?.speech_model || "-"}
-                    </Typography>
-                    <Typography variant="body2" gutterBottom>
-                        Speaker Labels: {options?.speaker_labels ? "True" : "-"}
-                    </Typography>
-                    <Typography variant="body2" gutterBottom>
-                        Speakers Expected: {options?.speakers_expected || "-"}
-                    </Typography>
-                    <Typography variant="body2" gutterBottom>
-                        Entity Detection:{" "}
-                        {options?.entity_detection ? "True" : "-"}
-                    </Typography>
-                    <Typography variant="body2" gutterBottom>
-                        Sentiment Analysis:{" "}
-                        {options?.sentiment_analysis ? "True" : "-"}
-                    </Typography>
-                    <Typography variant="body2" gutterBottom>
-                        Format Text: {options?.format_text ? "True" : "-"}
-                    </Typography>
-                    <Typography variant="body2" gutterBottom>
-                        Punctuate: {options?.punctuate ? "True" : "-"}
-                    </Typography>
-                    <Typography variant="body2" gutterBottom>
-                        Recorded at: {transcription.file_recorded_at}
-                    </Typography>
-
-                    <Divider sx={{ mb: 2 }} />
-                </>
-
-                <Typography variant="subtitle2" sx={{ mt: 2 }}>
-                    Transcription:
-                </Typography>
-                <Typography sx={{ whiteSpace: "pre-wrap", mt: 1 }}>
-                    {transcription.transcription}
-                </Typography>
-            </Paper>
             <Snackbar
                 open={snackbar.open}
                 autoHideDuration={2500}
                 onClose={() => setSnackbar({ ...snackbar, open: false })}
-                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                anchorOrigin={{
+                    vertical: "bottom",
+                    horizontal: "right",
+                }}
             >
                 <Alert
                     onClose={() => setSnackbar({ ...snackbar, open: false })}

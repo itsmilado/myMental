@@ -413,8 +413,12 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                 onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
                 message={snackbar.msg}
                 anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-                ContentProps={{
-                    sx: snackbar.error ? { backgroundColor: "error.main" } : {},
+                slotProps={{
+                    content: {
+                        sx: snackbar.error
+                            ? { backgroundColor: "error.main" }
+                            : {},
+                    },
                 }}
             />
         </>

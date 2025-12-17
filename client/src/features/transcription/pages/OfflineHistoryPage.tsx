@@ -1,5 +1,6 @@
 // src/features/transcription/pages/OfflineHistoryPage.tsx
-import { useNavigate } from "react-router-dom";
+// import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 import {
     Box,
     Paper,
@@ -15,13 +16,17 @@ import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { useTranscriptionList } from "../hooks/useTranscriptionList";
 import { TranscriptionTable } from "../components/TranscriptionTable";
 import FilterControls from "../components/FilterControls";
+import { OfflineTranscriptionModal } from "../components/OfflineTranscriptionModal";
 
 const OfflineHistoryPage = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
-    const navigate = useNavigate();
+    // const navigate = useNavigate();
     const { list, loading, error, setActive } = useTranscriptionStore();
     const { loadTranscriptions } = useTranscriptionList();
+
+    const [selected, setSelected] = useState<any | null>(null);
+
     const handleSync = () => {
         loadTranscriptions();
     };
@@ -77,10 +82,15 @@ const OfflineHistoryPage = () => {
                     error={error}
                     onRowClick={(t) => {
                         setActive(t);
-                        navigate(`/dashboard/transcriptions/${t.id}`);
+                        setSelected(t);
                     }}
                 />
             )}
+            <OfflineTranscriptionModal
+                open={!!selected}
+                transcription={selected}
+                onClose={() => setSelected(null)}
+            />
         </Paper>
     );
 };
