@@ -11,6 +11,8 @@ import CloseIcon from "@mui/icons-material/Close";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { ExportButton } from "./ExportButton";
 import { DeleteButton } from "./DeleteButton";
+import { getAudioStreamUrl } from "../../auth/api";
+import { AudioPlayer } from "./AudioPlayer";
 
 type DeleteArgs = {
     deleteFromAssembly: boolean;
@@ -44,6 +46,24 @@ export const TranscriptionDetailContent = ({
         const s = String(Math.floor(dur.seconds ?? 0)).padStart(2, "0");
         return `${h}:${m}:${s}`;
     };
+
+    const formatDate = (value: string | null | undefined) => {
+        if (!value) return "-";
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return value; // fallback to raw if invalid
+
+        const day = String(d.getDate()).padStart(2, "0");
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const year = d.getFullYear();
+        const hours = String(d.getHours()).padStart(2, "0");
+        const minutes = String(d.getMinutes()).padStart(2, "0");
+
+        // dd.MM.yyyy HH:mm
+        return `${day}.${month}.${year}_${hours}:${minutes}`;
+    };
+
+    const fileName = transcription?.file_name;
+    const audioSrc = fileName ? getAudioStreamUrl(fileName) : "";
 
     return (
         <Box
@@ -170,7 +190,7 @@ export const TranscriptionDetailContent = ({
                 >
                     <DetailRow
                         label="Recorded at"
-                        value={transcription.file_recorded_at}
+                        value={formatDate(transcription.file_recorded_at)}
                     />
                     <DetailRow
                         label="Speech model"
@@ -201,6 +221,13 @@ export const TranscriptionDetailContent = ({
                         value={options?.punctuate ? "True" : "-"}
                     />
                 </Box>
+
+                <Divider sx={{ my: 2 }} />
+                {fileName ? (
+                    <Box sx={{ mt: 2, mb: 2 }}>
+                        <AudioPlayer src={audioSrc} />
+                    </Box>
+                ) : null}
 
                 <Divider sx={{ my: 2 }} />
 

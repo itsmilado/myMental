@@ -66,7 +66,7 @@ export const signupUser = async (
     password: string,
     repeat_password: string
 ): Promise<AuthResponse> => {
-    const response = await axios.post("http://localhost:5000/users/signup", {
+    const response = await axios.post("http://localhost:5002/users/signup", {
         first_name,
         last_name,
         email,
@@ -183,7 +183,7 @@ export const fetchAssemblyTranscriptions = async (
 ): Promise<OnlineTranscription[]> => {
     const params = transcriptId ? { transcript_id: transcriptId } : {};
     const response = await axios.get(
-        "http://localhost:5002/transcription/assemblyai/history",
+        `${TRANSCRIPTION_BASE_URL}/assemblyai/history`,
         { params }
     );
 
@@ -199,9 +199,7 @@ export const fetchAssemblyTranscriptions = async (
 export const fetchTranscriptionById = async (
     id: string
 ): Promise<TranscriptData> => {
-    const res = await axios.get(
-        `http://localhost:5002/transcription/by_id/${id}`
-    );
+    const res = await axios.get(`${TRANSCRIPTION_BASE_URL}/by_id/${id}`);
     if (res.data?.success) return res.data.data as TranscriptData;
     throw new Error(res.data?.message || "Failed to fetch transcription");
 };
@@ -232,4 +230,8 @@ export const deleteAssemblyTranscription = async (
             error.response?.data?.message || error.message || "Delete failed";
         throw new Error(message);
     }
+};
+
+export const getAudioStreamUrl = (fileName: string) => {
+    return `${TRANSCRIPTION_BASE_URL}/audio/${encodeURIComponent(fileName)}`;
 };

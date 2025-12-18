@@ -11,6 +11,8 @@ import {
     Chip,
 } from "@mui/material";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import { getAudioStreamUrl } from "../../auth/api";
+import { AudioPlayer } from "./AudioPlayer";
 import { OnlineTranscription } from "../../../types/types";
 
 type Props = {
@@ -27,6 +29,9 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
     if (!transcription) return null;
 
     const isDeleted = transcription.audio_url === "http://deleted_by_user";
+    const audioSrc = transcription.file_name
+        ? getAudioStreamUrl(transcription.file_name)
+        : null;
 
     return (
         <Drawer
@@ -160,6 +165,16 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
                                 </>
                             )}
                     </Stack>
+
+                    <Divider sx={{ mt: 2, mb: 2 }} />
+
+                    <AudioPlayer
+                        src={audioSrc || ""}
+                        disabled={isDeleted}
+                        disabledMessage={
+                            isDeleted ? "Deleted by user." : undefined
+                        }
+                    />
 
                     <Divider sx={{ my: 2 }} />
 

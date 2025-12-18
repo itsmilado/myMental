@@ -20,6 +20,7 @@ const {
     restoreTranscription,
     startTranscriptionJob,
     streamTranscriptionProgress,
+    streamAudioFile,
 } = require("../middlewares/transcriptionsHandler");
 
 // Start a transcription job (returns { jobId } immediately)
@@ -115,6 +116,13 @@ transcriptionRoutes.post(
     "/restore",
     isAuthenticated,
     restoreTranscription,
+    errorHandler
+);
+
+transcriptionRoutes.get(
+    "/audio/:fileName",
+    isAuthenticated,
+    streamAudioFile,
     errorHandler
 );
 

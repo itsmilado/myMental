@@ -1,6 +1,8 @@
-// middleWares/transcriptionMiddleWare.js
+// middleWares/transcriptionHandler.js
 
 // Import required modules and utilities
+const fs = require("fs");
+const path = require("path");
 const {
     saveTranscriptionToFile,
     deleteTranscriptionTxtFile,
@@ -959,6 +961,82 @@ const restoreTranscription = async (request, response, next) => {
     }
 };
 
+const streamAudioFile = (request, response, next) => {
+    try {
+        const uploadDir = path.join(__dirname, "../uploads");
+
+        // prevent path traversal
+        const rawName = String(request.params.fileName || "");
+        const safeName = path.basename(rawName);
+
+        const audioPath = path.join(uploadDir, safeName);
+
+        if (!audioPath.startsWith(uploadDir)) {
+            return response.status(400).json({ message: "Invalid file name" });
+        }
+
+        if (!fs.existsSync(audioPath)) {
+            return response
+                .status(404)
+                .json({ message: "Audio file not found" });
+        }
+
+        const stat = fs.statSync(audioPath);
+        const fileSize = stat.size;
+        const range = request.headers.range;
+
+        // basic content-type mapping
+        const ext = path.extname(audioPath).toLowerCase();
+        const contentType =
+            ext === ".mp3"
+                ? "audio/mpeg"
+                : ext === ".wav"
+                ? "audio/wav"
+                : ext === ".m4a"
+                ? "audio/mp4"
+                : ext === ".aac"
+                ? "audio/aac"
+                : "application/octet-stream";
+
+        if (range) {
+            const parts = range.replace(/bytes=/, "").split("-");
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+            if (Number.isNaN(start) || Number.isNaN(end) || start > end) {
+                return response
+                    .status(416)
+                    .send("Requested Range Not Satisfiable");
+            }
+
+            const chunkSize = end - start + 1;
+
+            response.writeHead(206, {
+                "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+                "Accept-Ranges": "bytes",
+                "Content-Length": chunkSize,
+                "Content-Type": contentType,
+            });
+
+            const stream = fs.createReadStream(audioPath, { start, end });
+            stream.on("error", next);
+            return stream.pipe(response);
+        }
+
+        response.writeHead(200, {
+            "Content-Length": fileSize,
+            "Content-Type": contentType,
+            "Accept-Ranges": "bytes",
+        });
+
+        const stream = fs.createReadStream(audioPath);
+        stream.on("error", next);
+        return stream.pipe(response);
+    } catch (err) {
+        return next(err);
+    }
+};
+
 // Helper functions
 
 /**
@@ -1297,4 +1375,5 @@ module.exports = {
     restoreTranscription,
     startTranscriptionJob,
     streamTranscriptionProgress,
+    streamAudioFile,
 };
