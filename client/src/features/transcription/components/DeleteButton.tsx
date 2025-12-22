@@ -22,27 +22,19 @@ export type DeleteTargets = {
 };
 
 type Props = {
-    /**
-     * Called when user confirms delete.
-     * get the user-selected targets; return the backend message string.
-     */
     onDelete: (targets: DeleteTargets) => Promise<string>;
     label?: string;
-    /**
-     * Initial state for "delete from AssemblyAI"
-     */
+
     defaultDeleteFromAssembly?: boolean;
-    /**
-     * Initial state for "delete server-side files"
-     */
+
     defaultDeleteServerFiles?: boolean;
 };
 
 export const DeleteButton = ({
     onDelete,
     label = "Delete",
-    defaultDeleteFromAssembly = true,
-    defaultDeleteServerFiles = true,
+    defaultDeleteFromAssembly = false,
+    defaultDeleteServerFiles = false,
 }: Props) => {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);

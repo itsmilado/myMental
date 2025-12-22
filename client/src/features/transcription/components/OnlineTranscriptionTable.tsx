@@ -19,6 +19,9 @@ import {
     DialogActions,
     TablePagination,
     CircularProgress,
+    FormControl,
+    Select,
+    MenuItem,
 } from "@mui/material";
 import RestoreIcon from "@mui/icons-material/Restore";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
@@ -38,6 +41,7 @@ type Props = {
     data: OnlineTranscription[];
     onDetails: (t: OnlineTranscription) => void;
 };
+type StatusFilter = "all" | "completed" | "deleted";
 
 export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
     const theme = useTheme();
@@ -47,6 +51,19 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
     // Online/assembly state
     const { list: onlineList, setList: setOnlineList } =
         useAssemblyTranscriptionStore();
+
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+    const getDisplayStatus = (t: OnlineTranscription) =>
+        t.audio_url === "http://deleted_by_user" ? "deleted" : t.status;
+
+    const filteredData = data.filter((t) => {
+        const displayStatus = getDisplayStatus(t);
+
+        if (statusFilter === "deleted") return displayStatus === "deleted";
+        if (statusFilter === "completed") return displayStatus === "completed";
+        return true; // all
+    });
 
     // Local state for snackbar, restore, delete
     const [snackbar, setSnackbar] = useState<{
@@ -72,17 +89,21 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
         setPage(newPage);
     };
 
-    const paginatedData = data.slice(
+    const paginatedData = filteredData.slice(
         page * rowsPerPage,
         page * rowsPerPage + rowsPerPage
     );
 
     // Reset page if data length shrinks below current page
     useEffect(() => {
-        if (page > 0 && page * rowsPerPage >= data.length) {
+        if (page > 0 && page * rowsPerPage >= filteredData.length) {
             setPage(0);
         }
-    }, [data.length, page, rowsPerPage]);
+    }, [filteredData.length, page, rowsPerPage]);
+
+    useEffect(() => {
+        setPage(0);
+    }, [statusFilter]);
 
     const shorten = (value: string | null | undefined, max: number) => {
         if (!value) return "-";
@@ -128,8 +149,6 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
         try {
             const data = await restoreTranscription({
                 transcript_id: t.transcript_id,
-                // transcription: t.transcription,
-                file_recorded_at: t.created_at,
                 file_name: t.file_name,
                 audio_duration: t.audio_duration,
             });
@@ -170,7 +189,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
         }
     };
 
-    if (!data.length) {
+    if (!filteredData.length) {
         return <Box p={2}>No online transcriptions found.</Box>;
     }
 
@@ -179,12 +198,36 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
             <Table size="small">
                 <TableHead>
                     <TableRow>
-                        {/* --- Actions column inserted here --- */}
-                        <TableCell>Date</TableCell>
-                        <TableCell>Status</TableCell>
+                        <TableCell align="center">Date</TableCell>
+                        <TableCell align="center">
+                            <FormControl
+                                size="small"
+                                variant="standard"
+                                fullWidth
+                            >
+                                <Select
+                                    value={statusFilter}
+                                    onChange={(e) =>
+                                        setStatusFilter(
+                                            e.target.value as StatusFilter
+                                        )
+                                    }
+                                    disableUnderline
+                                    sx={{ fontSize: 13 }}
+                                >
+                                    <MenuItem value="all">Status: All</MenuItem>
+                                    <MenuItem value="completed">
+                                        Status: Completed
+                                    </MenuItem>
+                                    <MenuItem value="deleted">
+                                        Status: Deleted
+                                    </MenuItem>
+                                </Select>
+                            </FormControl>
+                        </TableCell>
                         <TableCell>File Name</TableCell>
-                        <TableCell>Audio Length</TableCell>
-                        <TableCell>Transcript ID</TableCell>
+                        <TableCell align="center">Audio Length</TableCell>
+                        <TableCell align="center">Transcript ID</TableCell>
                         <TableCell>Audio URL</TableCell>
                         <TableCell>Actions</TableCell>
                         <TableCell align="center">Details</TableCell>
@@ -207,15 +250,19 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                     : undefined
                             }
                         >
-                            <TableCell>{formatDate(t.created_at)}</TableCell>
-                            <TableCell>
+                            <TableCell align="center">
+                                {formatDate(t.created_at)}
+                            </TableCell>
+                            <TableCell align="center">
                                 {t.audio_url === "http://deleted_by_user"
                                     ? "deleted"
                                     : t.status}
                             </TableCell>
                             <TableCell>{cleanFileName(t.file_name)}</TableCell>
-                            <TableCell>{t.audio_duration || "-"}</TableCell>
-                            <TableCell>
+                            <TableCell align="center">
+                                {t.audio_duration || "-"}
+                            </TableCell>
+                            <TableCell align="center">
                                 <Chip
                                     variant="outlined"
                                     sx={{
@@ -372,7 +419,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
             </Table>
             <TablePagination
                 component="div"
-                count={data.length}
+                count={filteredData.length}
                 page={page}
                 onPageChange={handleChangePage}
                 rowsPerPage={rowsPerPage}

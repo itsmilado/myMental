@@ -265,6 +265,7 @@ const createTranscription = async (request, response, next) => {
             user_id: loggedUserId,
             user_role: userRole,
             raw_api_data: transcript, // This is a JS object; pg will handle JSONB
+            file_recorded_at: fileModifiedDate,
         });
 
         if (!createBackup) {
@@ -747,7 +748,13 @@ const fetchAssemblyAIHistory = async (request, response, next) => {
         if (transcriptIds.length > 0) {
             const backups = await getBackupsByTranscriptIdsQuery(transcriptIds);
             backupMap = new Map(
-                backups.map((b) => [b.transcript_id, b.file_name])
+                backups.map((b) => [
+                    b.transcript_id,
+                    {
+                        file_name: b.file_name ?? null,
+                        file_recorded_at: b.file_recorded_at ?? null,
+                    },
+                ])
             );
         }
 
@@ -762,7 +769,9 @@ const fetchAssemblyAIHistory = async (request, response, next) => {
             speech_model: t.speech_model,
             language: t.language,
             transcription: flattenTranscription(t.transcript),
-            file_name: backupMap.get(t.transcript_id) || null,
+            file_name: backupMap.get(t.transcript_id)?.file_name || null,
+            file_recorded_at:
+                backupMap.get(t.transcript_id)?.file_recorded_at || null,
         }));
 
         // console.log("aai results transcription", results);
@@ -829,17 +838,19 @@ const restoreTranscription = async (request, response, next) => {
         const user = request.session.user;
         const userId = user?.id;
 
-        const { transcript_id, file_recorded_at, file_name, audio_duration } =
-            request.body;
+        const {
+            transcript_id,
+            file_name: clientFileName,
+            audio_duration: clientAudioDuration,
+        } = request.body;
 
         logger.info(
             `Incoming request to ${request.method} ${
                 request.originalUrl
             }, body: ${JSON.stringify({
                 transcript_id,
-                file_recorded_at,
-                file_name,
-                hasAudioDuration: audio_duration != null,
+                file_name: clientFileName,
+                hasAudioDuration: clientAudioDuration != null,
             })}`
         );
 
@@ -854,13 +865,13 @@ const restoreTranscription = async (request, response, next) => {
         }
 
         // Required fields
-        if (!transcript_id || !file_recorded_at || !file_name) {
+        if (!transcript_id) {
             logger.warn(
-                `[transcriptionsMiddleware - restoreTranscription] => Missing fields. transcript_id? "${transcript_id}" file_recorded_at? "${file_recorded_at}" file_name? "${file_name}"`
+                `[transcriptionsMiddleware - restoreTranscription] => Missing fields. transcript_id? "${transcript_id}" `
             );
             return response.status(400).json({
                 success: false,
-                message: "Missing required fields",
+                message: "Missing transcript_id",
             });
         }
 
@@ -892,41 +903,59 @@ const restoreTranscription = async (request, response, next) => {
 
         const raw = backup.raw_api_data;
 
-        // --- Build transcription text robustly from raw_api_data ---
-        let transcriptionText = "";
+        // Prefer backup values (source of truth), fallback to client only if needed
+        const restoredFileName = backup.file_name ?? clientFileName;
+        const restoredRecordedAt = backup.file_recorded_at ?? null;
 
-        if (raw) {
-            // 1) Direct text on root
-            if (typeof raw.text === "string" && raw.text.trim().length > 0) {
-                transcriptionText = raw.text.trim();
-            }
-            // 2) Nested transcript.text
-            else if (
-                raw.transcript &&
-                typeof raw.transcript.text === "string" &&
-                raw.transcript.text.trim().length > 0
-            ) {
-                transcriptionText = raw.transcript.text.trim();
-            }
-            // 3) utterances array on root
-            else if (Array.isArray(raw.utterances) && raw.utterances.length) {
-                transcriptionText = raw.utterances
-                    .map((u) => (u.text || "").trim())
-                    .filter(Boolean)
-                    .join(" ");
-            }
-            // 4) utterances under transcript
-            else if (
-                raw.transcript &&
-                Array.isArray(raw.transcript.utterances) &&
-                raw.transcript.utterances.length
-            ) {
-                transcriptionText = raw.transcript.utterances
-                    .map((u) => (u.text || "").trim())
-                    .filter(Boolean)
-                    .join(" ");
-            }
+        if (!restoredFileName) {
+            return response.status(400).json({
+                success: false,
+                message:
+                    "Missing file_name (not present in backup and not provided by client)",
+            });
         }
+
+        // Speaker markers restored by using existing helper
+        // raw may be { transcript: {...} } or already the transcript object
+        const transcriptObject = raw?.transcript ?? raw;
+        const transcriptionText = flattenTranscription(transcriptObject);
+
+        // Restore metadata/options so detail UI is populated
+        const options = {
+            // match what UI expects (safe defaults)
+            language_code:
+                raw?.language_code ?? raw?.transcript?.language_code ?? null,
+
+            speech_model:
+                raw?.speech_model ?? raw?.transcript?.speech_model ?? null,
+
+            punctuate: raw?.punctuate ?? raw?.transcript?.punctuate ?? null,
+
+            format_text:
+                raw?.format_text ?? raw?.transcript?.format_text ?? null,
+
+            speaker_labels:
+                raw?.speaker_labels ?? raw?.transcript?.speaker_labels ?? null,
+
+            speakers_expected:
+                raw?.speakers_expected ??
+                raw?.transcript?.speakers_expected ??
+                null,
+
+            entity_detection:
+                raw?.entity_detection ??
+                raw?.transcript?.entity_detection ??
+                null,
+
+            sentiment_analysis:
+                raw?.sentiment_analysis ??
+                raw?.transcript?.sentiment_analysis ??
+                null,
+        };
+
+        // Duration: prefer client payload, fallback to raw
+        const restoredAudioDuration =
+            raw?.audio_duration ?? clientAudioDuration ?? null;
 
         if (!transcriptionText) {
             logger.warn(
@@ -937,13 +966,13 @@ const restoreTranscription = async (request, response, next) => {
         // Insert restored transcription into offline table
         const inserted = await insertTranscriptionQuery({
             user_id: userId,
-            file_name, // original from client/backups
+            file_name: restoredFileName,
             transcript_id,
             transcription: transcriptionText,
-            file_recorded_at,
-            audio_duration: audio_duration ?? null,
+            options,
+            file_recorded_at: restoredRecordedAt,
+            audio_duration: restoredAudioDuration,
         });
-
         logger.info(
             `[transcriptionsMiddleware - restoreTranscription] => Transcript with ID ${transcript_id} restored to offline successfully for user ${userId}`
         );
@@ -1152,6 +1181,7 @@ const runTranscriptionJob = async ({
             user_role: userRole,
             raw_api_data: transcript,
             file_name: filename,
+            file_recorded_at: rawDate,
         });
 
         if (!createBackup) {

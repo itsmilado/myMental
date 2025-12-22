@@ -17,11 +17,19 @@ const insertTranscriptionBackupQuery = async ({
     user_role,
     raw_api_data,
     file_name,
+    file_recorded_at,
 }) => {
     try {
         const insertQuery = `
-            INSERT INTO transcription_backups (transcript_id, user_id, user_role, raw_api_data, file_name)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO transcription_backups (
+                transcript_id,
+                user_id,
+                user_role,
+                raw_api_data,
+                file_name,
+                file_recorded_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *;
         `;
         const insertValues = [
@@ -30,6 +38,7 @@ const insertTranscriptionBackupQuery = async ({
             user_role,
             raw_api_data,
             file_name,
+            file_recorded_at ?? null,
         ];
         const result = await pool.query(insertQuery, insertValues);
         return result.rows[0];
@@ -50,13 +59,13 @@ const getBackupsByTranscriptIdsQuery = async (transcriptIds = []) => {
 
     try {
         const query = `
-            SELECT transcript_id, file_name
+            SELECT transcript_id, file_name, file_recorded_at
             FROM transcription_backups
             WHERE transcript_id = ANY($1)
         `;
         const values = [transcriptIds];
         const { rows } = await pool.query(query, values);
-        return rows; // [{ transcript_id, file_name }, ...]
+        return rows; // [{ transcript_id, file_name, file_recorded_at }, ...]
     } catch (error) {
         logger.error(
             `[transcribeQueries > getBackupsByTranscriptIdsQuery] => Error fetching backups: ${error.message}`
@@ -68,7 +77,7 @@ const getBackupsByTranscriptIdsQuery = async (transcriptIds = []) => {
 const getBackupWithRawByTranscriptIdQuery = async (transcript_id) => {
     try {
         const query = `
-            SELECT transcript_id, file_name, raw_api_data
+            SELECT transcript_id, file_name, file_recorded_at, raw_api_data
             FROM transcription_backups
             WHERE transcript_id = $1
             LIMIT 1
