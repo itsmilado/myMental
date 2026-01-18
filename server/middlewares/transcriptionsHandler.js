@@ -719,67 +719,12 @@ const fetchAssemblyAIHistory = async (request, response, next) => {
             `Incoming request to ${request.method} ${request.originalUrl}`
         );
 
-        // 1) Get history from AssemblyAI helper
-
-        const transcriptions = await fetchAssemblyHistory();
-
-        if (!transcriptions) {
-            response.status(500).json({
-                success: false,
-                message: "Error fetching transcription from Assembly API",
-            });
-            throw new Error(
-                "Error fetching transcription from Assembly API (history)"
-            );
-        }
-
-        // console.log("aai transcription", transcriptions);
-
-        // 2) Collect transcript_ids
-
-        const transcriptIds = transcriptions
-            .map((t) => t.transcript_id)
-            .filter(Boolean);
-
-        // 3) Fetch backup metadata (file_name) for IDs
-
-        let backupMap = new Map();
-
-        if (transcriptIds.length > 0) {
-            const backups = await getBackupsByTranscriptIdsQuery(transcriptIds);
-            backupMap = new Map(
-                backups.map((b) => [
-                    b.transcript_id,
-                    {
-                        file_name: b.file_name ?? null,
-                        file_recorded_at: b.file_recorded_at ?? null,
-                    },
-                ])
-            );
-        }
-
-        // 4) Build response + attach file_name from backups
-
-        const results = transcriptions.map((t) => ({
-            transcript_id: t.transcript_id,
-            created_at: t.created_at,
-            status: t.status,
-            audio_url: t.audio_url,
-            audio_duration: t.audio_duration,
-            speech_model: t.speech_model,
-            language: t.language,
-            transcription: flattenTranscription(t.transcript),
-            file_name: backupMap.get(t.transcript_id)?.file_name || null,
-            file_recorded_at:
-                backupMap.get(t.transcript_id)?.file_recorded_at || null,
-        }));
-
-        // console.log("aai results transcription", results);
+        const data = await fetchAssemblyHistory({ user });
 
         response.status(200).json({
             success: true,
             message: "API Transcription fetched successfully",
-            data: results,
+            data,
         });
     } catch (error) {
         logger.error(
@@ -845,13 +790,7 @@ const restoreTranscription = async (request, response, next) => {
         } = request.body;
 
         logger.info(
-            `Incoming request to ${request.method} ${
-                request.originalUrl
-            }, body: ${JSON.stringify({
-                transcript_id,
-                file_name: clientFileName,
-                hasAudioDuration: clientAudioDuration != null,
-            })}`
+            `Incoming request to ${request.method} ${request.originalUrl}`
         );
 
         if (!userId) {

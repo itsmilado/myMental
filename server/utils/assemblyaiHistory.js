@@ -1,90 +1,181 @@
 // utils/assemblyaiHistory.js
-
 const axios = require("axios");
 const logger = require("../utils/logger");
-const { pollTranscriptionResult } = require("./assemblyaiTranscriber");
+const { getBackupsByTranscriptIdsQuery } = require("../db/transcribeQueries");
 
-const fetchAssemblyHistory = async () => {
-    const baseUrl = "https://api.eu.assemblyai.com/v2/transcript?limit=200";
+const ASSEMBLY_LIST_URL =
+    "https://api.eu.assemblyai.com/v2/transcript?limit=200";
+
+const safeParseRaw = (raw) => {
+    if (!raw) return null;
+
+    if (typeof raw === "string") {
+        try {
+            return JSON.parse(raw);
+        } catch {
+            return null;
+        }
+    }
+    return raw;
+};
+
+const formatDurationMMSS = (seconds) => {
+    if (typeof seconds !== "number" || Number.isNaN(seconds)) return null;
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${String(s).padStart(2, "0")}`;
+};
+
+// Best-effort flattening from AssemblyAI transcript object
+const flattenTranscription = (transcript) => {
+    if (!transcript) return "";
+
+    // AssemblyAI can return utterances if speaker_labels enabled
+    if (Array.isArray(transcript.utterances) && transcript.utterances.length) {
+        return transcript.utterances
+            .map((u) => {
+                const speaker =
+                    u.speaker != null ? `Speaker ${u.speaker}` : null;
+                const text = (u.text || "").trim();
+                if (!text) return null;
+                return speaker ? `${speaker}: ${text}` : text;
+            })
+            .filter(Boolean)
+            .join("\n");
+    }
+
+    if (typeof transcript.text === "string") return transcript.text;
+
+    return "";
+};
+
+const fetchAssemblyTranscriptIds = async () => {
     const headers = {
         authorization: process.env.ASSEMBLYAI_API_KEY,
     };
+
+    const response = await axios.get(ASSEMBLY_LIST_URL, { headers });
+
+    const transcripts =
+        response?.data?.transcripts ||
+        response?.data?.results ||
+        (Array.isArray(response?.data) ? response.data : null);
+
+    if (!Array.isArray(transcripts)) {
+        throw new Error("Unexpected AssemblyAI transcript list response shape");
+    }
+
+    return transcripts
+        .map((t) => {
+            const id = t?.id || t?.transcript_id;
+            if (!id) return null;
+            return {
+                transcript_id: id,
+                created_at: t?.created ? String(t.created) : "",
+                status: t?.status ?? null,
+                audio_url: t?.audio_url ?? null,
+            };
+        })
+        .filter(Boolean);
+};
+
+const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
+    const backupMap = new Map(backups.map((b) => [b.transcript_id, b]));
+
+    // Exclude anything not present in backups (prevents incomplete rows + enforces local availability)
+    return historyIds
+        .map((h) => {
+            const backupRow = backupMap.get(h.transcript_id);
+            if (!backupRow) return null;
+
+            const raw = safeParseRaw(backupRow.raw_api_data);
+            const transcriptObject = raw?.transcript ?? raw;
+
+            const isDeletedByUser = h.audio_url === "deleted_by_user";
+
+            if (isDeletedByUser) {
+                return {
+                    transcript_id: h.transcript_id,
+                    created_at: h.created_at || "",
+
+                    status: h.status,
+                    audio_url: "http://deleted_by_user",
+
+                    // keep file metadata
+                    file_name: backupRow.file_name ?? null,
+                    file_recorded_at: backupRow.file_recorded_at ?? null,
+
+                    // avoid stale data
+                    audio_duration: formatDurationMMSS(
+                        transcriptObject?.audio_duration
+                    ),
+                    speech_model: null,
+                    language: null,
+                    transcription: "",
+                };
+            }
+
+            // If raw data is missing or malformed, still return minimal info.
+            const transcriptionText = transcriptObject
+                ? flattenTranscription(transcriptObject)
+                : "";
+
+            return {
+                transcript_id: h.transcript_id,
+                created_at: h.created_at || "",
+
+                status: transcriptObject?.status ?? h.status ?? null,
+
+                audio_url: transcriptObject?.audio_url ?? null,
+                audio_duration: formatDurationMMSS(
+                    transcriptObject?.audio_duration
+                ),
+
+                speech_model: transcriptObject?.speech_model ?? null,
+                language: transcriptObject?.language_code ?? null,
+
+                transcription: transcriptionText,
+
+                file_name: backupRow.file_name ?? null,
+                file_recorded_at: backupRow.file_recorded_at ?? null,
+            };
+        })
+        .filter(Boolean);
+};
+
+/**
+ * Fetch AssemblyAI history for the logged in user:
+ * - 1x AssemblyAI list (ids)
+ * - 1x DB lookup (scoped)
+ * - returns hydrated objects (from raw_api_data)
+ */
+const fetchAssemblyHistory = async ({ user }) => {
+    if (!user?.id) {
+        throw new Error("fetchAssemblyHistory requires a logged-in user");
+    }
+
     try {
-        const response = await axios.get(baseUrl, { headers });
-        if (!response.data) {
-            throw new Error(
-                "No transcripts found in AssemblyAI history response"
-            );
-        }
+        const historyIds = await fetchAssemblyTranscriptIds();
+        const transcriptIds = historyIds.map((h) => h.transcript_id);
 
-        const transcriptSummaries = response.data.transcripts.map((t) => ({
-            id: t.id,
-            created: t.created,
-        }));
-        const ids = transcriptSummaries.map((t) => t.id);
+        if (transcriptIds.length === 0) return [];
 
-        // Fetch full detail for each transcript ID (in parallel)
-        const results = await Promise.all(
-            ids.map(async (id) => {
-                try {
-                    const createdAt =
-                        transcriptSummaries.find((summary) => summary.id === id)
-                            ?.created || "";
-                    const transcript = await pollTranscriptionResult(id);
-                    return {
-                        createdAt,
-                        transcript,
-                    };
-                } catch (err) {
-                    logger.error(
-                        `[assemblyaiHistory] => Error polling id ${id}: ${err.message}`
-                    );
-                    return null;
-                }
-            })
-        );
+        const isAdmin = String(user.role || "").toLowerCase() === "admin";
 
-        // Only keep successful ones
-        const enriched = results.filter(Boolean).map((t) => ({
-            transcript_id: t.transcript.id,
-            created_at: t.createdAt || "",
-            status: t.transcript.status,
-            audio_url: t.transcript.audio_url,
-            audio_duration: t.transcript.audio_duration
-                ? `${Math.floor(t.transcript.audio_duration / 60)
-                      .toString()
-                      .padStart(2, "0")}:${Math.floor(
-                      t.transcript.audio_duration % 60
-                  )
-                      .toString()
-                      .padStart(2, "0")}`
-                : "",
-            speech_model: t.transcript.speech_model || "",
-            language: t.transcript.language_code || "",
-            transcript: t.transcript,
-            features: [
-                t.transcript.speaker_labels ? "speaker_labels" : null,
-                t.transcript.sentiment_analysis ? "sentiment_analysis" : null,
-                t.transcript.entity_detection ? "entity_detection" : null,
-            ].filter(Boolean),
-            // Any other fields you need...
-        }));
+        const backups = await getBackupsByTranscriptIdsQuery({
+            transcriptIds,
+            user_id: user.id,
+            isAdmin,
+        });
 
-        // Sort by created_at desc (newest first)
-        enriched.sort(
-            (a, b) => new Date(b.created_at) - new Date(a.created_at)
-        );
-
-        return enriched;
+        return buildHistoryResponseFromBackups({ historyIds, backups });
     } catch (error) {
         logger.error(
-            `[assemblyaiHistory] => Error fetching History ${error.message}`
+            `[assemblyaiHistory] Error building AssemblyAI history: ${error.message}`
         );
         throw error;
     }
 };
-
-const extractTranscriptId = (transcriptHistory) => {};
 
 module.exports = {
     fetchAssemblyHistory,

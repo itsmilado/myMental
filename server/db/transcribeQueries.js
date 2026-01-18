@@ -50,22 +50,40 @@ const insertTranscriptionBackupQuery = async ({
     }
 };
 
-// Get file_name (and optionally more) for a list of transcript_ids
+// Get backup rows for a list of transcript_ids, scoped to a user.
 
-const getBackupsByTranscriptIdsQuery = async (transcriptIds = []) => {
+const getBackupsByTranscriptIdsQuery = async ({
+    transcriptIds = [],
+    user_id = null,
+    isAdmin = false,
+}) => {
     if (!Array.isArray(transcriptIds) || transcriptIds.length === 0) {
         return [];
     }
 
     try {
-        const query = `
-            SELECT transcript_id, file_name, file_recorded_at
+        const params = [transcriptIds];
+        let query = `
+            SELECT transcript_id,
+                   user_id,
+                   file_name,
+                   file_recorded_at,
+                   raw_api_data
             FROM transcription_backups
             WHERE transcript_id = ANY($1)
         `;
-        const values = [transcriptIds];
-        const { rows } = await pool.query(query, values);
-        return rows; // [{ transcript_id, file_name, file_recorded_at }, ...]
+
+        // If isAdmin is false, results are filtered to the provided user_id.
+        if (!isAdmin) {
+            // enforce user scoping
+            params.push(user_id);
+            query += ` AND user_id = $${params.length}`;
+        }
+
+        if (!isAdmin && user_id == null) return [];
+
+        const { rows } = await pool.query(query, params);
+        return rows;
     } catch (error) {
         logger.error(
             `[transcribeQueries > getBackupsByTranscriptIdsQuery] => Error fetching backups: ${error.message}`
