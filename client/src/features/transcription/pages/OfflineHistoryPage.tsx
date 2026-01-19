@@ -1,17 +1,8 @@
 // src/features/transcription/pages/OfflineHistoryPage.tsx
-// import { useNavigate } from "react-router-dom";
-import { useState } from "react";
-import {
-    Box,
-    Paper,
-    CircularProgress,
-    Alert,
-    Button,
-    Typography,
-} from "@mui/material";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import { useTheme } from "@mui/material/styles";
-import { tokens } from "../../../theme/theme";
+
+import { useEffect, useRef, useState } from "react";
+import { Box, Paper, CircularProgress, Alert, Typography } from "@mui/material";
+
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { useTranscriptionList } from "../hooks/useTranscriptionList";
 import { TranscriptionTable } from "../components/TranscriptionTable";
@@ -19,17 +10,28 @@ import FilterControls from "../components/FilterControls";
 import { OfflineTranscriptionModal } from "../components/OfflineTranscriptionModal";
 
 const OfflineHistoryPage = () => {
-    const theme = useTheme();
-    const colors = tokens(theme.palette.mode);
-    // const navigate = useNavigate();
-    const { list, loading, error, setActive } = useTranscriptionStore();
+    const { list, loading, error, setActive, filters, sort } =
+        useTranscriptionStore();
     const { loadTranscriptions } = useTranscriptionList();
 
     const [selected, setSelected] = useState<any | null>(null);
 
-    const handleSync = () => {
+    // Trigger initial data load when the page mounts
+    useEffect(() => {
         loadTranscriptions();
-    };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Re-fetch when filters or sort change, skipping the initial render
+    const didMountRef = useRef(false);
+
+    useEffect(() => {
+        if (!didMountRef.current) {
+            didMountRef.current = true;
+            return;
+        }
+        loadTranscriptions();
+    }, [filters, sort, loadTranscriptions]);
 
     return (
         <Paper sx={{ p: 3, borderRadius: 3, position: "relative" }}>
@@ -42,26 +44,10 @@ const OfflineHistoryPage = () => {
                 <Box fontSize={24} fontWeight={600}>
                     Offline Transcription History
                 </Box>
-                <Button
-                    startIcon={<RefreshIcon />}
-                    onClick={handleSync}
-                    disabled={loading}
-                    variant="outlined"
-                    size="small"
-                    sx={{
-                        color: colors.grey[100],
-                        borderColor: colors.grey[300],
-                        "&:hover": {
-                            borderColor: colors.grey[200],
-                            backgroundColor: theme.palette.action.hover,
-                        },
-                    }}
-                >
-                    {loading ? "Syncing..." : "Sync"}
-                </Button>
             </Box>
+
             <FilterControls />
-            <Box display="flex" alignItems="center" mb={2} gap={2}></Box>
+
             {loading ? (
                 <Box display="flex" justifyContent="center" py={5}>
                     <CircularProgress />
@@ -73,7 +59,7 @@ const OfflineHistoryPage = () => {
                     color="text.secondary"
                     sx={{ py: 6, textAlign: "center" }}
                 >
-                    Please sync to load online transcriptions.
+                    No offline transcriptions found.
                 </Typography>
             ) : (
                 <TranscriptionTable
@@ -86,6 +72,7 @@ const OfflineHistoryPage = () => {
                     }}
                 />
             )}
+
             <OfflineTranscriptionModal
                 open={!!selected}
                 transcription={selected}

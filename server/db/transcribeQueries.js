@@ -44,7 +44,7 @@ const insertTranscriptionBackupQuery = async ({
         return result.rows[0];
     } catch (error) {
         logger.error(
-            `[transcriptionBackupsQueries > insertTranscriptionBackupQuery] Error: ${error.message}`
+            `[transcriptionBackupsQueries > insertTranscriptionBackupQuery] Error: ${error.message}`,
         );
         throw error;
     }
@@ -86,7 +86,7 @@ const getBackupsByTranscriptIdsQuery = async ({
         return rows;
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getBackupsByTranscriptIdsQuery] => Error fetching backups: ${error.message}`
+            `[transcribeQueries > getBackupsByTranscriptIdsQuery] => Error fetching backups: ${error.message}`,
         );
         throw error;
     }
@@ -105,7 +105,7 @@ const getBackupWithRawByTranscriptIdQuery = async (transcript_id) => {
         return rows[0] || null;
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getBackupWithRawByTranscriptIdQuery] => Error: ${error.message}`
+            `[transcribeQueries > getBackupWithRawByTranscriptIdQuery] => Error: ${error.message}`,
         );
         throw error;
     }
@@ -135,13 +135,13 @@ const insertTranscriptionQuery = async ({
 
         const insertedTranscription = await pool.query(
             insertQuery,
-            insertValues
+            insertValues,
         );
 
         return insertedTranscription.rows[0];
     } catch (error) {
         logger.error(
-            `[transcribeQueries > insertTranscription] => Error inserting transcription: ${error.message}`
+            `[transcribeQueries > insertTranscription] => Error inserting transcription: ${error.message}`,
         );
 
         throw error;
@@ -160,19 +160,19 @@ const getAllTranscriptionsQuery = async () => {
 
         if (rows.length === 0) {
             logger.error(
-                "[transcribeQueries > getAllTranscriptions] => No transcriptions found"
+                "[transcribeQueries > getAllTranscriptions] => No transcriptions found",
             );
             return [];
         }
 
         logger.info(
-            `[transcribeQueries > getAllTranscriptionsQuery] - Fetched ${rows.length} transcriptions`
+            `[transcribeQueries > getAllTranscriptionsQuery] - Fetched ${rows.length} transcriptions`,
         );
 
         return rows;
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getAllTranscriptions] => Error getting all transcriptions: ${error.message}`
+            `[transcribeQueries > getAllTranscriptions] => Error getting all transcriptions: ${error.message}`,
         );
 
         throw error;
@@ -188,7 +188,7 @@ const getAllTranscriptionsQuery = async () => {
 const getFilteredTranscriptionsQuery = async (filters) => {
     try {
         logger.info(
-            "[transcribeQueries > getFilteredTranscriptionsQuery] - Start"
+            "[transcribeQueries > getFilteredTranscriptionsQuery] - Start",
         );
         const params = [];
         const where = [];
@@ -208,11 +208,14 @@ const getFilteredTranscriptionsQuery = async (filters) => {
         }
         if (filters.date_from) {
             params.push(filters.date_from);
-            where.push(`file_recorded_at >= $${params.length}`);
+            where.push(`created_at >= $${params.length}::date`);
         }
+
         if (filters.date_to) {
             params.push(filters.date_to);
-            where.push(`file_recorded_at <= $${params.length}`);
+            where.push(
+                `created_at < ($${params.length}::date + INTERVAL '1 day')`,
+            );
         }
 
         let orderBy = "id";
@@ -239,12 +242,12 @@ const getFilteredTranscriptionsQuery = async (filters) => {
 
         const { rows } = await pool.query(fetchQuery, params);
         logger.info(
-            `[transcribeQueries > getFilteredTranscriptionsQuery] - Fetched ${rows.length} transcriptions with filters`
+            `[transcribeQueries > getFilteredTranscriptionsQuery] - Fetched ${rows.length} transcriptions with filters`,
         );
         return rows;
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getFilteredTranscriptions] => Error getting filtered transcriptions: ${error.message}`
+            `[transcribeQueries > getFilteredTranscriptions] => Error getting filtered transcriptions: ${error.message}`,
         );
         throw error;
     }
@@ -262,7 +265,7 @@ const getTranscriptionByApiTranscriptIdQuery = async (transcriptId) => {
 
         if (transcription.rows.length === 0) {
             logger.error(
-                `[transcribeQueries > getTranscriptionByApiTranscriptId] => Transcription not found with ID: ${transcriptId}`
+                `[transcribeQueries > getTranscriptionByApiTranscriptId] => Transcription not found with ID: ${transcriptId}`,
             );
             return false;
         }
@@ -270,7 +273,7 @@ const getTranscriptionByApiTranscriptIdQuery = async (transcriptId) => {
         return transcription.rows[0];
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getTranscriptionByApiTranscriptId] => Error getting transcription by ID: ${error.message}`
+            `[transcribeQueries > getTranscriptionByApiTranscriptId] => Error getting transcription by ID: ${error.message}`,
         );
 
         throw error;
@@ -289,7 +292,7 @@ const getTranscriptionByIdQuery = async (id) => {
 
         if (transcription.rows.length === 0) {
             logger.error(
-                `[transcribeQueries > getTranscriptionByIdQuery] => Transcription not found with ID: ${id}`
+                `[transcribeQueries > getTranscriptionByIdQuery] => Transcription not found with ID: ${id}`,
             );
             return false;
         }
@@ -297,7 +300,7 @@ const getTranscriptionByIdQuery = async (id) => {
         return transcription.rows[0];
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getTranscriptionByIdQuery] => Error getting transcription by ID: ${error.message}`
+            `[transcribeQueries > getTranscriptionByIdQuery] => Error getting transcription by ID: ${error.message}`,
         );
 
         throw error;
@@ -310,7 +313,7 @@ const deleteTranscriptionByIdQuery = async (id) => {
         return true;
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getTranscriptionByIdQuery] => Error getting transcription by ID: ${error.message}`
+            `[transcribeQueries > getTranscriptionByIdQuery] => Error getting transcription by ID: ${error.message}`,
         );
 
         throw error;
