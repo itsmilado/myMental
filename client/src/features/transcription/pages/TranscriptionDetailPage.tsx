@@ -18,7 +18,7 @@ const TranscriptionDetailPage = () => {
         useTranscriptionStore();
 
     const [transcription, setTranscription] = useState<TranscriptData | null>(
-        null
+        null,
     );
 
     const [snackbar, setSnackbar] = useState<{

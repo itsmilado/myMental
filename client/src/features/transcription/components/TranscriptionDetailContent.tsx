@@ -13,6 +13,7 @@ import { ExportButton } from "./ExportButton";
 import { DeleteButton } from "./DeleteButton";
 import { getAudioStreamUrl } from "../../auth/api";
 import { AudioPlayer } from "./AudioPlayer";
+import { TranscriptText } from "./TranscriptText";
 
 type DeleteArgs = {
     deleteFromAssembly: boolean;
@@ -120,7 +121,7 @@ export const TranscriptionDetailContent = ({
                                 size="small"
                                 variant="outlined"
                                 label={`Duration: ${formatDuration(
-                                    audio_duration
+                                    audio_duration,
                                 )}`}
                             />
                             <Chip
@@ -239,18 +240,22 @@ export const TranscriptionDetailContent = ({
                 <Paper
                     variant="outlined"
                     sx={{
-                        p: 2,
+                        mt: 1.5,
+                        px: 2,
+                        py: 1.5,
                         borderRadius: 2,
                         bgcolor: "action.hover",
                         whiteSpace: "pre-wrap",
                         lineHeight: 1.7,
-                        maxHeight: { xs: "none", md: 420 },
+                        maxHeight: { xs: "none", md: 500 },
                         overflow: "auto",
                     }}
                 >
-                    <Typography variant="body2">
-                        {transcription.transcription || "-"}
-                    </Typography>
+                    <TranscriptText
+                        text={transcription.transcription}
+                        utterances={transcription.utterances}
+                        maxHeight={420}
+                    />
                 </Paper>
             </Box>
         </Box>

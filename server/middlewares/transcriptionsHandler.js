@@ -119,7 +119,7 @@ const startTranscriptionJob = async (request, response, next) => {
         };
 
         logger.info(
-            `[startTranscriptionJob] => Created job ${jobId} for user ${user.id}`
+            `[startTranscriptionJob] => Created job ${jobId} for user ${user.id}`,
         );
 
         // fire & forget: run worker in background
@@ -132,7 +132,7 @@ const startTranscriptionJob = async (request, response, next) => {
             userOptions,
         }).catch((err) => {
             logger.error(
-                `[startTranscriptionJob] => Unhandled error in job ${jobId}: ${err.message}`
+                `[startTranscriptionJob] => Unhandled error in job ${jobId}: ${err.message}`,
             );
         });
 
@@ -143,7 +143,7 @@ const startTranscriptionJob = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[startTranscriptionJob] => Error starting job: ${error.message}`
+            `[startTranscriptionJob] => Error starting job: ${error.message}`,
         );
         next(error);
     }
@@ -212,7 +212,7 @@ const streamTranscriptionProgress = (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[streamTranscriptionProgress] => Error streaming SSE: ${error.message}`
+            `[streamTranscriptionProgress] => Error streaming SSE: ${error.message}`,
         );
         next(error);
     }
@@ -232,7 +232,7 @@ const createTranscription = async (request, response, next) => {
         const fileModifiedDate = rawDate ? new Date(rawDate) : "00.00.00";
 
         logger.info(
-            `Incoming request to Transcribe from user_id ${loggedUserId} to "${request.method} ${request.originalUrl}"`
+            `Incoming request to Transcribe from user_id ${loggedUserId} to "${request.method} ${request.originalUrl}"`,
         );
 
         // Parse user options from request body
@@ -273,7 +273,7 @@ const createTranscription = async (request, response, next) => {
         }
 
         logger.info(
-            `[transcriptionHandler - createTranscription] => insertTranscriptionBackupQuery: Transcript's API response for User ${loggedUserId} with role ${userRole} successfully stored. `
+            `[transcriptionHandler - createTranscription] => insertTranscriptionBackupQuery: Transcript's API response for User ${loggedUserId} with role ${userRole} successfully stored. `,
         );
 
         const {
@@ -315,14 +315,17 @@ const createTranscription = async (request, response, next) => {
         // Save the transcription to a file
         const storedTxtfilePath = saveTranscriptionToFile(
             filename,
-            insertedTranscription.transcription
+            insertedTranscription.transcription,
         );
 
         // Send response to client
         response.status(200).json({
             success: true,
             message: `Transcription created and stored successfully at: ${storedTxtfilePath}`,
-            TranscriptData: insertedTranscription,
+            TranscriptData: {
+                ...insertedTranscription,
+                utterances: extractUtterances(transcript),
+            },
         });
     } catch (error) {
         logger.error(`[createTranscription] => Error: ${error.message}`);
@@ -338,7 +341,7 @@ const createTranscription = async (request, response, next) => {
 const fetchAllTranscriptions = async (request, response, next) => {
     try {
         logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`
+            `Incoming request to ${request.method} ${request.originalUrl}`,
         );
 
         const transcriptions = await getAllTranscriptionsQuery();
@@ -350,7 +353,7 @@ const fetchAllTranscriptions = async (request, response, next) => {
         }
 
         logger.info(
-            `[transcriptionsMiddleware - fetchAllTranscriptions] => Transcriptions retrieved`
+            `[transcriptionsMiddleware - fetchAllTranscriptions] => Transcriptions retrieved`,
         );
         response.status(200).json({
             success: true,
@@ -359,7 +362,7 @@ const fetchAllTranscriptions = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - getAllTranscriptions] => Error fetching transcriptions: ${error.message}`
+            `[transcriptionsMiddleware - getAllTranscriptions] => Error fetching transcriptions: ${error.message}`,
         );
         next(error);
     }
@@ -372,9 +375,13 @@ const fetchAllTranscriptions = async (request, response, next) => {
 const fetchFilteredTranscriptions = async (request, response, next) => {
     try {
         logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`
+            `Incoming request to ${request.method} ${request.originalUrl}`,
         );
-        const userId = request.session.user.id;
+
+        const user = request.session.user;
+        const userId = user.id;
+        const isAdmin = String(user.role || "").toLowerCase() === "admin";
+
         // Extract filters from query parameters
         const {
             file_name,
@@ -384,6 +391,7 @@ const fetchFilteredTranscriptions = async (request, response, next) => {
             order_by,
             direction,
         } = request.query;
+
         const filters = {
             user_id: userId,
             file_name,
@@ -393,29 +401,43 @@ const fetchFilteredTranscriptions = async (request, response, next) => {
             order_by,
             direction,
         };
-        logger.info(
-            `[transcriptionsMiddleware - fetchFilteredTranscriptions] => Filters: ${JSON.stringify(
-                filters
-            )}`
-        );
+
         const transcriptions = await getFilteredTranscriptionsQuery(filters);
+
         if (!transcriptions) {
             response
                 .status(404)
                 .json({ success: false, message: "No transcriptions found" });
             return;
         }
-        logger.info(
-            `[transcriptionsMiddleware - fetchFilteredTranscriptions] => Filtered Transcriptions retrieved`
+
+        const transcriptIds = transcriptions
+            .map((t) => t.transcript_id)
+            .filter(Boolean);
+
+        const backups = await getBackupsByTranscriptIdsQuery({
+            transcriptIds,
+            user_id: userId,
+            isAdmin,
+        });
+
+        const backupMap = new Map(
+            backups.map((b) => [b.transcript_id, b.raw_api_data]),
         );
+
+        const hydrated = transcriptions.map((t) => ({
+            ...t,
+            utterances: extractUtterances(backupMap.get(t.transcript_id)),
+        }));
+
         response.status(200).json({
             success: true,
             message: "Transcriptions found",
-            data: transcriptions,
+            data: hydrated,
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - getAllTranscriptions] => Error fetching transcriptions: ${error.message}`
+            `[transcriptionsMiddleware - fetchFilteredTranscriptions] => Error: ${error.message}`,
         );
         next(error);
     }
@@ -429,32 +451,55 @@ const fetchFilteredTranscriptions = async (request, response, next) => {
 const fetchTranscriptionById = async (request, response, next) => {
     try {
         logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`
+            `Incoming request to ${request.method} ${request.originalUrl}`,
         );
+
+        const user = request.session.user;
+        const isAdmin = String(user.role || "").toLowerCase() === "admin";
         const { id } = request.params;
+
         // Fetch the transcription by ID
         const transcription = await getTranscriptionByIdQuery(id);
+
         if (!transcription) {
-            logger.warn(
-                `[transcriptionsMiddleware - fetchTranscriptionById] => Transcription with ID: ${id} not found`
-            );
             response.status(401).json({
                 success: false,
                 message: `Transcription with ID: ${id} does not exist`,
             });
             return false;
         }
+
+        // Enforce ownership unless admin
+        if (!isAdmin && transcription.user_id !== user.id) {
+            return response.status(403).json({
+                success: false,
+                message: "You are not authorized to access this resource!",
+            });
+        }
+
+        const backups = await getBackupsByTranscriptIdsQuery({
+            transcriptIds: [transcription.transcript_id],
+            user_id: user.id,
+            isAdmin,
+        });
+
+        const rawApiData = backups?.[0]?.raw_api_data ?? null;
+
         logger.info(
-            `[transcriptionsMiddleware - fetchTranscriptionById] => Transcription fetched with ID: ${id}`
+            `[transcriptionsMiddleware - fetchTranscriptionById] => Transcription fetched with ID: ${id}`,
         );
+
         response.status(200).json({
             success: true,
             message: "Transcription retrieved successfully",
-            data: transcription,
+            data: {
+                ...transcription,
+                utterances: extractUtterances(rawApiData),
+            },
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - fetchTranscriptionById] => Error fetching transcription with ID: ${error.message}`
+            `[transcriptionsMiddleware - fetchTranscriptionById] => Error fetching transcription with ID: ${error.message}`,
         );
         next(error);
     }
@@ -466,19 +511,23 @@ const fetchTranscriptionById = async (request, response, next) => {
  */
 const fetchTranscriptionByApiId = async (request, response, next) => {
     try {
+        const user = request.session.user;
+        const isAdmin = String(user.role || "").toLowerCase() === "admin";
         const { transcriptId } = request.params;
+
         logger.info(
             `Incoming request to ${request.method} ${
                 request.originalUrl
-            }, params: ${JSON.stringify(request.params)}`
+            }, params: ${JSON.stringify(request.params)}`,
         );
+
         // Fetch the transcription by API transcript ID
-        const transcription = await getTranscriptionByApiTranscriptIdQuery(
-            transcriptId
-        );
+        const transcription =
+            await getTranscriptionByApiTranscriptIdQuery(transcriptId);
+
         if (!transcription) {
             logger.warn(
-                `[transcriptionsMiddleware - fetchTranscriptionByApiId] => Transcription with API ID: ${transcriptId} not found`
+                `[transcriptionsMiddleware - fetchTranscriptionByApiId] => Transcription with API ID: ${transcriptId} not found`,
             );
             response.status(401).json({
                 success: false,
@@ -486,17 +535,36 @@ const fetchTranscriptionByApiId = async (request, response, next) => {
             });
             return false;
         }
+
+        if (!isAdmin && transcription.user_id !== user.id) {
+            return response.status(403).json({
+                success: false,
+                message: "You are not authorized to access this resource!",
+            });
+        }
+
+        const backups = await getBackupsByTranscriptIdsQuery({
+            transcriptIds: [transcription.transcript_id],
+            user_id: user.id,
+            isAdmin,
+        });
+
+        const rawApiData = backups?.[0]?.raw_api_data ?? null;
+
         logger.info(
-            `[transcriptionsMiddleware - fetchTranscriptionByApiId] => Transcription fetched with API ID: ${transcriptId}`
+            `[transcriptionsMiddleware - fetchTranscriptionByApiId] => Transcription fetched with API ID: ${transcriptId}`,
         );
         response.status(200).json({
             success: true,
             message: "Transcription fetched successfully",
-            data: transcription,
+            data: {
+                ...transcription,
+                utterances: extractUtterances(rawApiData),
+            },
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - fetchTranscriptionByApiId] => Error fetching transcription: ${error.message}`
+            `[transcriptionsMiddleware - fetchTranscriptionByApiId] => Error fetching transcription: ${error.message}`,
         );
         next(error);
     }
@@ -513,16 +581,16 @@ const fetchApiTranscriptionById = async (request, response, next) => {
             `Incoming request to ${request.method} ${
                 request.originalUrl
             } body: ${JSON.stringify(
-                request.body
-            )}, transcript_id: ${transcript_id}`
+                request.body,
+            )}, transcript_id: ${transcript_id}`,
         ); // Log the request URL
 
         const transcript = await assemblyClient.transcripts.get(
-            `${transcript_id}`
+            `${transcript_id}`,
         );
         if (!transcript) {
             logger.error(
-                `[transcriptionsMiddleware - fetchApiTranscriptionById] => Error fetching transcription by ID: ${error.message}`
+                `[transcriptionsMiddleware - fetchApiTranscriptionById] => Error fetching transcription by ID: ${error.message}`,
             );
             response.status(500).json({
                 success: false,
@@ -532,7 +600,7 @@ const fetchApiTranscriptionById = async (request, response, next) => {
         }
 
         logger.info(
-            `[transcriptionsMiddleware - fetchApiTranscriptionById] => Transcription fetched by ID: ${transcript_id}`
+            `[transcriptionsMiddleware - fetchApiTranscriptionById] => Transcription fetched by ID: ${transcript_id}`,
         );
         response.status(200).json({
             success: true,
@@ -541,7 +609,7 @@ const fetchApiTranscriptionById = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - fetchApiTranscriptionById] => Error fetching transcription : ${error.message}`
+            `[transcriptionsMiddleware - fetchApiTranscriptionById] => Error fetching transcription : ${error.message}`,
         );
         next(error);
     }
@@ -558,14 +626,14 @@ const exportTranscription = async (request, response, next) => {
         const user = request.session.user;
 
         logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`
+            `Incoming request to ${request.method} ${request.originalUrl}`,
         ); // Log the request URL
 
         // Fetch transcription
         const transcription = await getTranscriptionByIdQuery(id);
         if (!transcription) {
             logger.error(
-                `[transcriptionsMiddleware - fetchApiTranscriptionById] => Error fetching transcription by ID: ${error.message}`
+                `[transcriptionsMiddleware - fetchApiTranscriptionById] => Error fetching transcription by ID: ${error.message}`,
             );
             return response.status(404).json({
                 success: false,
@@ -583,25 +651,25 @@ const exportTranscription = async (request, response, next) => {
         // Export transcription to file
         const { buffer, mime, fileName } = await exportTranscriptionToFile(
             transcription,
-            format
+            format,
         );
 
         logger.info(
-            `[transcriptionsMiddleware - exportTranscription] => file name: ${fileName} `
+            `[transcriptionsMiddleware - exportTranscription] => file name: ${fileName} `,
         );
 
         response.setHeader("Content-Type", mime);
         response.setHeader(
             "Content-Disposition",
-            `attachment; filename="${fileName}"`
+            `attachment; filename="${fileName}"`,
         );
         response.send(buffer);
         logger.info(
-            `[transcriptionsMiddleware - exportTranscription] User ${request.session.user.id} exported ${transcription.transcript_id} as ${format}`
+            `[transcriptionsMiddleware - exportTranscription] User ${request.session.user.id} exported ${transcription.transcript_id} as ${format}`,
         );
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - exportTranscription] => Error exporting transcription : ${error.message}`
+            `[transcriptionsMiddleware - exportTranscription] => Error exporting transcription : ${error.message}`,
         );
         next(error);
     }
@@ -613,7 +681,7 @@ const deleteDBTranscription = async (request, response, next) => {
         const user = request.session.user;
 
         logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`
+            `Incoming request to ${request.method} ${request.originalUrl}`,
         ); // Log the request URL
 
         const {
@@ -625,7 +693,7 @@ const deleteDBTranscription = async (request, response, next) => {
         const transcription = await getTranscriptionByIdQuery(id);
         if (!transcription) {
             logger.error(
-                `[transcriptionsMiddleware - fetchApiTranscriptionById] => transcription with ID ${id} Not found`
+                `[transcriptionsMiddleware - fetchApiTranscriptionById] => transcription with ID ${id} Not found`,
             );
             return response.status(404).json({
                 success: false,
@@ -651,7 +719,7 @@ const deleteDBTranscription = async (request, response, next) => {
         const transcriptionDeleted = await deleteTranscriptionByIdQuery(id);
         if (!transcriptionDeleted) {
             logger.error(
-                `[transcriptionsMiddleware - deleteDBTranscription] => Error delete transcription by ID: ${error.message}`
+                `[transcriptionsMiddleware - deleteDBTranscription] => Error delete transcription by ID: ${error.message}`,
             );
             next(error);
         }
@@ -659,7 +727,7 @@ const deleteDBTranscription = async (request, response, next) => {
         results.dbDeleted = true;
 
         logger.info(
-            `[deleteTranscription] User ${user.id} deleted transcription ${id} from database`
+            `[deleteTranscription] User ${user.id} deleted transcription ${id} from database`,
         );
 
         // remove associated local files here
@@ -683,21 +751,21 @@ const deleteDBTranscription = async (request, response, next) => {
         if (deleteFromAssembly && transcription.transcript_id) {
             try {
                 const { status } = await assemblyClient.transcripts.delete(
-                    transcription.transcript_id
+                    transcription.transcript_id,
                 );
                 if (status === "completed") {
                     results.assemblyDeleted = true;
                     logger.info(
-                        `[deleteTranscription] Transcript ${transcription.transcript_id} deleted from AssemblyAI`
+                        `[deleteTranscription] Transcript ${transcription.transcript_id} deleted from AssemblyAI`,
                     );
                 } else {
                     logger.warn(
-                        `[deleteTranscription] AssemblyAI delete for ${transcription.transcript_id} returned status: ${status}`
+                        `[deleteTranscription] AssemblyAI delete for ${transcription.transcript_id} returned status: ${status}`,
                     );
                 }
             } catch (err) {
                 logger.error(
-                    `[deleteTranscription] Error deleting from AssemblyAI: ${err.message}`
+                    `[deleteTranscription] Error deleting from AssemblyAI: ${err.message}`,
                 );
             }
         }
@@ -716,7 +784,7 @@ const fetchAssemblyAIHistory = async (request, response, next) => {
         const user = request.session.user;
 
         logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`
+            `Incoming request to ${request.method} ${request.originalUrl}`,
         );
 
         const data = await fetchAssemblyHistory({ user });
@@ -728,7 +796,7 @@ const fetchAssemblyAIHistory = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - fetchAssemblyAIHistory] => Error fetching transcriptions: ${error.message}`
+            `[transcriptionsMiddleware - fetchAssemblyAIHistory] => Error fetching transcriptions: ${error.message}`,
         );
         next(error);
     }
@@ -739,13 +807,13 @@ const deleteAssemblyAiTranscript = async (request, response, next) => {
         const { transcriptId } = request.params;
         const userId = request.session.user.id;
         logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}, params: ${request.params}`
+            `Incoming request to ${request.method} ${request.originalUrl}, params: ${request.params}`,
         ); // Log the request URL
 
         // Allow only if user is owner or admin
         if (!userId && request.session.user.role !== "admin") {
             logger.warn(
-                `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Unauthorized access attempt: ${request.originalUrl} `
+                `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Unauthorized access attempt: ${request.originalUrl} `,
             );
             return response.status(403).json({
                 success: false,
@@ -754,17 +822,16 @@ const deleteAssemblyAiTranscript = async (request, response, next) => {
         }
         // Delete from AssemblyAI
         // This permanently removes sensitive transcript data
-        const { status } = await assemblyClient.transcripts.delete(
-            transcriptId
-        );
+        const { status } =
+            await assemblyClient.transcripts.delete(transcriptId);
         if (status !== "completed") {
             logger.warn(
-                `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Request to ${request.originalUrl} not successfull.`
+                `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Request to ${request.originalUrl} not successfull.`,
             );
             throw error;
         }
         logger.info(
-            `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Transcript with ID ${transcriptId} deleted from AssemblyAI API `
+            `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Transcript with ID ${transcriptId} deleted from AssemblyAI API `,
         );
         response.json({
             success: true,
@@ -772,7 +839,7 @@ const deleteAssemblyAiTranscript = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Error delete transcript: ${error.message}`
+            `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Error delete transcript: ${error.message}`,
         );
         next(error);
     }
@@ -790,12 +857,12 @@ const restoreTranscription = async (request, response, next) => {
         } = request.body;
 
         logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`
+            `Incoming request to ${request.method} ${request.originalUrl}`,
         );
 
         if (!userId) {
             logger.warn(
-                `[transcriptionsMiddleware - restoreTranscription] => Unauthorized restore attempt`
+                `[transcriptionsMiddleware - restoreTranscription] => Unauthorized restore attempt`,
             );
             return response.status(401).json({
                 success: false,
@@ -806,7 +873,7 @@ const restoreTranscription = async (request, response, next) => {
         // Required fields
         if (!transcript_id) {
             logger.warn(
-                `[transcriptionsMiddleware - restoreTranscription] => Missing fields. transcript_id? "${transcript_id}" `
+                `[transcriptionsMiddleware - restoreTranscription] => Missing fields. transcript_id? "${transcript_id}" `,
             );
             return response.status(400).json({
                 success: false,
@@ -815,12 +882,11 @@ const restoreTranscription = async (request, response, next) => {
         }
 
         // Prevent duplicate offline row
-        const existing = await getTranscriptionByApiTranscriptIdQuery(
-            transcript_id
-        );
+        const existing =
+            await getTranscriptionByApiTranscriptIdQuery(transcript_id);
         if (existing) {
             logger.warn(
-                `[transcriptionsMiddleware - restoreTranscription] => Transcript with ID: ${transcript_id} already exists in database`
+                `[transcriptionsMiddleware - restoreTranscription] => Transcript with ID: ${transcript_id} already exists in database`,
             );
             return response.status(409).json({
                 success: false,
@@ -832,7 +898,7 @@ const restoreTranscription = async (request, response, next) => {
         const backup = await getBackupWithRawByTranscriptIdQuery(transcript_id);
         if (!backup) {
             logger.warn(
-                `[transcriptionsMiddleware - restoreTranscription] => No backup found for transcript_id: ${transcript_id}`
+                `[transcriptionsMiddleware - restoreTranscription] => No backup found for transcript_id: ${transcript_id}`,
             );
             return response.status(404).json({
                 success: false,
@@ -898,7 +964,7 @@ const restoreTranscription = async (request, response, next) => {
 
         if (!transcriptionText) {
             logger.warn(
-                `[transcriptionsMiddleware - restoreTranscription] => Could not derive transcription text from backup.raw_api_data for transcript_id: ${transcript_id}`
+                `[transcriptionsMiddleware - restoreTranscription] => Could not derive transcription text from backup.raw_api_data for transcript_id: ${transcript_id}`,
             );
         }
 
@@ -913,7 +979,7 @@ const restoreTranscription = async (request, response, next) => {
             audio_duration: restoredAudioDuration,
         });
         logger.info(
-            `[transcriptionsMiddleware - restoreTranscription] => Transcript with ID ${transcript_id} restored to offline successfully for user ${userId}`
+            `[transcriptionsMiddleware - restoreTranscription] => Transcript with ID ${transcript_id} restored to offline successfully for user ${userId}`,
         );
 
         return response.status(201).json({
@@ -923,7 +989,7 @@ const restoreTranscription = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - restoreTranscription] => Error restoring transcript: ${error.message}`
+            `[transcriptionsMiddleware - restoreTranscription] => Error restoring transcript: ${error.message}`,
         );
         next(error);
     }
@@ -959,12 +1025,12 @@ const streamAudioFile = (request, response, next) => {
             ext === ".mp3"
                 ? "audio/mpeg"
                 : ext === ".wav"
-                ? "audio/wav"
-                : ext === ".m4a"
-                ? "audio/mp4"
-                : ext === ".aac"
-                ? "audio/aac"
-                : "application/octet-stream";
+                  ? "audio/wav"
+                  : ext === ".m4a"
+                    ? "audio/mp4"
+                    : ext === ".aac"
+                      ? "audio/aac"
+                      : "application/octet-stream";
 
         if (range) {
             const parts = range.replace(/bytes=/, "").split("-");
@@ -1007,6 +1073,34 @@ const streamAudioFile = (request, response, next) => {
 
 // Helper functions
 
+const safeParseRaw = (raw) => {
+    if (!raw) return null;
+    if (typeof raw === "string") {
+        try {
+            return JSON.parse(raw);
+        } catch {
+            return null;
+        }
+    }
+    return raw;
+};
+
+const extractUtterances = (rawApiData) => {
+    const raw = safeParseRaw(rawApiData);
+    const transcriptObject = raw?.transcript ?? raw;
+    const utterances = transcriptObject?.utterances;
+
+    if (!Array.isArray(utterances) || utterances.length === 0) return null;
+
+    // Return only fields the UI needs
+    return utterances.map((u) => ({
+        speaker: u?.speaker ?? null,
+        text: u?.text ?? "",
+        start: u?.start ?? null,
+        end: u?.end ?? null,
+    }));
+};
+
 /**
  * Internal worker that runs the full transcription pipeline for one jobId.
  * Emits step events via job.emitter for SSE clients.
@@ -1022,7 +1116,7 @@ const runTranscriptionJob = async ({
     const job = transcriptionJobs[jobId];
     if (!job) {
         logger.warn(
-            `[runTranscriptionJob] => Job ${jobId} no longer exists in registry`
+            `[runTranscriptionJob] => Job ${jobId} no longer exists in registry`,
         );
         return;
     }
@@ -1071,16 +1165,16 @@ const runTranscriptionJob = async ({
                 : "00.00.00";
 
         logger.info(
-            `Incoming SSE transcription job ${jobId} from user_id ${loggedUserId}`
+            `Incoming SSE transcription job ${jobId} from user_id ${loggedUserId}`,
         );
 
         console.log(
-            `[runTranscriptionJob] => jobId=${jobId}, filename=${filename}, fileModifiedDate=${fileModifiedDisplayDate}`
+            `[runTranscriptionJob] => jobId=${jobId}, filename=${filename}, fileModifiedDate=${fileModifiedDisplayDate}`,
         );
         console.log(
             `[runTranscriptionJob] Received options: ${JSON.stringify(
-                userOptions
-            )}`
+                userOptions,
+            )}`,
         );
 
         emitStep(TRANSCRIPTION_STEPS.INIT, "success");
@@ -1102,8 +1196,8 @@ const runTranscriptionJob = async ({
 
         console.log(
             `[runTranscriptionJob] transcriptionOptions: ${JSON.stringify(
-                transcriptionOptions
-            )}`
+                transcriptionOptions,
+            )}`,
         );
 
         const transcriptId = await requestTranscription(transcriptionOptions);
@@ -1125,12 +1219,12 @@ const runTranscriptionJob = async ({
 
         if (!createBackup) {
             throw new Error(
-                "Failed to insert transcription backup into database"
+                "Failed to insert transcription backup into database",
             );
         }
 
         logger.info(
-            `[runTranscriptionJob] => insertTranscriptionBackupQuery: Transcript's API response for User ${loggedUserId} stored`
+            `[runTranscriptionJob] => insertTranscriptionBackupQuery: Transcript's API response for User ${loggedUserId} stored`,
         );
 
         const {
@@ -1178,7 +1272,7 @@ const runTranscriptionJob = async ({
         const storedTxtfilePath = saveTranscriptionToFile(
             filename,
             insertedTranscription.transcription,
-            fileModifiedDisplayDate
+            fileModifiedDisplayDate,
         );
 
         emitStep(TRANSCRIPTION_STEPS.SAVE_FILE, "success");
@@ -1191,11 +1285,14 @@ const runTranscriptionJob = async ({
             jobId,
             steps,
             message: `Transcription created and stored successfully at: ${storedTxtfilePath}`,
-            TranscriptData: insertedTranscription,
+            TranscriptData: {
+                ...insertedTranscription,
+                utterances: extractUtterances(transcript),
+            },
         });
 
         logger.info(
-            `[runTranscriptionJob] => job ${jobId} completed successfully`
+            `[runTranscriptionJob] => job ${jobId} completed successfully`,
         );
     } catch (err) {
         const msg = err && err.message ? err.message : String(err);
@@ -1212,9 +1309,12 @@ const runTranscriptionJob = async ({
         });
     } finally {
         // Cleanup job from memory after 10 minutes
-        setTimeout(() => {
-            delete transcriptionJobs[jobId];
-        }, 10 * 60 * 1000);
+        setTimeout(
+            () => {
+                delete transcriptionJobs[jobId];
+            },
+            10 * 60 * 1000,
+        );
     }
 };
 
@@ -1266,7 +1366,7 @@ const storeTranscriptionText = async ({ transcriptData }) => {
         }
 
         logger.info(
-            `[transcriptionMiddleware - createTranscription - storeTranscriptionText] => Transcription text prepared (length=${transcriptionText.length}).`
+            `[transcriptionMiddleware - createTranscription - storeTranscriptionText] => Transcription text prepared (length=${transcriptionText.length}).`,
         );
 
         const transcriptionDataToInsert = {
@@ -1283,7 +1383,7 @@ const storeTranscriptionText = async ({ transcriptData }) => {
         return insertedTranscription;
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - storeTranscriptionText] => Error storing transcription: ${error.message}`
+            `[transcriptionsMiddleware - storeTranscriptionText] => Error storing transcription: ${error.message}`,
         );
         throw error;
     }
@@ -1313,7 +1413,7 @@ const flattenTranscription = (transcriptObject) => {
                 (u) =>
                     `Speaker ${u.speaker != null ? u.speaker : ""}: ${
                         u.text || ""
-                    }`
+                    }`,
             )
             .join("\n");
     }

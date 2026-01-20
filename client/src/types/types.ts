@@ -136,6 +136,14 @@ export type TranscriptData = {
     transcription: string; // plain text
     created_at: string;
     options: TranscriptionOptions;
+    utterances?: TranscriptUtterance[] | null;
+};
+
+export type TranscriptUtterance = {
+    speaker: string | number | null;
+    text: string;
+    start: number | null; // ms
+    end: number | null; // ms
 };
 
 export type TranscriptionOptions = {
@@ -245,6 +253,7 @@ export type OnlineTranscription = {
     transcription: string;
     file_name?: string | null;
     file_recorded_at?: string | null;
+    utterances?: TranscriptUtterance[] | null;
 };
 
 export type AssemblyTranscriptionState = {

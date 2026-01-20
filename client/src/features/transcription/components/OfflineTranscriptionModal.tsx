@@ -104,7 +104,7 @@ export const OfflineTranscriptionModal = ({
                             setActive(null);
                             onClose();
                             navigate(
-                                `/dashboard/transcriptions/${transcription.id}`
+                                `/dashboard/transcriptions/${transcription.id}`,
                             );
                         }}
                         onDelete={handleDelete}

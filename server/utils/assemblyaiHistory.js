@@ -26,6 +26,20 @@ const formatDurationMMSS = (seconds) => {
     return `${m}:${String(s).padStart(2, "0")}`;
 };
 
+// Normalize utterances so the frontend can render speaker blocks + timestamps reliably
+const extractUtterances = (transcriptObject) => {
+    const utterances = transcriptObject?.utterances;
+
+    if (!Array.isArray(utterances) || utterances.length === 0) return null;
+
+    return utterances.map((u) => ({
+        speaker: u?.speaker ?? null,
+        text: u?.text ?? "",
+        start: u?.start ?? null,
+        end: u?.end ?? null,
+    }));
+};
+
 // Best-effort flattening from AssemblyAI transcript object
 const flattenTranscription = (transcript) => {
     if (!transcript) return "";
@@ -107,11 +121,12 @@ const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
 
                     // avoid stale data
                     audio_duration: formatDurationMMSS(
-                        transcriptObject?.audio_duration
+                        transcriptObject?.audio_duration,
                     ),
                     speech_model: null,
                     language: null,
                     transcription: "",
+                    utterances: null,
                 };
             }
 
@@ -119,6 +134,10 @@ const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
             const transcriptionText = transcriptObject
                 ? flattenTranscription(transcriptObject)
                 : "";
+
+            const utterances = transcriptObject
+                ? extractUtterances(transcriptObject)
+                : null;
 
             return {
                 transcript_id: h.transcript_id,
@@ -128,13 +147,14 @@ const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
 
                 audio_url: transcriptObject?.audio_url ?? null,
                 audio_duration: formatDurationMMSS(
-                    transcriptObject?.audio_duration
+                    transcriptObject?.audio_duration,
                 ),
 
                 speech_model: transcriptObject?.speech_model ?? null,
                 language: transcriptObject?.language_code ?? null,
 
                 transcription: transcriptionText,
+                utterances,
 
                 file_name: backupRow.file_name ?? null,
                 file_recorded_at: backupRow.file_recorded_at ?? null,
@@ -171,7 +191,7 @@ const fetchAssemblyHistory = async ({ user }) => {
         return buildHistoryResponseFromBackups({ historyIds, backups });
     } catch (error) {
         logger.error(
-            `[assemblyaiHistory] Error building AssemblyAI history: ${error.message}`
+            `[assemblyaiHistory] Error building AssemblyAI history: ${error.message}`,
         );
         throw error;
     }

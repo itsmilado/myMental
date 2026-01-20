@@ -38,6 +38,7 @@ import {
 import { formatDateTime } from "../../../utils/formatDate";
 import { useTheme } from "@mui/material/styles";
 import { tokens } from "../../../theme/theme";
+import { TranscriptText } from "../components/TranscriptText";
 
 const TRANSCRIPTION_STEP_ORDER: TranscriptionStepKey[] = [
     "init",
@@ -59,7 +60,7 @@ const createInitialStepsState = (): TranscriptionStepsState => ({
 
 const getActiveStepIndexFromSteps = (
     steps: TranscriptionStepsState,
-    order: TranscriptionStepKey[] = TRANSCRIPTION_STEP_ORDER
+    order: TranscriptionStepKey[] = TRANSCRIPTION_STEP_ORDER,
 ): number => {
     let lastIndex = 0;
     order.forEach((key, index) => {
@@ -113,14 +114,14 @@ export const UploadAudioPage = () => {
     const colors = tokens(theme.palette.mode);
     const [file, setFile] = useState<File | null>(null);
     const [options, setOptions] = useState<TranscriptionOptions>(
-        defaultTranscriptionOptions
+        defaultTranscriptionOptions,
     );
     const [results, setResults] = useState<TranscriptData | null>(null);
     const [loading, setLoading] = useState(false);
 
     const [jobId, setJobId] = useState<string | null>(null);
     const [stepsState, setStepsState] = useState<TranscriptionStepsState>(
-        createInitialStepsState
+        createInitialStepsState,
     );
     const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -171,7 +172,7 @@ export const UploadAudioPage = () => {
             // 1) Start background job
             const startResponse = await startTranscriptionJob(
                 file,
-                userOptions
+                userOptions,
             );
             const newJobId = startResponse.jobId;
             setJobId(newJobId);
@@ -187,8 +188,8 @@ export const UploadAudioPage = () => {
                 setActiveStepIndex(
                     getActiveStepIndexFromSteps(
                         payload.steps,
-                        TRANSCRIPTION_STEP_ORDER
-                    )
+                        TRANSCRIPTION_STEP_ORDER,
+                    ),
                 );
             });
 
@@ -198,8 +199,8 @@ export const UploadAudioPage = () => {
                 setActiveStepIndex(
                     getActiveStepIndexFromSteps(
                         payload.steps,
-                        TRANSCRIPTION_STEP_ORDER
-                    )
+                        TRANSCRIPTION_STEP_ORDER,
+                    ),
                 );
                 setResults(payload.TranscriptData);
                 setLoading(false);
@@ -211,24 +212,24 @@ export const UploadAudioPage = () => {
                 try {
                     if (event.data) {
                         const payload = JSON.parse(
-                            event.data as string
+                            event.data as string,
                         ) as ErrorEventPayload;
                         setErrorMessage(
                             payload.error ||
-                                "An error occurred during transcription."
+                                "An error occurred during transcription.",
                         );
                         if (payload.steps) {
                             setStepsState(payload.steps);
                             setActiveStepIndex(
                                 getActiveStepIndexFromSteps(
                                     payload.steps,
-                                    TRANSCRIPTION_STEP_ORDER
-                                )
+                                    TRANSCRIPTION_STEP_ORDER,
+                                ),
                             );
                         }
                     } else {
                         setErrorMessage(
-                            "An error occurred during transcription (no data)."
+                            "An error occurred during transcription (no data).",
                         );
                     }
                 } catch {
@@ -243,7 +244,7 @@ export const UploadAudioPage = () => {
             setErrorMessage(
                 error instanceof Error
                     ? error.message
-                    : "Failed to start transcription job."
+                    : "Failed to start transcription job.",
             );
             setLoading(false);
         }
@@ -627,7 +628,7 @@ export const UploadAudioPage = () => {
                                             deleteFromAssembly,
                                             deleteTxtFile: deleteServerFiles,
                                             deleteAudioFile: deleteServerFiles,
-                                        }
+                                        },
                                     );
                                     // Remove the result from view once it’s deleted
                                     setResults(null);
@@ -637,9 +638,11 @@ export const UploadAudioPage = () => {
                         </Box>
                     </Box>
 
-                    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                        {results.transcription}
-                    </Typography>
+                    <TranscriptText
+                        text={results.transcription}
+                        utterances={results.utterances}
+                        maxHeight={360}
+                    />
                 </Box>
             )}
         </Paper>

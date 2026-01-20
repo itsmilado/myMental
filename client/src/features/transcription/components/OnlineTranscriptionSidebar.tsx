@@ -14,6 +14,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { getAudioStreamUrl } from "../../auth/api";
 import { AudioPlayer } from "./AudioPlayer";
 import { OnlineTranscription } from "../../../types/types";
+import { TranscriptText } from "./TranscriptText";
 
 type Props = {
     open: boolean;
@@ -183,21 +184,12 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
                         Transcript Text
                     </Typography>
 
-                    <Box
-                        sx={{
-                            maxHeight: "60vh",
-                            overflowY: "auto",
-                        }}
-                    >
-                        <Typography
-                            variant="body2"
-                            sx={{ whiteSpace: "pre-wrap" }}
-                        >
-                            {transcription.transcription &&
-                            transcription.transcription.trim().length
-                                ? transcription.transcription
-                                : "No transcript text available."}
-                        </Typography>
+                    <Box sx={{ maxHeight: "60vh", overflowY: "auto" }}>
+                        <TranscriptText
+                            text={transcription.transcription}
+                            utterances={transcription.utterances}
+                            maxHeight="50vh"
+                        />
                     </Box>
                 </Stack>
             </Box>
