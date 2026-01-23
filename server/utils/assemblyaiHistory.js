@@ -2,6 +2,8 @@
 const axios = require("axios");
 const logger = require("../utils/logger");
 const { getBackupsByTranscriptIdsQuery } = require("../db/transcribeQueries");
+const { log } = require("winston");
+const { Console } = require("winston/lib/winston/transports");
 
 const ASSEMBLY_LIST_URL =
     "https://api.eu.assemblyai.com/v2/transcript?limit=200";

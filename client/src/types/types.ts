@@ -146,12 +146,14 @@ export type TranscriptUtterance = {
     end: number | null; // ms
 };
 
+export type SpeechModel = "universal" | "slam-1" | "nano";
+
 export type TranscriptionOptions = {
     speaker_labels?: boolean;
     speakers_expected?: number;
     sentiment_analysis?: boolean;
-    speech_model?: string;
-    language_code?: string;
+    speech_model: SpeechModel;
+    language_code: string;
     format_text?: boolean;
     punctuate?: boolean;
     entity_detection?: boolean;
