@@ -932,7 +932,29 @@ const restoreTranscription = async (request, response, next) => {
                 raw?.language_code ?? raw?.transcript?.language_code ?? null,
 
             speech_model:
-                raw?.speech_model ?? raw?.transcript?.speech_model ?? null,
+                raw?.speech_model ??
+                raw?.transcript?.speech_model ??
+                raw?.speech_models?.[0] ??
+                raw?.transcript?.speech_models?.[0] ??
+                null,
+
+            speech_models:
+                raw?.speech_models ??
+                raw?.transcript?.speech_models ??
+                (raw?.speech_model ? [raw.speech_model] : null) ??
+                (raw?.transcript?.speech_model
+                    ? [raw.transcript.speech_model]
+                    : null),
+
+            language_detection:
+                raw?.language_detection ??
+                raw?.transcript?.language_detection ??
+                null,
+
+            language_detection_options:
+                raw?.language_detection_options ??
+                raw?.transcript?.language_detection_options ??
+                null,
 
             punctuate: raw?.punctuate ?? raw?.transcript?.punctuate ?? null,
 
@@ -1072,6 +1094,30 @@ const streamAudioFile = (request, response, next) => {
 };
 
 // Helper functions
+
+// Prefer array-based model selection, fallback to legacy field
+const getSpeechModelFromTranscript = (transcript) => {
+    if (!transcript) return null;
+    if (
+        Array.isArray(transcript.speech_models) &&
+        transcript.speech_models[0]
+    ) {
+        return transcript.speech_models[0];
+    }
+    return transcript.speech_model ?? null;
+};
+
+const getSpeechModelsFromTranscript = (transcript) => {
+    if (!transcript) return null;
+    if (
+        Array.isArray(transcript.speech_models) &&
+        transcript.speech_models.length
+    ) {
+        return transcript.speech_models;
+    }
+    if (transcript.speech_model) return [transcript.speech_model];
+    return null;
+};
 
 const safeParseRaw = (raw) => {
     if (!raw) return null;
@@ -1240,8 +1286,14 @@ const runTranscriptionJob = async ({
         } = transcript;
 
         const resTranscriptOptions = {
-            language_code,
-            speech_model,
+            language_code: language_code ?? null,
+            speech_model: getSpeechModelFromTranscript(transcript),
+            speech_models: getSpeechModelsFromTranscript(transcript),
+
+            language_detection: userOptions?.language_detection ?? null,
+            language_detection_options:
+                userOptions?.language_detection_options ?? null,
+
             entity_detection,
             sentiment_analysis,
             speaker_labels,

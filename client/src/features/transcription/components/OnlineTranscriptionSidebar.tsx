@@ -113,10 +113,10 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
                                 label={`Status: ${transcription.status}`}
                             />
 
-                            {transcription.speech_model && (
+                            {transcription.speech_models && (
                                 <Chip
                                     size="small"
-                                    label={transcription.speech_model}
+                                    label={transcription.speech_models}
                                 />
                             )}
                             {transcription.language && (

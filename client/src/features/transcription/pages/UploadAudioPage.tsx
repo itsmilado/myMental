@@ -112,31 +112,49 @@ const defaultTranscriptionOptions: TranscriptionOptions = {
     entity_detection: false,
     sentiment_analysis: false,
 
-    speech_model: "slam-1",
+    speech_models: ["slam-1"],
     language_code: "en_us",
 };
 
 const modelLanguages: Record<string, string[]> = {
-    universal: ["en", "en_uk", "en_us", "es", "de", "fr"],
+    "universal-2": [
+        "en",
+        "en_uk",
+        "en_us",
+        "de",
+        "fa",
+        "ar",
+        "es",
+        "fr",
+        "uk",
+        "ru",
+    ],
     "slam-1": ["en", "en_uk", "en_us"],
     nano: ["en", "en_uk", "en_us", "es", "de", "fr"],
 };
 
 const speechModelHelp: Record<string, string> = {
-    universal:
-        "Best for out-of-the-box transcription of pre-recorded audio with multi-lingual support, excellent accuracy, and low latency.",
+    "universal-2":
+        "Advanced general-purpose model for pre-recorded audio with multi-lingual support, improved accuracy and low latency.",
     "slam-1":
         "Highest accuracy for transcribing English pre-recorded audio with fine-tuning support and customization.",
     nano: "Fast and lightweight for general transcription with multi-lingual support.",
 };
 
+const AUTO_LANGUAGE_CODE = "auto";
+
 const languageLabels: Record<string, string> = {
-    en: "English (Global English)",
-    en_uk: "English (British English)",
-    en_us: "English (US English)",
-    es: "Spanish",
+    [AUTO_LANGUAGE_CODE]: "Automatic Language Detection",
+    en: "English ( Global )",
+    en_uk: "English ( British )",
+    en_us: "English ( US )",
     de: "German",
+    fa: "Persian ( Farsi )",
+    ar: "Arabic",
+    es: "Spanish",
     fr: "French",
+    uk: "Ukrainian",
+    ru: "Russian",
 };
 
 const getLanguageLabel = (code: string): string => {
@@ -190,13 +208,72 @@ export const UploadAudioPage = () => {
           ? "Processing… this panel updates automatically."
           : "Select a file and start transcription to see results here.";
 
+    const currentSpeechModel: SpeechModel =
+        options.speech_models?.[0] ?? "slam-1";
+
     const currentModelLanguages = useMemo(() => {
-        const langs = modelLanguages[options.speech_model] ?? [];
+        const langs = modelLanguages[currentSpeechModel] ?? [];
         return langs.length ? langs : ["en"];
-    }, [options.speech_model]);
+    }, [currentSpeechModel]);
+
+    const isUniversal2 = currentSpeechModel === "universal-2";
+    const codeSwitchingEnabled = Boolean(
+        options.language_detection_options?.code_switching,
+    );
 
     useEffect(() => {
-        // Keep language_code valid when switching models.
+        // Hide/reset auto language detection + code switching when not using Universal-2.
+        if (isUniversal2) return;
+
+        setOptions((o) => {
+            const model = o.speech_models?.[0] ?? "slam-1";
+            const langs = modelLanguages[model] ?? ["en"];
+
+            const nextLanguageCode =
+                o.language_code === AUTO_LANGUAGE_CODE
+                    ? (langs[0] ?? "en")
+                    : o.language_code;
+
+            const hadDetection =
+                o.language_code === AUTO_LANGUAGE_CODE ||
+                o.language_detection ||
+                o.language_detection_options?.code_switching;
+
+            if (!hadDetection) return o;
+
+            return {
+                ...o,
+                language_code: nextLanguageCode,
+                language_detection: false,
+                language_detection_options: undefined,
+            };
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentSpeechModel, isUniversal2]);
+
+    useEffect(() => {
+        // Enforce Code Switching contract for Universal-2.
+        if (!isUniversal2) return;
+        if (!codeSwitchingEnabled) return;
+
+        if (
+            options.language_code !== AUTO_LANGUAGE_CODE ||
+            !options.language_detection
+        ) {
+            setOptions((o) => ({
+                ...o,
+                language_code: AUTO_LANGUAGE_CODE,
+                language_detection: true,
+                language_detection_options: { code_switching: true },
+            }));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isUniversal2, codeSwitchingEnabled]);
+
+    useEffect(() => {
+        // Keep language_code valid when switching models (but do not override auto detection).
+        if (options.language_code === AUTO_LANGUAGE_CODE) return;
+
         if (!currentModelLanguages.includes(options.language_code)) {
             setOptions((o) => ({
                 ...o,
@@ -204,7 +281,41 @@ export const UploadAudioPage = () => {
             }));
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [options.speech_model]);
+    }, [currentSpeechModel, currentModelLanguages, options.language_code]);
+
+    const handleSelectModel = (model: SpeechModel): void => {
+        if (model === currentSpeechModel) return;
+        const langs = modelLanguages[model] ?? ["en"];
+
+        setOptions((o) => {
+            const nextIsUniversal2 = model === "universal-2";
+            const prevWasAuto = o.language_code === AUTO_LANGUAGE_CODE;
+
+            const nextLanguageCode = nextIsUniversal2
+                ? prevWasAuto
+                    ? AUTO_LANGUAGE_CODE
+                    : langs.includes(o.language_code)
+                      ? o.language_code
+                      : (langs[0] ?? "en")
+                : prevWasAuto
+                  ? (langs[0] ?? "en")
+                  : langs.includes(o.language_code)
+                    ? o.language_code
+                    : (langs[0] ?? "en");
+
+            return {
+                ...o,
+                speech_models: [model],
+                language_code: nextLanguageCode,
+                language_detection: nextIsUniversal2
+                    ? o.language_detection
+                    : false,
+                language_detection_options: nextIsUniversal2
+                    ? o.language_detection_options
+                    : undefined,
+            };
+        });
+    };
 
     const handleUpload = async (): Promise<void> => {
         if (!file) return;
@@ -234,8 +345,18 @@ export const UploadAudioPage = () => {
         if (options.entity_detection) userOptions.entity_detection = true;
         if (options.sentiment_analysis) userOptions.sentiment_analysis = true;
 
-        userOptions.speech_model = options.speech_model;
-        userOptions.language_code = options.language_code;
+        userOptions.speech_models = [currentSpeechModel];
+        const isAutoLanguage = options.language_code === AUTO_LANGUAGE_CODE;
+        if (isAutoLanguage || options.language_detection) {
+            userOptions.language_detection = true;
+            if (codeSwitchingEnabled) {
+                userOptions.language_detection_options = {
+                    code_switching: true,
+                };
+            }
+        } else {
+            userOptions.language_code = options.language_code;
+        }
 
         try {
             const startResponse = await startTranscriptionJob(
@@ -316,20 +437,8 @@ export const UploadAudioPage = () => {
         }
     };
 
-    const handleSelectModel = (model: SpeechModel): void => {
-        if (model === options.speech_model) return;
-        const langs = modelLanguages[model] ?? [];
-        setOptions((o) => ({
-            ...o,
-            speech_model: model,
-            language_code: langs.includes(o.language_code)
-                ? o.language_code
-                : (langs[0] ?? "en"),
-        }));
-    };
-
     const renderModelButton = (model: SpeechModel) => {
-        const selected = options.speech_model === model;
+        const selected = currentSpeechModel === model;
 
         return (
             <Button
@@ -552,7 +661,7 @@ export const UploadAudioPage = () => {
                         }}
                         fullWidth
                     >
-                        Select Audio File
+                        {file ? "Change Audio File" : "Choose Audio File"}
                         <input
                             hidden
                             type="file"
@@ -596,7 +705,7 @@ export const UploadAudioPage = () => {
                         </Typography>
 
                         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                            {renderModelButton("universal")}
+                            {renderModelButton("universal-2")}
                             {renderModelButton("slam-1")}
                             {renderModelButton("nano")}
                         </Box>
@@ -635,19 +744,95 @@ export const UploadAudioPage = () => {
                         >
                             <Select
                                 value={options.language_code}
+                                disabled={isUniversal2 && codeSwitchingEnabled}
                                 onChange={(e) =>
-                                    setOptions((o) => ({
-                                        ...o,
-                                        language_code: e.target.value,
-                                    }))
+                                    setOptions((o) => {
+                                        const next = String(e.target.value);
+
+                                        // Prevent selecting auto for non-Universal-2 models.
+                                        if (
+                                            !isUniversal2 &&
+                                            next === AUTO_LANGUAGE_CODE
+                                        ) {
+                                            return o;
+                                        }
+
+                                        const selectingAuto =
+                                            next === AUTO_LANGUAGE_CODE;
+
+                                        return {
+                                            ...o,
+                                            language_code: next,
+                                            language_detection: selectingAuto
+                                                ? true
+                                                : false,
+                                            language_detection_options:
+                                                selectingAuto
+                                                    ? o.language_detection_options
+                                                    : undefined,
+                                        };
+                                    })
                                 }
                             >
+                                {isUniversal2 && (
+                                    <MenuItem value={AUTO_LANGUAGE_CODE}>
+                                        {getLanguageLabel(AUTO_LANGUAGE_CODE)}
+                                    </MenuItem>
+                                )}
+
                                 {currentModelLanguages.map((lang) => (
                                     <MenuItem key={lang} value={lang}>
                                         {getLanguageLabel(lang)}
                                     </MenuItem>
                                 ))}
                             </Select>
+
+                            {isUniversal2 && (
+                                <FormControlLabel
+                                    sx={{ mt: 0.5, ml: 0 }}
+                                    control={
+                                        <Switch
+                                            checked={codeSwitchingEnabled}
+                                            onChange={(e) => {
+                                                const checked =
+                                                    e.target.checked;
+                                                setOptions((o) => ({
+                                                    ...o,
+                                                    language_detection: checked
+                                                        ? true
+                                                        : o.language_code ===
+                                                            AUTO_LANGUAGE_CODE
+                                                          ? true
+                                                          : false,
+                                                    language_code: checked
+                                                        ? AUTO_LANGUAGE_CODE
+                                                        : o.language_code,
+                                                    language_detection_options:
+                                                        checked
+                                                            ? {
+                                                                  code_switching: true,
+                                                              }
+                                                            : undefined,
+                                                }));
+                                            }}
+                                            sx={{
+                                                "& .MuiSwitch-switchBase.Mui-checked":
+                                                    {
+                                                        color: colors
+                                                            .greenAccent[500],
+                                                    },
+                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
+                                                    {
+                                                        backgroundColor:
+                                                            colors
+                                                                .greenAccent[500],
+                                                    },
+                                            }}
+                                        />
+                                    }
+                                    label="Code switching"
+                                />
+                            )}
                         </FormControl>
                     </Box>
 
@@ -1007,7 +1192,7 @@ export const UploadAudioPage = () => {
                         >
                             <Chip
                                 size="small"
-                                label={`Model: ${options.speech_model}`}
+                                label={`Model: ${results.options?.speech_models?.[0]}`}
                                 variant="outlined"
                             />
                             <Chip

@@ -146,14 +146,22 @@ export type TranscriptUtterance = {
     end: number | null; // ms
 };
 
-export type SpeechModel = "universal" | "slam-1" | "nano";
+export type SpeechModel = "universal-2" | "slam-1" | "nano";
 
 export type TranscriptionOptions = {
     speaker_labels?: boolean;
     speakers_expected?: number;
     sentiment_analysis?: boolean;
-    speech_model: SpeechModel;
+
+    // Preferred API request field for model selection (priority order).
+    speech_models?: SpeechModel[];
     language_code: string;
+
+    // Enable automatic language detection.
+    language_detection?: boolean;
+    language_detection_options?: {
+        code_switching?: boolean;
+    };
     format_text?: boolean;
     punctuate?: boolean;
     entity_detection?: boolean;
@@ -249,7 +257,7 @@ export type OnlineTranscription = {
     project?: string;
     audio_url: string;
     audio_duration?: string;
-    speech_model: string;
+    speech_models: string[];
     language: string;
     features?: string[];
     transcription: string;

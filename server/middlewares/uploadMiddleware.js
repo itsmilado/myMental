@@ -32,7 +32,7 @@ const storage = multer.diskStorage({
         // Create new filename
         const safeName = originalName.replace(/[^\w]+/g, "_");
         const newFileName = `${safeName}_Recorded(${fileModifiedDisplayDate})_Transcribed(${currentDate})${path.extname(
-            file.originalname
+            file.originalname,
         )}`;
         cb(null, newFileName);
     },
@@ -43,11 +43,12 @@ const upload = multer({
     storage: storage,
     fileFilter: (req, file, cb) => {
         logger.info(
-            `Incoming file: ${file.originalname}, type: ${file.mimetype}`
+            `Incoming file: ${file.originalname}, type: ${file.mimetype}`,
         );
         const allowedTypes = [
             "audio/mp4",
             "audio/m4a",
+            "audio/vnd.dlna.adts",
             "audio/x-m4a",
             "audio/mp3",
             "audio/wav",
@@ -59,7 +60,7 @@ const upload = multer({
         if (!allowedTypes.includes(file.mimetype)) {
             logger.warn(`Invalid file type: ${file.mimetype}`);
             return cb(
-                new Error("Only MP4, M4A, MP3, WAV, and OGG files are allowed")
+                new Error("Only MP4, M4A, MP3, WAV, and OGG files are allowed"),
             );
         }
         cb(null, true);
