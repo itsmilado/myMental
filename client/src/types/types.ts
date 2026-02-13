@@ -100,11 +100,13 @@ export interface User {
     created_at: string;
 }
 
-export interface AuthState {
+export type AuthState = {
     user: User | null;
-    setUser: (user: User | null) => void;
+    authReady: boolean;
+    setUser: (user: User) => void;
     clearUser: () => void;
-}
+    hydrateUser: () => Promise<void>;
+};
 
 export interface AuthResponse {
     success: boolean;
