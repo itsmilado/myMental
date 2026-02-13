@@ -30,7 +30,7 @@ export type DeleteTranscriptionOptions = {
 export const getUser = async (id: string): Promise<User> => {
     try {
         const response = await axios.get<User>(
-            `http://localhost:5002/users/${id}`
+            `http://localhost:5002/users/${id}`,
         );
         return response.data;
     } catch (error) {
@@ -41,7 +41,7 @@ export const getUser = async (id: string): Promise<User> => {
 
 export const loginUser = async (
     email: string,
-    password: string
+    password: string,
 ): Promise<AuthResponse> => {
     const response = await axios.post("http://localhost:5002/users/login", {
         email,
@@ -64,7 +64,7 @@ export const signupUser = async (
     last_name: string,
     email: string,
     password: string,
-    repeat_password: string
+    repeat_password: string,
 ): Promise<AuthResponse> => {
     const response = await axios.post("http://localhost:5002/users/signup", {
         first_name,
@@ -76,10 +76,23 @@ export const signupUser = async (
     return response.data as AuthResponse;
 };
 
+export const updateCurrentUser = async (payload: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+}): Promise<User> => {
+    const response = await axios.patch("/users/me", payload, {
+        withCredentials: true,
+    });
+    if (!response.data?.success)
+        throw new Error(response.data?.message || "Update failed");
+    return response.data.userData;
+};
+
 // SSE-based background job starter
 export const startTranscriptionJob = async (
     file: File,
-    options: Partial<TranscriptionOptions>
+    options: Partial<TranscriptionOptions>,
 ): Promise<StartTranscriptionResponse> => {
     const formData = new FormData();
 
@@ -100,7 +113,7 @@ export const startTranscriptionJob = async (
             headers: {
                 "Content-Type": "multipart/form-data",
             },
-        }
+        },
     );
 
     return data;
@@ -114,7 +127,7 @@ export const getTranscriptionProgressUrl = (jobId: string): string => {
 
 export const fetchUserTranscripts = async (
     filters: Filters = {},
-    sort: SortState = { orderBy: "file_recorded_at", direction: "desc" }
+    sort: SortState = { orderBy: "file_recorded_at", direction: "desc" },
 ): Promise<TranscriptData[]> => {
     const params = {
         ...filters,
@@ -123,7 +136,7 @@ export const fetchUserTranscripts = async (
     };
     const response = await axios.get(
         "http://localhost:5002/transcription/filtered_transcriptions",
-        { params }
+        { params },
     );
     if (response.data.success) return response.data.data as TranscriptData[];
     throw new Error(response.data.message || "Failed to fetch transcriptions");
@@ -132,18 +145,18 @@ export const fetchUserTranscripts = async (
 export const exportTranscription = async (
     transcriptId: string,
     format: "txt" | "pdf" | "docx",
-    fallbackFileName?: string
+    fallbackFileName?: string,
 ): Promise<{ blob: Blob; fileName: string }> => {
     const res = await axios.get(
         `http://localhost:5002/transcription/export/${transcriptId}?format=${format}`,
-        { responseType: "blob" }
+        { responseType: "blob" },
     );
     // Try to extract filename from header
     const cd = res.headers["content-disposition"];
     let fileName = fallbackFileName
         ? `${fallbackFileName.replace(
               /\.[^/.]+$/,
-              ""
+              "",
           )}-${transcriptId}.${format}`
         : `${transcriptId}.${format}`;
     if (cd) {
@@ -155,7 +168,7 @@ export const exportTranscription = async (
 
 export const deleteTranscription = async (
     id: string,
-    options?: DeleteTranscriptionOptions
+    options?: DeleteTranscriptionOptions,
 ): Promise<string> => {
     try {
         // NOTE: axios.delete with a body must use `data` inside the config object
@@ -163,7 +176,7 @@ export const deleteTranscription = async (
             `http://localhost:5002/transcription/delete/dbTranscription/${id}`,
             {
                 data: options ?? {},
-            }
+            },
         );
 
         if (!response.data?.success) {
@@ -179,25 +192,25 @@ export const deleteTranscription = async (
 };
 
 export const fetchAssemblyTranscriptions = async (
-    transcriptId: string
+    transcriptId: string,
 ): Promise<OnlineTranscription[]> => {
     const params = transcriptId ? { transcript_id: transcriptId } : {};
     const response = await axios.get(
         `${TRANSCRIPTION_BASE_URL}/assemblyai/history`,
-        { params }
+        { params },
     );
 
     if (!response.data?.success) {
         throw new Error(
             response.data?.message ||
-                "Failed to fetch AssemblyAI transcriptions"
+                "Failed to fetch AssemblyAI transcriptions",
         );
     }
     return response.data.data as OnlineTranscription[];
 };
 
 export const fetchTranscriptionById = async (
-    id: string
+    id: string,
 ): Promise<TranscriptData> => {
     const res = await axios.get(`${TRANSCRIPTION_BASE_URL}/by_id/${id}`);
     if (res.data?.success) return res.data.data as TranscriptData;
@@ -205,21 +218,21 @@ export const fetchTranscriptionById = async (
 };
 
 export const restoreTranscription = async (
-    payload: RestorePayload
+    payload: RestorePayload,
 ): Promise<TranscriptData> => {
     const { data } = await axios.post(
         "http://localhost:5002/transcription/restore",
-        payload
+        payload,
     );
     return data.data;
 };
 
 export const deleteAssemblyTranscription = async (
-    transcriptId: string
+    transcriptId: string,
 ): Promise<string> => {
     try {
         const response = await axios.delete(
-            `http://localhost:5002/transcription/assemblyai/delete/${transcriptId}`
+            `http://localhost:5002/transcription/assemblyai/delete/${transcriptId}`,
         );
         if (!response.data.success) {
             throw new Error(response.data.message || "Delete failed");
