@@ -81,9 +81,13 @@ export const updateCurrentUser = async (payload: {
     last_name?: string;
     email?: string;
 }): Promise<User> => {
-    const response = await axios.patch("/users/me", payload, {
-        withCredentials: true,
-    });
+    const response = await axios.patch(
+        "http://localhost:5002/users/me",
+        payload,
+        {
+            withCredentials: true,
+        },
+    );
     if (!response.data?.success)
         throw new Error(response.data?.message || "Update failed");
     return response.data.userData;
