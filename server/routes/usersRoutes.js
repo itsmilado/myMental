@@ -9,6 +9,7 @@ const {
     userLoggedOut,
     getAllProfiles,
     getCurrentUser,
+    updateCurrentUser,
     // checkloggedIn,
 } = require("../middlewares/usersRoutesHandler");
 const errorHandler = require("../middlewares/errorHandler");
@@ -26,7 +27,7 @@ usersRoutes.post(
     validateSignupRules,
     handleValidationErrors,
     createUsers,
-    errorHandler
+    errorHandler,
 );
 
 usersRoutes.post(
@@ -34,7 +35,7 @@ usersRoutes.post(
     validationLoginRules,
     handleValidationErrors,
     userLogin,
-    errorHandler
+    errorHandler,
 );
 usersRoutes.post("/logout", userLoggedOut, errorHandler);
 usersRoutes.get("/profile/:id", isAuthenticated, getUserInfo, errorHandler);
@@ -51,13 +52,11 @@ usersRoutes.get(
     isAuthenticated,
     hasRole("admin"),
     getAllProfiles,
-    errorHandler
+    errorHandler,
 );
 
 usersRoutes.get("/me", getCurrentUser);
 
-// usersRoutes.get("/allprofiles", getAllProfiles, errorHandler);
-
-// usersRoutes.get("/checkLogin", checkloggedIn);
+usersRoutes.patch("/me", isAuthenticated, updateCurrentUser);
 
 module.exports = { usersRoutes };
