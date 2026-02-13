@@ -7,8 +7,7 @@
         "start": "node server.js",
         "start:dev": "NODE_ENV=development nodemon server.js",
         "dev": "npm run start:dev",
-        "start:prod": "NODE_ENV=production node server.js",
-        "test": "jest"
+        "start:prod": "NODE_ENV=production node server.js"
     },
     "keywords": [],
     "author": "",
@@ -19,7 +18,9 @@
         "bcryptjs": "^2.4.3",
         "connect-redis": "^8.0.1",
         "cookie-session": "^2.1.0",
+        "cors": "^2.8.5",
         "date-and-time": "^3.6.0",
+        "docx": "^9.5.0",
         "dotenv": "^16.4.7",
         "express": "^4.21.2",
         "express-session": "^1.18.1",
@@ -27,6 +28,7 @@
         "fs": "^0.0.1-security",
         "multer": "^1.4.5-lts.1",
         "nodemon": "^3.1.9",
+        "pdfkit": "^0.17.1",
         "pg": "^8.13.1",
         "redis": "^4.7.0",
         "util": "^0.12.5",

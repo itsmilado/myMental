@@ -8,6 +8,7 @@ const {
     userLogin,
     userLoggedOut,
     getAllProfiles,
+    getCurrentUser,
     // checkloggedIn,
 } = require("../middlewares/usersRoutesHandler");
 const errorHandler = require("../middlewares/errorHandler");
@@ -52,6 +53,8 @@ usersRoutes.get(
     getAllProfiles,
     errorHandler
 );
+
+usersRoutes.get("/me", getCurrentUser);
 
 // usersRoutes.get("/allprofiles", getAllProfiles, errorHandler);
 

@@ -10,17 +10,14 @@ if (!fs.existsSync(transcriptionDir)) {
     fs.mkdirSync(transcriptionDir, { recursive: true });
 }
 
-const saveTranscriptionToFile = (
-    filename,
-    transcriptText,
-    fileModifiedDate
-) => {
+const saveTranscriptionToFile = (filename, transcriptText) => {
     try {
-        const modifiedDate = fileModifiedDate.match(/^(\d{4})-(\d{2})-(\d{2})/); // Extract YYYY-MM-DD
-        const [, year, month, day] = modifiedDate;
-        const formattedModifiedDate = `${day}.${month}.${year}`;
         const originalName = path.parse(filename).name;
-        const transcriptionFileName = `${originalName} - [${formattedModifiedDate}].txt`;
+        const safeName = originalName.replace(/[^\w]+/g, "_");
+        const transcriptionFileName = `${safeName}.txt`;
+        logger.info(
+            `[saveTranscriptionToFile] => FileName: ${transcriptionFileName}`
+        );
         const transcriptionFilePath = path.join(
             transcriptionDir,
             transcriptionFileName
@@ -48,6 +45,56 @@ const saveTranscriptionToFile = (
     }
 };
 
+const getTranscriptionFilePath = (fileName) => {
+    const originalName = path.parse(fileName).name;
+    const safeName = originalName.replace(/[^\w]+/g, "_");
+    const transcriptionFileName = `${safeName}.txt`;
+    return path.join(transcriptionDir, transcriptionFileName);
+};
+
+const deleteTranscriptionTxtFile = (fileName) => {
+    try {
+        const transcriptionFilePath = getTranscriptionFilePath(fileName);
+        if (fs.existsSync(transcriptionFilePath)) {
+            fs.unlinkSync(transcriptionFilePath);
+            logger.info(
+                `[deleteTranscriptionTxtFile] Deleted transcription file: ${transcriptionFilePath}`
+            );
+        } else {
+            logger.info(
+                `[deleteTranscriptionTxtFile] File does not exist, skipping: ${transcriptionFilePath}`
+            );
+        }
+    } catch (error) {
+        logger.error(
+            `[deleteTranscriptionTxtFile] Error deleting transcription file: ${error.message}`
+        );
+    }
+};
+
+const deleteAudioFileCopy = (fileName) => {
+    try {
+        const uploadDir = path.join(__dirname, "../uploads");
+        const audioPath = path.join(uploadDir, fileName);
+        if (fs.existsSync(audioPath)) {
+            fs.unlinkSync(audioPath);
+            logger.info(
+                `[deleteAudioFileCopy] Deleted audio file copy: ${audioPath}`
+            );
+        } else {
+            logger.info(
+                `[deleteAudioFileCopy] Audio file not found, skipping: ${audioPath}`
+            );
+        }
+    } catch (error) {
+        logger.error(
+            `[deleteAudioFileCopy] Error deleting audio file: ${error.message}`
+        );
+    }
+};
+
 module.exports = {
     saveTranscriptionToFile,
+    deleteTranscriptionTxtFile,
+    deleteAudioFileCopy,
 };

@@ -19,20 +19,20 @@ const storage = multer.diskStorage({
     filename: (req, file, cb) => {
         // Get original filename without extension
         const originalName = path.parse(file.originalname).name;
+        const { fileModifiedDate } = req.body;
+        const parsed =
+            fileModifiedDate && !Number.isNaN(Date.parse(fileModifiedDate))
+                ? new Date(fileModifiedDate)
+                : new Date(); // fallback to "now"
 
-        // Format the current date and time (DD.MM.YY_HH.mm.ss)
+        const fileModifiedDisplayDate = formatISOToCustomDate(parsed);
         const now = new Date();
         const currentDate = now.toLocaleDateString("en-GB").replace(/\//g, ".");
-        const currentTime = now.toLocaleTimeString("en-GB", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: false,
-        });
 
         // Create new filename
-        const newFileName = `${originalName} - ${currentDate}_${currentTime}${path.extname(
-            file.originalname
+        const safeName = originalName.replace(/[^\w]+/g, "_");
+        const newFileName = `${safeName}_Recorded(${fileModifiedDisplayDate})_Transcribed(${currentDate})${path.extname(
+            file.originalname,
         )}`;
         cb(null, newFileName);
     },
@@ -42,18 +42,25 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage: storage,
     fileFilter: (req, file, cb) => {
+        logger.info(
+            `Incoming file: ${file.originalname}, type: ${file.mimetype}`,
+        );
         const allowedTypes = [
             "audio/mp4",
             "audio/m4a",
+            "audio/vnd.dlna.adts",
+            "audio/x-m4a",
             "audio/mp3",
             "audio/wav",
+            "audio/x-wav",
             "audio/ogg",
             "audio/mpeg",
+            "audio/webm",
         ];
         if (!allowedTypes.includes(file.mimetype)) {
             logger.warn(`Invalid file type: ${file.mimetype}`);
             return cb(
-                new Error("Only MP4, M4A, MP3, WAV, and OGG files are allowed")
+                new Error("Only MP4, M4A, MP3, WAV, and OGG files are allowed"),
             );
         }
         cb(null, true);
@@ -92,10 +99,28 @@ const uploadMiddleware = (req, res, next) => {
             });
         }
 
-        logger.info(`File successfully uploaded: ${req.file.filename}`);
+        logger.info(`File successfully uploaded to API: ${req.file.filename}`);
 
         next();
     });
+};
+
+// Format date for display
+const formatISOToCustomDate = (isoString) => {
+    const date = isoString instanceof Date ? isoString : new Date(isoString);
+    if (Number.isNaN(date.getTime())) {
+        // hard fallback to something safe
+        return "00.00.00_00:00";
+    }
+    const pad = (n) => String(n).padStart(2, "0");
+
+    const day = pad(date.getDate());
+    const month = pad(date.getMonth() + 1); // Months are zero-based
+    const year = String(date.getFullYear()).slice(-2);
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+
+    return `${day}.${month}.${year}_${hours}:${minutes}`;
 };
 
 module.exports = uploadMiddleware;

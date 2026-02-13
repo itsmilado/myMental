@@ -5,7 +5,7 @@ const fs = require("fs").promises;
 const logger = require("./logger");
 
 const uploadAudioFile = async (filePath) => {
-    const baseUrl = "https://api.assemblyai.com/v2/upload";
+    const baseUrl = "https://api.eu.assemblyai.com/v2/upload";
     const headers = {
         "content-type": "application/octet-stream",
         authorization: process.env.ASSEMBLYAI_API_KEY,
