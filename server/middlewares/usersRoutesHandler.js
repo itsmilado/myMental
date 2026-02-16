@@ -1,5 +1,6 @@
 // middlwares/usersRoutesHandler.js
 
+const { compare } = require("bcryptjs");
 const { hashPassword } = require("../utils/hashPass");
 const logger = require("../utils/logger");
 const loginCheck = require("../utils/loginCheck");
@@ -397,6 +398,62 @@ const patchMyPreferences = async (request, response, next) => {
     }
 };
 
+// Re-auth: confirm current password and set a session timestamp
+const REAUTH_WINDOW_MS = 1000 * 60 * 5; // 5 minutes (tweakable)
+
+const reauthCurrentUser = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`,
+        );
+
+        const sessionUser = request.session?.user;
+        if (!sessionUser?.id) {
+            return response.status(401).json({
+                success: false,
+                message: "Unauthorized access. Please log in.",
+            });
+        }
+
+        const { password } = request.body || {};
+        if (!password || typeof password !== "string" || password.length < 1) {
+            return response.status(400).json({
+                success: false,
+                message: "Password is required",
+            });
+        }
+
+        const user = await getUserByIdQuery({ id: sessionUser.id });
+        if (!user) {
+            return response.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        const ok = await compare(password, user.hashed_password);
+        if (!ok) {
+            return response.status(401).json({
+                success: false,
+                message: "Password is incorrect",
+            });
+        }
+
+        const now = Date.now();
+        request.session.reauthenticatedAt = now;
+
+        return response.status(200).json({
+            success: true,
+            message: "Re-authenticated",
+            reauthenticatedAt: now,
+            validForMs: REAUTH_WINDOW_MS,
+        });
+    } catch (error) {
+        logger.error(`[reauthCurrentUser] => Error: ${error.message}`);
+        next(error);
+    }
+};
+
 // Helper function to filter sensitive fields
 const filterSensitiveFields = (body, fieldsToHide) => {
     const filteredBody = { ...body };
@@ -446,5 +503,6 @@ module.exports = {
     updateCurrentUser,
     getMyPreferences,
     patchMyPreferences,
+    reauthCurrentUser,
     // checkloggedIn,
 };

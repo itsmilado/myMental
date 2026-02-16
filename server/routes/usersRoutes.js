@@ -12,6 +12,7 @@ const {
     updateCurrentUser,
     getMyPreferences,
     patchMyPreferences,
+    reauthCurrentUser,
     // checkloggedIn,
 } = require("../middlewares/usersRoutesHandler");
 const errorHandler = require("../middlewares/errorHandler");
@@ -21,7 +22,10 @@ const {
     handleValidationErrors,
 } = require("../middlewares/validationMiddleware");
 
-const { isAuthenticated } = require("../middlewares/authMiddleware");
+const {
+    isAuthenticated,
+    requireRecentReauth,
+} = require("../middlewares/authMiddleware");
 const { hasRole } = require("../middlewares/roleMiddleware");
 
 usersRoutes.post(
@@ -50,13 +54,38 @@ usersRoutes.get(
     errorHandler,
 );
 
-usersRoutes.get("/me", getCurrentUser);
+usersRoutes.get("/me", getCurrentUser, errorHandler);
 
-usersRoutes.patch("/me", isAuthenticated, updateCurrentUser);
+usersRoutes.patch("/me", isAuthenticated, updateCurrentUser, errorHandler);
 
-usersRoutes.get("/me/preferences", isAuthenticated, getMyPreferences);
+usersRoutes.post(
+    "/me/reauth",
+    isAuthenticated,
+    reauthCurrentUser,
+    errorHandler,
+);
 
-usersRoutes.patch("/me/preferences", isAuthenticated, patchMyPreferences);
+usersRoutes.get(
+    "/me/preferences",
+    isAuthenticated,
+    getMyPreferences,
+    errorHandler,
+);
+
+usersRoutes.patch(
+    "/me/preferences",
+    isAuthenticated,
+    patchMyPreferences,
+    errorHandler,
+);
+
+// usersRoutes.delete(
+//     "/me",
+//     isAuthenticated,
+//     requireRecentReauth(),
+//     deleteMe,
+//     errorHandler,
+// );
 
 module.exports = { usersRoutes };
 
