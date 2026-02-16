@@ -15,6 +15,7 @@ import {
 axios.defaults.withCredentials = true;
 
 const TRANSCRIPTION_BASE_URL = "http://localhost:5002/transcription";
+const USER_BASE_URL = "http://localhost:5002/users";
 
 export interface StartTranscriptionResponse {
     success: boolean;
@@ -29,9 +30,7 @@ export type DeleteTranscriptionOptions = {
 
 export const getUser = async (id: string): Promise<User> => {
     try {
-        const response = await axios.get<User>(
-            `http://localhost:5002/users/${id}`,
-        );
+        const response = await axios.get<User>(`${USER_BASE_URL}/${id}`);
         return response.data;
     } catch (error) {
         console.error("Error fetching user:", error);
@@ -43,7 +42,7 @@ export const loginUser = async (
     email: string,
     password: string,
 ): Promise<AuthResponse> => {
-    const response = await axios.post("http://localhost:5002/users/login", {
+    const response = await axios.post(`${USER_BASE_URL}/login`, {
         email,
         password,
     });
@@ -51,12 +50,12 @@ export const loginUser = async (
 };
 
 export const fetchCurrentUser = async (): Promise<AuthResponse> => {
-    const response = await axios.get("http://localhost:5002/users/me");
+    const response = await axios.get(`${USER_BASE_URL}/me`);
     return response.data as AuthResponse;
 };
 
 export const logoutUser = async () => {
-    await axios.post("http://localhost:5002/users/logout");
+    await axios.post(`${USER_BASE_URL}/logout`);
 };
 
 export const signupUser = async (
@@ -66,7 +65,7 @@ export const signupUser = async (
     password: string,
     repeat_password: string,
 ): Promise<AuthResponse> => {
-    const response = await axios.post("http://localhost:5002/users/signup", {
+    const response = await axios.post(`${USER_BASE_URL}/signup`, {
         first_name,
         last_name,
         email,
@@ -81,16 +80,42 @@ export const updateCurrentUser = async (payload: {
     last_name?: string;
     email?: string;
 }): Promise<User> => {
-    const response = await axios.patch(
-        "http://localhost:5002/users/me",
-        payload,
-        {
-            withCredentials: true,
-        },
-    );
+    const response = await axios.patch(`${USER_BASE_URL}/me`, payload, {
+        withCredentials: true,
+    });
     if (!response.data?.success)
         throw new Error(response.data?.message || "Update failed");
     return response.data.userData;
+};
+
+export const reauthCurrentUser = async (
+    password: string,
+): Promise<{
+    reauthenticatedAt: number;
+    validForMs: number;
+}> => {
+    const response = await axios.post(
+        `${USER_BASE_URL}/me/reauth`,
+        { password },
+        { withCredentials: true },
+    );
+    if (!response.data?.success) {
+        throw new Error(response.data?.message || "Re-auth failed");
+    }
+    return {
+        reauthenticatedAt: response.data.reauthenticatedAt,
+        validForMs: response.data.validForMs,
+    };
+};
+
+export const deleteMyAccount = async (): Promise<string> => {
+    const response = await axios.delete(`${USER_BASE_URL}/me`, {
+        withCredentials: true,
+    });
+    if (!response.data?.success) {
+        throw new Error(response.data?.message || "Delete account failed");
+    }
+    return response.data.message || "Account deleted";
 };
 
 // SSE-based background job starter

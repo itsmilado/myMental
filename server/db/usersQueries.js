@@ -156,6 +156,19 @@ const updateUserPreferencesByIdQuery = async ({ id, preferences }) => {
     return res.rows[0].preferences;
 };
 
+const deleteUserByIdQuery = async ({ id }) => {
+    try {
+        const q = `DELETE FROM users WHERE id = $1 RETURNING id;`;
+        const res = await pool.query(q, [id]);
+        return res.rows[0] || null;
+    } catch (error) {
+        logger.error(
+            `[usersQueries > deleteUserByIdQuery] => Error deleting user: ${error.message}`,
+        );
+        throw error;
+    }
+};
+
 module.exports = {
     createUserQuery,
     getUserByIdQuery,
@@ -164,4 +177,5 @@ module.exports = {
     updateUserByIdQuery,
     getUserPreferencesByIdQuery,
     updateUserPreferencesByIdQuery,
+    deleteUserByIdQuery,
 };

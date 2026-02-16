@@ -320,6 +320,40 @@ const deleteTranscriptionByIdQuery = async (id) => {
     }
 };
 
+const deleteTranscriptionsByUserIdQuery = async ({ user_id }) => {
+    try {
+        const q = `
+            DELETE FROM transcriptions
+            WHERE user_id = $1
+            RETURNING id, file_name, transcript_id;
+        `;
+        const { rows } = await pool.query(q, [user_id]);
+        return rows || [];
+    } catch (error) {
+        logger.error(
+            `[transcribeQueries > deleteTranscriptionsByUserIdQuery] => Error: ${error.message}`,
+        );
+        throw error;
+    }
+};
+
+const deleteTranscriptionBackupsByUserIdQuery = async ({ user_id }) => {
+    try {
+        const q = `
+            DELETE FROM transcription_backups
+            WHERE user_id = $1
+            RETURNING transcript_id, file_name;
+        `;
+        const { rows } = await pool.query(q, [user_id]);
+        return rows || [];
+    } catch (error) {
+        logger.error(
+            `[transcribeQueries > deleteTranscriptionBackupsByUserIdQuery] => Error: ${error.message}`,
+        );
+        throw error;
+    }
+};
+
 module.exports = {
     insertTranscriptionBackupQuery,
     insertTranscriptionQuery,
@@ -330,4 +364,6 @@ module.exports = {
     deleteTranscriptionByIdQuery,
     getBackupsByTranscriptIdsQuery,
     getBackupWithRawByTranscriptIdQuery,
+    deleteTranscriptionsByUserIdQuery,
+    deleteTranscriptionBackupsByUserIdQuery,
 };

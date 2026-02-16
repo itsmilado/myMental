@@ -13,6 +13,7 @@ const {
     getMyPreferences,
     patchMyPreferences,
     reauthCurrentUser,
+    deleteMe,
     // checkloggedIn,
 } = require("../middlewares/usersRoutesHandler");
 const errorHandler = require("../middlewares/errorHandler");
@@ -79,13 +80,13 @@ usersRoutes.patch(
     errorHandler,
 );
 
-// usersRoutes.delete(
-//     "/me",
-//     isAuthenticated,
-//     requireRecentReauth(),
-//     deleteMe,
-//     errorHandler,
-// );
+usersRoutes.delete(
+    "/me",
+    isAuthenticated,
+    requireRecentReauth(),
+    deleteMe,
+    errorHandler,
+);
 
 module.exports = { usersRoutes };
 

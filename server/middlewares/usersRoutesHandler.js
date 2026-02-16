@@ -3,6 +3,7 @@
 const { compare } = require("bcryptjs");
 const { hashPassword } = require("../utils/hashPass");
 const logger = require("../utils/logger");
+const pool = require("../db/db");
 const loginCheck = require("../utils/loginCheck");
 const {
     createUserQuery,
@@ -12,10 +13,17 @@ const {
     updateUserByIdQuery,
     getUserPreferencesByIdQuery,
     updateUserPreferencesByIdQuery,
+    deleteUserByIdQuery,
 } = require("../db/usersQueries");
+const {
+    deleteTranscriptionsByUserIdQuery,
+    deleteTranscriptionBackupsByUserIdQuery,
+} = require("../db/transcribeQueries");
+const {
+    deleteTranscriptionTxtFile,
+    deleteAudioFileCopy,
+} = require("../utils/fileProcessor");
 const { mergePreferences } = require("../utils/preferencesDefaults");
-const { request } = require("express");
-const { log } = require("winston");
 
 const createUsers = async (request, response, next) => {
     try {
@@ -454,6 +462,128 @@ const reauthCurrentUser = async (request, response, next) => {
     }
 };
 
+const deleteMe = async (request, response, next) => {
+    const sessionUser = request.session?.user;
+
+    if (!sessionUser?.id) {
+        return response.status(401).json({
+            success: false,
+            message: "Unauthorized access. Please log in.",
+        });
+    }
+
+    const userId = sessionUser.id;
+
+    let client;
+    let deletedFileNames = [];
+
+    try {
+        client = await pool.connect();
+
+        await client.query("BEGIN");
+
+        // Delete transcriptions (RETURN file_name for cleanup)
+        const transRes = await client.query(
+            `
+            DELETE FROM transcriptions
+            WHERE user_id = $1
+            RETURNING file_name;
+            `,
+            [userId],
+        );
+
+        deletedFileNames = (transRes.rows || [])
+            .map((r) => r.file_name)
+            .filter(Boolean);
+
+        // Delete backups
+        await client.query(
+            `
+            DELETE FROM transcription_backups
+            WHERE user_id = $1;
+            `,
+            [userId],
+        );
+
+        // Delete user
+        const userRes = await client.query(
+            `
+            DELETE FROM users
+            WHERE id = $1
+            RETURNING id;
+            `,
+            [userId],
+        );
+
+        if (!userRes.rows?.length) {
+            // If user didn't exist, rollback so we don't delete data for a non-existing user
+            await client.query("ROLLBACK");
+            return response.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        await client.query("COMMIT");
+    } catch (error) {
+        if (client) {
+            try {
+                await client.query("ROLLBACK");
+            } catch (rollbackErr) {
+                logger.error(
+                    `[deleteMe] rollback failed: ${rollbackErr.message}`,
+                );
+            }
+        }
+
+        logger.error(`[deleteMe] DB transaction failed: ${error.message}`);
+        return next(error);
+    } finally {
+        if (client) client.release();
+    }
+
+    // file cleanup AFTER commit (outside transaction)
+    const uniqueFileNames = Array.from(new Set(deletedFileNames));
+
+    for (const fileName of uniqueFileNames) {
+        try {
+            deleteTranscriptionTxtFile(fileName);
+        } catch (e) {
+            logger.warn(
+                `[deleteMe] Failed deleting transcription txt for ${fileName}: ${e.message}`,
+            );
+        }
+
+        try {
+            deleteAudioFileCopy(fileName);
+        } catch (e) {
+            logger.warn(
+                `[deleteMe] Failed deleting audio copy for ${fileName}: ${e.message}`,
+            );
+        }
+    }
+
+    // Destroy session + clear cookie
+    request.session.destroy((err) => {
+        if (err) {
+            logger.error(`[deleteMe] session destroy failed: ${err.message}`);
+            // Account is already deleted; return success but warn.
+            response.clearCookie("sessionId");
+            return response.status(200).json({
+                success: true,
+                message:
+                    "Account deleted (session cleanup had a minor issue, please refresh).",
+            });
+        }
+
+        response.clearCookie("sessionId");
+        return response.status(200).json({
+            success: true,
+            message: "Account deleted",
+        });
+    });
+};
+
 // Helper function to filter sensitive fields
 const filterSensitiveFields = (body, fieldsToHide) => {
     const filteredBody = { ...body };
@@ -504,5 +634,6 @@ module.exports = {
     getMyPreferences,
     patchMyPreferences,
     reauthCurrentUser,
+    deleteMe,
     // checkloggedIn,
 };
