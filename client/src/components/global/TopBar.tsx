@@ -112,6 +112,18 @@ const TopBar = () => {
                         </MenuItem>
 
                         <MenuItem
+                            onClick={() => navigate("/dashboard/account")}
+                        >
+                            Account
+                        </MenuItem>
+
+                        <MenuItem
+                            onClick={() => navigate("/dashboard/preferences")}
+                        >
+                            Preferences
+                        </MenuItem>
+
+                        <MenuItem
                             onClick={() => navigate("/dashboard/settings")}
                         >
                             Settings
