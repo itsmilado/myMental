@@ -1,6 +1,9 @@
-// ./src/types.ts
 import type { ReactNode } from "react";
 import type { ThemeOptions } from "@mui/material/styles";
+
+/* -------------------------------------------------------------------------- */
+/* Theme Types                                                                */
+/* -------------------------------------------------------------------------- */
 
 export type ColorMode = "light" | "dark";
 
@@ -66,10 +69,20 @@ export interface ColorModeContextValue {
     toggleColorMode: () => void;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Navigation / Sidebar Types                                                 */
+/* -------------------------------------------------------------------------- */
+
 export interface SidebarItem {
     text: string;
     icon: React.ReactElement;
     path: string;
+}
+
+export interface SubMenuItemProps {
+    text: string;
+    path: string;
+    icon?: ReactNode;
 }
 
 export interface SidebarItemProps {
@@ -79,17 +92,15 @@ export interface SidebarItemProps {
     subMenu?: SubMenuItemProps[] | null;
 }
 
-export interface SubMenuItemProps {
-    text: string;
-    path: string;
-    icon?: ReactNode;
-}
-
 export interface SidebarProps {
     isCollapsed: boolean;
     toggleCollapse: () => void;
     menuItems: SidebarItemProps[];
 }
+
+/* -------------------------------------------------------------------------- */
+/* Auth / User Types                                                          */
+/* -------------------------------------------------------------------------- */
 
 export interface User {
     id: number;
@@ -114,6 +125,10 @@ export interface AuthResponse {
     userData: User;
 }
 
+/* -------------------------------------------------------------------------- */
+/* UI / Feature-Specific Types                                                */
+/* -------------------------------------------------------------------------- */
+
 export type ProfileDialogProps = {
     open: boolean;
     onClose: () => void;
@@ -124,9 +139,9 @@ export type SortState = {
     direction: "asc" | "desc";
 };
 
-// transcription related types
-
-// ----- UploadAudioPage.tsx -----
+/* -------------------------------------------------------------------------- */
+/* Transcription Types                                                        */
+/* -------------------------------------------------------------------------- */
 
 export type TranscriptData = {
     id: string; // local DB ID
@@ -209,8 +224,6 @@ export interface ErrorEventPayload {
     steps?: TranscriptionStepsState;
     error: string;
 }
-
-// -----------------------------------
 
 export interface TranscriptionPayload {
     file: File;

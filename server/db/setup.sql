@@ -9,6 +9,7 @@ CREATE TABLE users (
   isConfirmed BOOLEAN DEFAULT false,
   hashed_password VARCHAR(255) NOT NULL,
   user_role VARCHAR(50) NOT NULL,
+  preferences JSONB NOT NULL DEFAULT '{}'::JSONB,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 

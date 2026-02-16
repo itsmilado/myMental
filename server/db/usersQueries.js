@@ -137,10 +137,31 @@ const updateUserByIdQuery = async ({ id, first_name, last_name, email }) => {
     }
 };
 
+const getUserPreferencesByIdQuery = async ({ id }) => {
+    const q = `SELECT preferences FROM users WHERE id = $1;`;
+    const res = await pool.query(q, [id]);
+    if (!res.rows.length) return null;
+    return res.rows[0].preferences;
+};
+
+const updateUserPreferencesByIdQuery = async ({ id, preferences }) => {
+    const q = `
+        UPDATE users
+        SET preferences = $2
+        WHERE id = $1
+        RETURNING preferences;
+    `;
+    const res = await pool.query(q, [id, preferences]);
+    if (!res.rows.length) return null;
+    return res.rows[0].preferences;
+};
+
 module.exports = {
     createUserQuery,
     getUserByIdQuery,
     getUserByEmailQuery,
     getAllUsersQuery,
     updateUserByIdQuery,
+    getUserPreferencesByIdQuery,
+    updateUserPreferencesByIdQuery,
 };

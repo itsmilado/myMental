@@ -10,6 +10,8 @@ const {
     getAllProfiles,
     getCurrentUser,
     updateCurrentUser,
+    getMyPreferences,
+    patchMyPreferences,
     // checkloggedIn,
 } = require("../middlewares/usersRoutesHandler");
 const errorHandler = require("../middlewares/errorHandler");
@@ -40,13 +42,6 @@ usersRoutes.post(
 usersRoutes.post("/logout", userLoggedOut, errorHandler);
 usersRoutes.get("/profile/:id", isAuthenticated, getUserInfo, errorHandler);
 
-// usersRoutes.get(
-//     "/admin",
-//     isAuthenticated,
-//     hasRole("admin"),
-//     adminProfile,
-//     errorHandler
-// );
 usersRoutes.get(
     "/admin/all_profiles",
     isAuthenticated,
@@ -59,4 +54,16 @@ usersRoutes.get("/me", getCurrentUser);
 
 usersRoutes.patch("/me", isAuthenticated, updateCurrentUser);
 
+usersRoutes.get("/me/preferences", isAuthenticated, getMyPreferences);
+
+usersRoutes.patch("/me/preferences", isAuthenticated, patchMyPreferences);
+
 module.exports = { usersRoutes };
+
+// usersRoutes.get(
+//     "/admin",
+//     isAuthenticated,
+//     hasRole("admin"),
+//     adminProfile,
+//     errorHandler
+// );

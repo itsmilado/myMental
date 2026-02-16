@@ -9,7 +9,10 @@ const {
     getAllUsersQuery,
     getUserByEmailQuery,
     updateUserByIdQuery,
+    getUserPreferencesByIdQuery,
+    updateUserPreferencesByIdQuery,
 } = require("../db/usersQueries");
+const { mergePreferences } = require("../utils/preferencesDefaults");
 const { request } = require("express");
 const { log } = require("winston");
 
@@ -321,6 +324,79 @@ const updateCurrentUser = async (request, response, next) => {
     }
 };
 
+const getMyPreferences = async (request, response, next) => {
+    try {
+        const user = request.session?.user;
+        if (!user?.id) {
+            return response
+                .status(401)
+                .json({ success: false, message: "Unauthorized" });
+        }
+
+        const stored = await getUserPreferencesByIdQuery({ id: user.id });
+        const merged = mergePreferences(stored);
+
+        return response.status(200).json({
+            success: true,
+            message: "Preferences loaded",
+            preferences: merged,
+        });
+    } catch (error) {
+        logger.error(`[getMyPreferences] => ${error.message}`);
+        next(error);
+    }
+};
+
+// shallow merge patch at section level (appearance/transcription/ai)
+const patchMyPreferences = async (request, response, next) => {
+    try {
+        const user = request.session?.user;
+        if (!user?.id) {
+            return response
+                .status(401)
+                .json({ success: false, message: "Unauthorized" });
+        }
+
+        const patch = request.body || {};
+        if (typeof patch !== "object" || Array.isArray(patch)) {
+            return response
+                .status(400)
+                .json({ success: false, message: "Invalid payload" });
+        }
+
+        // Load + merge defaults first
+        const stored = await getUserPreferencesByIdQuery({ id: user.id });
+        const current = mergePreferences(stored);
+
+        // Apply patch (only known top-level keys)
+        const nextPrefs = {
+            ...current,
+            appearance: patch.appearance
+                ? { ...current.appearance, ...patch.appearance }
+                : current.appearance,
+            transcription: patch.transcription
+                ? { ...current.transcription, ...patch.transcription }
+                : current.transcription,
+            ai: patch.ai ? { ...current.ai, ...patch.ai } : current.ai,
+            schemaVersion: current.schemaVersion,
+        };
+
+        const saved = await updateUserPreferencesByIdQuery({
+            id: user.id,
+            preferences: nextPrefs,
+        });
+
+        return response.status(200).json({
+            success: true,
+            message: "Preferences updated",
+            preferences: mergePreferences(saved),
+        });
+    } catch (error) {
+        logger.error(`[patchMyPreferences] => ${error.message}`);
+        next(error);
+    }
+};
+
 // Helper function to filter sensitive fields
 const filterSensitiveFields = (body, fieldsToHide) => {
     const filteredBody = { ...body };
@@ -368,5 +444,7 @@ module.exports = {
     getAllProfiles,
     getCurrentUser,
     updateCurrentUser,
+    getMyPreferences,
+    patchMyPreferences,
     // checkloggedIn,
 };
