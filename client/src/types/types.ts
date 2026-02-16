@@ -125,6 +125,24 @@ export interface AuthResponse {
     userData: User;
 }
 
+export type ThemePreference = "system" | "light" | "dark";
+
+export type UserPreferences = {
+    schemaVersion: number;
+    appearance: { theme: ThemePreference };
+    transcription: {
+        defaultLanguageCode: string;
+        defaultModel: string;
+        defaultSpeakerLabels: boolean;
+        defaultShowSpeakers: boolean;
+        defaultShowTimestamps: boolean;
+    };
+    ai: {
+        autoSummarizeAfterTranscription: boolean;
+        summaryStyle: "bullets" | "journal" | "action_items";
+    };
+};
+
 /* -------------------------------------------------------------------------- */
 /* UI / Feature-Specific Types                                                */
 /* -------------------------------------------------------------------------- */
