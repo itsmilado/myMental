@@ -169,6 +169,24 @@ const deleteUserByIdQuery = async ({ id }) => {
     }
 };
 
+const updateUserPasswordByIdQuery = async ({ id, hashed_password }) => {
+    try {
+        const q = `
+            UPDATE users
+            SET hashed_password = $2
+            WHERE id = $1
+            RETURNING id;
+        `;
+        const res = await pool.query(q, [id, hashed_password]);
+        return res.rows[0] || null;
+    } catch (error) {
+        logger.error(
+            `[usersQueries > updateUserPasswordByIdQuery] => Error updating password: ${error.message}`,
+        );
+        throw error;
+    }
+};
+
 module.exports = {
     createUserQuery,
     getUserByIdQuery,
@@ -178,4 +196,5 @@ module.exports = {
     getUserPreferencesByIdQuery,
     updateUserPreferencesByIdQuery,
     deleteUserByIdQuery,
+    updateUserPasswordByIdQuery,
 };

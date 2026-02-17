@@ -14,6 +14,7 @@ const {
     patchMyPreferences,
     reauthCurrentUser,
     deleteMe,
+    changeMyPassword,
     // checkloggedIn,
 } = require("../middlewares/usersRoutesHandler");
 const errorHandler = require("../middlewares/errorHandler");
@@ -85,6 +86,14 @@ usersRoutes.delete(
     isAuthenticated,
     requireRecentReauth(),
     deleteMe,
+    errorHandler,
+);
+
+usersRoutes.post(
+    "/me/change-password",
+    isAuthenticated,
+    requireRecentReauth(),
+    changeMyPassword,
     errorHandler,
 );
 

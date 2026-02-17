@@ -13,6 +13,7 @@ const {
     updateUserByIdQuery,
     getUserPreferencesByIdQuery,
     updateUserPreferencesByIdQuery,
+    updateUserPasswordByIdQuery,
     deleteUserByIdQuery,
 } = require("../db/usersQueries");
 const {
@@ -584,6 +585,76 @@ const deleteMe = async (request, response, next) => {
     });
 };
 
+const changeMyPassword = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`,
+        );
+
+        const sessionUser = request.session?.user;
+        if (!sessionUser?.id) {
+            return response.status(401).json({
+                success: false,
+                message: "Unauthorized access. Please log in.",
+            });
+        }
+
+        const { new_password } = request.body || {};
+        if (
+            !new_password ||
+            typeof new_password !== "string" ||
+            new_password.trim().length < 6
+        ) {
+            return response.status(400).json({
+                success: false,
+                message: "New password must be at least 6 characters",
+            });
+        }
+
+        const user = await getUserByIdQuery({ id: sessionUser.id });
+        if (!user) {
+            return response.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        // Prevent reusing the same password
+        const isSame = await compare(new_password, user.hashed_password);
+        if (isSame) {
+            return response.status(400).json({
+                success: false,
+                message: "New password must be different from the current one",
+            });
+        }
+
+        const hashed_password = await hashPassword(new_password);
+
+        const updated = await updateUserPasswordByIdQuery({
+            id: sessionUser.id,
+            hashed_password,
+        });
+
+        if (!updated) {
+            return response.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        // Invalidate reauth so it can't be reused repeatedly
+        request.session.reauthenticatedAt = null;
+
+        return response.status(200).json({
+            success: true,
+            message: "Password updated",
+        });
+    } catch (error) {
+        logger.error(`[changeMyPassword] => Error: ${error.message}`);
+        next(error);
+    }
+};
+
 // Helper function to filter sensitive fields
 const filterSensitiveFields = (body, fieldsToHide) => {
     const filteredBody = { ...body };
@@ -635,5 +706,6 @@ module.exports = {
     patchMyPreferences,
     reauthCurrentUser,
     deleteMe,
+    changeMyPassword,
     // checkloggedIn,
 };

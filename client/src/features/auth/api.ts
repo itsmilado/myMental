@@ -118,6 +118,13 @@ export const deleteMyAccount = async (): Promise<string> => {
     return response.data.message || "Account deleted";
 };
 
+export async function changeMyPassword(newPassword: string): Promise<string> {
+    const res = await axios.post(`${USER_BASE_URL}/me/change-password`, {
+        new_password: newPassword,
+    });
+    return res.data?.message || "Password updated";
+}
+
 // SSE-based background job starter
 export const startTranscriptionJob = async (
     file: File,

@@ -5,18 +5,23 @@ import {
     Box,
     Paper,
     Typography,
-    Button,
     Stack,
     Divider,
+    Button,
     Snackbar,
     Alert,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+
 import { useAuthStore } from "../../../store/useAuthStore";
 import ProfileDialog from "../../profile/components/ProfileDialog";
 import ReauthDialog from "../components/ReauthDialog";
 import DeleteAccountConfirmDialog from "../components/DeleteAccountConfirmDialog";
-import { deleteMyAccount } from "../../auth/api";
+import ChangePasswordDialog from "../components/ChangePasswordDialog";
+
+import { deleteMyAccount, changeMyPassword } from "../../auth/api";
+
+// Small local dialog to avoid extra files
 
 const AccountPage = () => {
     const user = useAuthStore((s) => s.user);
@@ -25,9 +30,15 @@ const AccountPage = () => {
 
     const [openProfileDialog, setOpenProfileDialog] = useState(false);
 
-    const [reauthOpen, setReauthOpen] = useState(false);
+    // delete flow
+    const [reauthDeleteOpen, setReauthDeleteOpen] = useState(false);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
+
+    // change password flow
+    const [reauthPwOpen, setReauthPwOpen] = useState(false);
+    const [changePwOpen, setChangePwOpen] = useState(false);
+    const [changingPw, setChangingPw] = useState(false);
 
     const [toast, setToast] = useState<{
         open: boolean;
@@ -35,10 +46,11 @@ const AccountPage = () => {
         severity: "success" | "error";
     }>({ open: false, message: "", severity: "success" });
 
-    const startDeleteFlow = () => setReauthOpen(true);
+    // ---- Delete flow handlers ----
+    const startDeleteFlow = () => setReauthDeleteOpen(true);
 
-    const handleReauthSuccess = () => {
-        setReauthOpen(false);
+    const handleReauthDeleteSuccess = () => {
+        setReauthDeleteOpen(false);
         setDeleteConfirmOpen(true);
     };
 
@@ -47,7 +59,7 @@ const AccountPage = () => {
             setDeleting(true);
             await deleteMyAccount();
 
-            clearUser();
+            clearUser?.();
             setToast({
                 open: true,
                 message: "Account deleted",
@@ -64,6 +76,38 @@ const AccountPage = () => {
         } finally {
             setDeleting(false);
             setDeleteConfirmOpen(false);
+        }
+    };
+
+    // ---- Change password handlers ----
+    const startChangePasswordFlow = () => setReauthPwOpen(true);
+
+    const handleReauthPwSuccess = () => {
+        setReauthPwOpen(false);
+        setChangePwOpen(true);
+    };
+
+    const handleChangePassword = async (newPassword: string) => {
+        try {
+            setChangingPw(true);
+            const msg = await changeMyPassword(newPassword);
+
+            setToast({
+                open: true,
+                message: msg || "Password updated",
+                severity: "success",
+            });
+
+            setChangePwOpen(false);
+        } catch (e: any) {
+            setToast({
+                open: true,
+                message: e?.message || "Failed to update password",
+                severity: "error",
+            });
+            // keep dialog open so user can fix input / retry
+        } finally {
+            setChangingPw(false);
         }
     };
 
@@ -101,8 +145,11 @@ const AccountPage = () => {
                             Edit profile
                         </Button>
 
-                        <Button variant="outlined" disabled>
-                            Change password (soon)
+                        <Button
+                            variant="outlined"
+                            onClick={startChangePasswordFlow}
+                        >
+                            Change password
                         </Button>
                     </Stack>
                 </Stack>
@@ -128,23 +175,44 @@ const AccountPage = () => {
                         variant="contained"
                         color="error"
                         onClick={startDeleteFlow}
+                        disabled={
+                            reauthDeleteOpen || deleteConfirmOpen || deleting
+                        }
                     >
                         Delete account
                     </Button>
                 </Stack>
             </Paper>
 
+            {/* Existing profile dialog */}
             <ProfileDialog
                 open={openProfileDialog}
                 onClose={() => setOpenProfileDialog(false)}
             />
 
+            {/* Reauth for password change */}
             <ReauthDialog
-                open={reauthOpen}
-                onClose={() => setReauthOpen(false)}
-                onSuccess={handleReauthSuccess}
+                open={reauthPwOpen}
+                onClose={() => setReauthPwOpen(false)}
+                onSuccess={handleReauthPwSuccess}
             />
 
+            {/* Change password dialog */}
+            <ChangePasswordDialog
+                open={changePwOpen}
+                onClose={() => setChangePwOpen(false)}
+                onSubmit={handleChangePassword}
+                loading={changingPw}
+            />
+
+            {/* Reauth for deletion */}
+            <ReauthDialog
+                open={reauthDeleteOpen}
+                onClose={() => setReauthDeleteOpen(false)}
+                onSuccess={handleReauthDeleteSuccess}
+            />
+
+            {/* Type DELETE confirm */}
             <DeleteAccountConfirmDialog
                 open={deleteConfirmOpen}
                 loading={deleting}
