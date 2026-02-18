@@ -1,6 +1,7 @@
 // middlwares/usersRoutesHandler.js
 
 const { compare } = require("bcryptjs");
+const crypto = require("crypto");
 const { hashPassword } = require("../utils/hashPass");
 const logger = require("../utils/logger");
 const pool = require("../db/db");
@@ -14,6 +15,8 @@ const {
     getUserPreferencesByIdQuery,
     updateUserPreferencesByIdQuery,
     updateUserPasswordByIdQuery,
+    setPendingEmailChangeQuery,
+    confirmPendingEmailByTokenHashQuery,
     deleteUserByIdQuery,
 } = require("../db/usersQueries");
 const {
@@ -25,6 +28,7 @@ const {
     deleteAudioFileCopy,
 } = require("../utils/fileProcessor");
 const { mergePreferences } = require("../utils/preferencesDefaults");
+const { sendEmail } = require("../utils/mailer");
 
 const createUsers = async (request, response, next) => {
     try {
@@ -257,11 +261,15 @@ const updateCurrentUser = async (request, response, next) => {
 
         const { first_name, last_name, email } = request.body || {};
 
-        if (
-            first_name === undefined &&
-            last_name === undefined &&
-            email === undefined
-        ) {
+        if (email !== undefined) {
+            return response.status(400).json({
+                success: false,
+                message:
+                    "Email changes require verification. Use /users/me/change-email.",
+            });
+        }
+
+        if (first_name === undefined && last_name === undefined) {
             return response.status(400).json({
                 success: false,
                 message: "No fields provided to update",
@@ -655,6 +663,126 @@ const changeMyPassword = async (request, response, next) => {
     }
 };
 
+const requestEmailChange = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`,
+        );
+
+        const sessionUser = request.session?.user;
+        if (!sessionUser?.id) {
+            return response.status(401).json({
+                success: false,
+                message: "Not authenticated",
+            });
+        }
+
+        const newEmailRaw = request.body?.new_email;
+        if (!newEmailRaw || !isValidEmail(newEmailRaw)) {
+            return response.status(400).json({
+                success: false,
+                message: "Invalid email",
+            });
+        }
+
+        const new_email = String(newEmailRaw).trim().toLowerCase();
+
+        const existing = await getUserByEmailQuery({ email: new_email });
+        if (existing && String(existing.id) !== String(sessionUser.id)) {
+            return response.status(409).json({
+                success: false,
+                message: "Email already in use",
+            });
+        }
+
+        const token = crypto.randomBytes(32).toString("hex");
+        const token_hash = crypto
+            .createHash("sha256")
+            .update(token)
+            .digest("hex");
+
+        const expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24h
+
+        await setPendingEmailChangeQuery({
+            id: sessionUser.id,
+            pending_email: new_email,
+            token_hash,
+            expires_at,
+        });
+
+        const baseUrl = process.env.APP_ORIGIN || "http://localhost:5002";
+        const confirmUrl = `${baseUrl}/users/confirm-email?token=${token}`;
+
+        await sendEmail({
+            to: new_email,
+            subject: "Confirm your email for myMental",
+            text: `Confirm your email change by opening this link: ${confirmUrl}`,
+            html: `
+                <p>Confirm your email change by clicking the link below:</p>
+                <p><a href="${confirmUrl}">Confirm email</a></p>
+                <p>This link expires in 24 hours.</p>
+            `,
+        });
+
+        return response.status(200).json({
+            success: true,
+            message: "Confirmation email sent",
+            pending_email: new_email,
+        });
+    } catch (error) {
+        logger.error(`[requestEmailChange] => Error: ${error.message}`);
+        next(error);
+    }
+};
+
+const confirmEmailChange = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`,
+        );
+
+        const token = String(request.query?.token || "").trim();
+        if (!token) {
+            return response.status(400).json({
+                success: false,
+                message: "Missing token",
+            });
+        }
+
+        const token_hash = crypto
+            .createHash("sha256")
+            .update(token)
+            .digest("hex");
+
+        const updated = await confirmPendingEmailByTokenHashQuery({
+            token_hash,
+        });
+
+        if (!updated) {
+            return response.status(400).json({
+                success: false,
+                message: "Invalid or expired token",
+            });
+        }
+
+        if (
+            request.session?.user?.id &&
+            String(request.session.user.id) === String(updated.id)
+        ) {
+            request.session.user.email = updated.email;
+        }
+
+        return response.status(200).json({
+            success: true,
+            message: "Email confirmed",
+            userData: serializeUserInfo(updated),
+        });
+    } catch (error) {
+        logger.error(`[confirmEmailChange] => Error: ${error.message}`);
+        next(error);
+    }
+};
+
 // Helper function to filter sensitive fields
 const filterSensitiveFields = (body, fieldsToHide) => {
     const filteredBody = { ...body };
@@ -707,5 +835,7 @@ module.exports = {
     reauthCurrentUser,
     deleteMe,
     changeMyPassword,
+    requestEmailChange,
+    confirmEmailChange,
     // checkloggedIn,
 };

@@ -5,11 +5,14 @@ CREATE TABLE users (
   id SERIAL PRIMARY KEY,
   first_name VARCHAR(255) NOT NULL,
   last_name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
   isConfirmed BOOLEAN DEFAULT false,
   hashed_password VARCHAR(255) NOT NULL,
   user_role VARCHAR(50) NOT NULL,
   preferences JSONB NOT NULL DEFAULT '{}'::JSONB,
+  pending_email VARCHAR(255),
+  email_confirm_token_hash TEXT,
+  email_confirm_expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 

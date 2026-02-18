@@ -187,6 +187,43 @@ const updateUserPasswordByIdQuery = async ({ id, hashed_password }) => {
     }
 };
 
+const setPendingEmailChangeQuery = async ({
+    id,
+    pending_email,
+    token_hash,
+    expires_at,
+}) => {
+    const q = `
+        UPDATE users
+        SET pending_email = $2,
+            email_confirm_token_hash = $3,
+            email_confirm_expires_at = $4,
+            "isConfirmed" = FALSE
+        WHERE id = $1
+        RETURNING *;
+    `;
+    const r = await pool.query(q, [id, pending_email, token_hash, expires_at]);
+    return r.rows[0] || null;
+};
+
+const confirmPendingEmailByTokenHashQuery = async ({ token_hash }) => {
+    const q = `
+        UPDATE users
+        SET email = pending_email,
+            pending_email = NULL,
+            email_confirm_token_hash = NULL,
+            email_confirm_expires_at = NULL,
+            "isConfirmed" = TRUE
+        WHERE email_confirm_token_hash = $1
+          AND pending_email IS NOT NULL
+          AND email_confirm_expires_at IS NOT NULL
+          AND email_confirm_expires_at > NOW()
+        RETURNING *;
+    `;
+    const r = await pool.query(q, [token_hash]);
+    return r.rows[0] || null;
+};
+
 module.exports = {
     createUserQuery,
     getUserByIdQuery,
@@ -197,4 +234,6 @@ module.exports = {
     updateUserPreferencesByIdQuery,
     deleteUserByIdQuery,
     updateUserPasswordByIdQuery,
+    setPendingEmailChangeQuery,
+    confirmPendingEmailByTokenHashQuery,
 };

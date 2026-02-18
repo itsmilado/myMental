@@ -15,6 +15,8 @@ const {
     reauthCurrentUser,
     deleteMe,
     changeMyPassword,
+    requestEmailChange,
+    confirmEmailChange,
     // checkloggedIn,
 } = require("../middlewares/usersRoutesHandler");
 const errorHandler = require("../middlewares/errorHandler");
@@ -29,6 +31,8 @@ const {
     requireRecentReauth,
 } = require("../middlewares/authMiddleware");
 const { hasRole } = require("../middlewares/roleMiddleware");
+
+const { sendEmail } = require("../utils/mailer");
 
 usersRoutes.post(
     "/signup",
@@ -96,6 +100,31 @@ usersRoutes.post(
     changeMyPassword,
     errorHandler,
 );
+
+usersRoutes.post(
+    "/me/change-email",
+    isAuthenticated,
+    requireRecentReauth(),
+    requestEmailChange,
+    errorHandler,
+);
+
+usersRoutes.get("/confirm-email", confirmEmailChange, errorHandler);
+
+// usersRoutes.get("/test-email", async (req, res) => {
+//     try {
+//         await sendEmail({
+//             to: "khoshkaran.milad@gmail.com", // must be verified if in sandbox
+//             subject: "SES Test Email",
+//             text: "If you received this, SES is working correctly.",
+//         });
+
+//         res.json({ message: "Email sent successfully" });
+//     } catch (error) {
+//         console.error("SES Error:", error);
+//         res.status(500).json({ error: "Failed to send email" });
+//     }
+// });
 
 module.exports = { usersRoutes };
 
