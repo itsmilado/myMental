@@ -198,7 +198,7 @@ const setPendingEmailChangeQuery = async ({
         SET pending_email = $2,
             email_confirm_token_hash = $3,
             email_confirm_expires_at = $4,
-            "isConfirmed" = FALSE
+            "isconfirmed" = FALSE
         WHERE id = $1
         RETURNING *;
     `;
@@ -213,7 +213,7 @@ const confirmPendingEmailByTokenHashQuery = async ({ token_hash }) => {
             pending_email = NULL,
             email_confirm_token_hash = NULL,
             email_confirm_expires_at = NULL,
-            "isConfirmed" = TRUE
+            "isconfirmed" = TRUE
         WHERE email_confirm_token_hash = $1
           AND pending_email IS NOT NULL
           AND email_confirm_expires_at IS NOT NULL

@@ -710,8 +710,8 @@ const requestEmailChange = async (request, response, next) => {
             expires_at,
         });
 
-        const baseUrl = process.env.APP_ORIGIN || "http://localhost:5002";
-        const confirmUrl = `${baseUrl}/users/confirm-email?token=${token}`;
+        const baseUrl = process.env.APP_ORIGIN || "http://localhost:3002";
+        const confirmUrl = `${baseUrl}/confirm-email?token=${token}`;
 
         await sendEmail({
             to: new_email,
@@ -801,7 +801,7 @@ const serializeUserInfo = (user) => {
         first_name: user.first_name,
         last_name: user.last_name,
         email: user.email,
-        isConfirmed: user.isConfirmed,
+        isconfirmed: user.isconfirmed,
         user_role: user.user_role,
         created_at: user.created_at,
     };

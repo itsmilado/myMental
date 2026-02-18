@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+// src/features/account/pages/ConffirmEmailChange.tsx
+
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
     Box,
@@ -22,13 +24,19 @@ const ConfirmEmailPage = () => {
         [params],
     );
 
+    const ranRef = useRef(false);
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string>("");
     const [success, setSuccess] = useState(false);
 
     useEffect(() => {
+        if (ranRef.current) return;
+        ranRef.current = true;
+
         const run = async () => {
             if (!token) {
+                setSuccess(false);
                 setError("Missing token");
                 setLoading(false);
                 return;
@@ -37,17 +45,32 @@ const ConfirmEmailPage = () => {
             try {
                 setLoading(true);
                 setError("");
+                setSuccess(false);
+
                 const updated = await confirmEmail(token);
                 setUser(updated);
+
                 setSuccess(true);
+                setError("");
             } catch (e: any) {
-                setError(e?.message || "Email confirmation failed");
+                // If success already happened (e.g., duplicate run), ignore the error
+                setSuccess((prev) => {
+                    if (prev) return prev;
+                    return false;
+                });
+
+                setError((prev) => {
+                    // If already confirmed successfully, keep UI success-only
+                    if (success) return "";
+                    return e?.message || "Email confirmation failed";
+                });
             } finally {
                 setLoading(false);
             }
         };
 
         run();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token, setUser]);
 
     return (
@@ -67,20 +90,23 @@ const ConfirmEmailPage = () => {
                         </Stack>
                     ) : null}
 
-                    {!loading && error ? (
-                        <Alert severity="error">{error}</Alert>
-                    ) : null}
                     {!loading && success ? (
                         <Alert severity="success">
                             Your email has been confirmed.
                         </Alert>
                     ) : null}
 
+                    {!loading && !success && error ? (
+                        <Alert severity="error">{error}</Alert>
+                    ) : null}
+
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                         <Button
                             variant="contained"
                             onClick={() =>
-                                navigate("/account", { replace: true })
+                                navigate("/dashboard/account", {
+                                    replace: true,
+                                })
                             }
                         >
                             Go to account

@@ -107,7 +107,7 @@ export interface User {
     email: string;
     first_name: string;
     last_name: string;
-    isConfirmed: boolean;
+    isconfirmed: boolean;
     created_at: string;
     pending_email?: string | null;
 }

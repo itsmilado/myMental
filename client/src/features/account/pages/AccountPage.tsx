@@ -239,7 +239,7 @@ const AccountPage = () => {
                             <Chip
                                 size="small"
                                 label={
-                                    user?.isConfirmed
+                                    user?.isconfirmed
                                         ? "Confirmed"
                                         : "Unconfirmed"
                                 }

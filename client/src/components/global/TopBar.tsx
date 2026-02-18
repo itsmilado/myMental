@@ -17,7 +17,6 @@ import { tokens } from "../../theme/theme";
 import { useColorMode } from "../../theme/theme";
 import { logoutUser } from "../../features/auth/api";
 import { useAuthStore } from "../../store/useAuthStore";
-import ProfileDialog from "../../features/profile/components/ProfileDialog";
 
 const TopBar = () => {
     const theme = useTheme();
@@ -26,8 +25,6 @@ const TopBar = () => {
     const { toggleColorMode } = useColorMode();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const open: boolean = Boolean(anchorEl);
-
-    const [openProfileDialog, setOpenProfileDialog] = useState(false);
 
     const user = useAuthStore((state) => state.user);
     const handleMenuOpen = (event: React.MouseEvent<HTMLElement>): void => {
@@ -45,7 +42,6 @@ const TopBar = () => {
         } catch (error) {
             console.error("Logout failed:", error);
         }
-        // localStorage.removeItem("user");
         navigate("/");
     };
 
@@ -89,10 +85,7 @@ const TopBar = () => {
                             {user?.first_name?.[0] || "U"}
                         </Avatar>
                     </Tooltip>
-                    <ProfileDialog
-                        open={openProfileDialog}
-                        onClose={() => setOpenProfileDialog(false)}
-                    />
+
                     <Menu
                         anchorEl={anchorEl}
                         open={open}
@@ -107,10 +100,6 @@ const TopBar = () => {
                             vertical: "bottom",
                         }}
                     >
-                        <MenuItem onClick={() => setOpenProfileDialog(true)}>
-                            My Profile
-                        </MenuItem>
-
                         <MenuItem
                             onClick={() => navigate("/dashboard/account")}
                         >
