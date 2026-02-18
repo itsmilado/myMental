@@ -1,6 +1,6 @@
 // src/features/account/pages/AcccountPage.tsx
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     Box,
     Paper,
@@ -10,25 +10,53 @@ import {
     Button,
     Snackbar,
     Alert,
+    TextField,
+    Chip,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
 import { useAuthStore } from "../../../store/useAuthStore";
-import ProfileDialog from "../../profile/components/ProfileDialog";
 import ReauthDialog from "../components/ReauthDialog";
 import DeleteAccountConfirmDialog from "../components/DeleteAccountConfirmDialog";
 import ChangePasswordDialog from "../components/ChangePasswordDialog";
+import ChangeEmailDialog from "../components/ChangeEmailDialog";
 
-import { deleteMyAccount, changeMyPassword } from "../../auth/api";
+import {
+    deleteMyAccount,
+    changeMyPassword,
+    updateCurrentUser,
+} from "../../auth/api";
 
-// Small local dialog to avoid extra files
+const isValidName = (value: string) => {
+    const v = value.trim();
+    if (v.length < 1 || v.length > 30) return false;
+    return /^[A-Za-zÀ-ÖØ-öø-ÿ -]+$/.test(v);
+};
 
 const AccountPage = () => {
     const user = useAuthStore((s) => s.user);
+    const setUser = useAuthStore((s) => s.setUser);
     const clearUser = useAuthStore((s) => s.clearUser);
     const navigate = useNavigate();
 
-    const [openProfileDialog, setOpenProfileDialog] = useState(false);
+    const [editingProfile, setEditingProfile] = useState(false);
+    const [savingProfile, setSavingProfile] = useState(false);
+    const [firstName, setFirstName] = useState(user?.first_name ?? "");
+    const [lastName, setLastName] = useState(user?.last_name ?? "");
+
+    useEffect(() => {
+        setFirstName(user?.first_name ?? "");
+        setLastName(user?.last_name ?? "");
+    }, [user?.first_name, user?.last_name]);
+
+    const profileValidation = useMemo(() => {
+        if (!editingProfile) return { ok: true, reason: "" };
+        if (!isValidName(firstName))
+            return { ok: false, reason: "Invalid first name" };
+        if (!isValidName(lastName))
+            return { ok: false, reason: "Invalid last name" };
+        return { ok: true, reason: "" };
+    }, [editingProfile, firstName, lastName]);
 
     // delete flow
     const [reauthDeleteOpen, setReauthDeleteOpen] = useState(false);
@@ -40,15 +68,17 @@ const AccountPage = () => {
     const [changePwOpen, setChangePwOpen] = useState(false);
     const [changingPw, setChangingPw] = useState(false);
 
+    // change email flow
+    const [reauthEmailOpen, setReauthEmailOpen] = useState(false);
+    const [changeEmailOpen, setChangeEmailOpen] = useState(false);
+
     const [toast, setToast] = useState<{
         open: boolean;
         message: string;
-        severity: "success" | "error";
+        severity: "success" | "error" | "info";
     }>({ open: false, message: "", severity: "success" });
 
-    // ---- Delete flow handlers ----
     const startDeleteFlow = () => setReauthDeleteOpen(true);
-
     const handleReauthDeleteSuccess = () => {
         setReauthDeleteOpen(false);
         setDeleteConfirmOpen(true);
@@ -58,14 +88,12 @@ const AccountPage = () => {
         try {
             setDeleting(true);
             await deleteMyAccount();
-
-            clearUser?.();
+            clearUser();
             setToast({
                 open: true,
                 message: "Account deleted",
                 severity: "success",
             });
-
             navigate("/", { replace: true });
         } catch (e: any) {
             setToast({
@@ -79,9 +107,7 @@ const AccountPage = () => {
         }
     };
 
-    // ---- Change password handlers ----
     const startChangePasswordFlow = () => setReauthPwOpen(true);
-
     const handleReauthPwSuccess = () => {
         setReauthPwOpen(false);
         setChangePwOpen(true);
@@ -91,13 +117,11 @@ const AccountPage = () => {
         try {
             setChangingPw(true);
             const msg = await changeMyPassword(newPassword);
-
             setToast({
                 open: true,
                 message: msg || "Password updated",
                 severity: "success",
             });
-
             setChangePwOpen(false);
         } catch (e: any) {
             setToast({
@@ -105,10 +129,55 @@ const AccountPage = () => {
                 message: e?.message || "Failed to update password",
                 severity: "error",
             });
-            // keep dialog open so user can fix input / retry
         } finally {
             setChangingPw(false);
         }
+    };
+
+    const startChangeEmailFlow = () => setReauthEmailOpen(true);
+    const handleReauthEmailSuccess = () => {
+        setReauthEmailOpen(false);
+        setChangeEmailOpen(true);
+    };
+
+    const handleSaveProfile = async () => {
+        if (!profileValidation.ok) {
+            setToast({
+                open: true,
+                message: profileValidation.reason,
+                severity: "error",
+            });
+            return;
+        }
+
+        try {
+            setSavingProfile(true);
+            const updated = await updateCurrentUser({
+                first_name: firstName.trim(),
+                last_name: lastName.trim(),
+            });
+            setUser(updated);
+            setEditingProfile(false);
+            setToast({
+                open: true,
+                message: "Profile updated",
+                severity: "success",
+            });
+        } catch (e: any) {
+            setToast({
+                open: true,
+                message: e?.message || "Failed to update profile",
+                severity: "error",
+            });
+        } finally {
+            setSavingProfile(false);
+        }
+    };
+
+    const handleCancelProfileEdit = () => {
+        setFirstName(user?.first_name ?? "");
+        setLastName(user?.last_name ?? "");
+        setEditingProfile(false);
     };
 
     return (
@@ -123,26 +192,98 @@ const AccountPage = () => {
                         <Typography variant="subtitle2" color="text.secondary">
                             Name
                         </Typography>
-                        <Typography>
-                            {user?.first_name} {user?.last_name}
-                        </Typography>
+
+                        {!editingProfile ? (
+                            <Typography>
+                                {user?.first_name} {user?.last_name}
+                            </Typography>
+                        ) : (
+                            <Stack
+                                direction={{ xs: "column", sm: "row" }}
+                                spacing={2}
+                            >
+                                <TextField
+                                    label="First name"
+                                    value={firstName}
+                                    onChange={(e) =>
+                                        setFirstName(e.target.value)
+                                    }
+                                    disabled={savingProfile}
+                                    fullWidth
+                                />
+                                <TextField
+                                    label="Last name"
+                                    value={lastName}
+                                    onChange={(e) =>
+                                        setLastName(e.target.value)
+                                    }
+                                    disabled={savingProfile}
+                                    fullWidth
+                                />
+                            </Stack>
+                        )}
                     </Box>
 
                     <Box>
                         <Typography variant="subtitle2" color="text.secondary">
                             Email
                         </Typography>
-                        <Typography>{user?.email}</Typography>
+
+                        <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                            flexWrap="wrap"
+                        >
+                            <Typography>{user?.email}</Typography>
+                            <Chip
+                                size="small"
+                                label={
+                                    user?.isConfirmed
+                                        ? "Confirmed"
+                                        : "Unconfirmed"
+                                }
+                                variant="outlined"
+                            />
+                        </Stack>
                     </Box>
 
                     <Divider />
 
-                    <Stack direction="row" spacing={2}>
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                        {!editingProfile ? (
+                            <Button
+                                variant="outlined"
+                                onClick={() => setEditingProfile(true)}
+                            >
+                                Edit profile
+                            </Button>
+                        ) : (
+                            <>
+                                <Button
+                                    variant="contained"
+                                    onClick={handleSaveProfile}
+                                    disabled={
+                                        savingProfile || !profileValidation.ok
+                                    }
+                                >
+                                    Save
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    onClick={handleCancelProfileEdit}
+                                    disabled={savingProfile}
+                                >
+                                    Cancel
+                                </Button>
+                            </>
+                        )}
+
                         <Button
-                            variant="contained"
-                            onClick={() => setOpenProfileDialog(true)}
+                            variant="outlined"
+                            onClick={startChangeEmailFlow}
                         >
-                            Edit profile
+                            Change email
                         </Button>
 
                         <Button
@@ -151,53 +292,39 @@ const AccountPage = () => {
                         >
                             Change password
                         </Button>
+
+                        <Button
+                            variant="contained"
+                            color="error"
+                            onClick={startDeleteFlow}
+                            disabled={deleting}
+                        >
+                            Delete account
+                        </Button>
                     </Stack>
                 </Stack>
             </Paper>
 
-            <Paper
-                sx={{
-                    p: 3,
-                    border: "1px solid",
-                    borderColor: "error.light",
-                }}
-            >
-                <Typography variant="h6" fontWeight={700} color="error">
-                    Danger Zone
-                </Typography>
-
-                <Typography color="text.secondary" sx={{ mt: 1 }}>
-                    Permanently delete your account and all associated data.
-                </Typography>
-
-                <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-                    <Button
-                        variant="contained"
-                        color="error"
-                        onClick={startDeleteFlow}
-                        disabled={
-                            reauthDeleteOpen || deleteConfirmOpen || deleting
-                        }
-                    >
-                        Delete account
-                    </Button>
-                </Stack>
-            </Paper>
-
-            {/* Existing profile dialog */}
-            <ProfileDialog
-                open={openProfileDialog}
-                onClose={() => setOpenProfileDialog(false)}
+            <ReauthDialog
+                open={reauthEmailOpen}
+                onClose={() => setReauthEmailOpen(false)}
+                onSuccess={handleReauthEmailSuccess}
             />
 
-            {/* Reauth for password change */}
+            <ChangeEmailDialog
+                open={changeEmailOpen}
+                onClose={() => setChangeEmailOpen(false)}
+                onInfo={(msg) =>
+                    setToast({ open: true, message: msg, severity: "info" })
+                }
+            />
+
             <ReauthDialog
                 open={reauthPwOpen}
                 onClose={() => setReauthPwOpen(false)}
                 onSuccess={handleReauthPwSuccess}
             />
 
-            {/* Change password dialog */}
             <ChangePasswordDialog
                 open={changePwOpen}
                 onClose={() => setChangePwOpen(false)}
@@ -205,30 +332,29 @@ const AccountPage = () => {
                 loading={changingPw}
             />
 
-            {/* Reauth for deletion */}
             <ReauthDialog
                 open={reauthDeleteOpen}
                 onClose={() => setReauthDeleteOpen(false)}
                 onSuccess={handleReauthDeleteSuccess}
             />
 
-            {/* Type DELETE confirm */}
             <DeleteAccountConfirmDialog
                 open={deleteConfirmOpen}
-                loading={deleting}
                 onClose={() => setDeleteConfirmOpen(false)}
                 onConfirm={handleDelete}
+                loading={deleting}
             />
 
             <Snackbar
                 open={toast.open}
-                autoHideDuration={2500}
+                autoHideDuration={3500}
                 onClose={() => setToast((t) => ({ ...t, open: false }))}
-                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
             >
                 <Alert
-                    severity={toast.severity}
                     onClose={() => setToast((t) => ({ ...t, open: false }))}
+                    severity={toast.severity}
+                    sx={{ width: "100%" }}
                 >
                     {toast.message}
                 </Alert>

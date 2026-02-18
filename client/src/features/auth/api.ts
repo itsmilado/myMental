@@ -108,6 +108,28 @@ export const reauthCurrentUser = async (
     };
 };
 
+export async function requestEmailChange(newEmail: string): Promise<string> {
+    const response = await axios.post(`${USER_BASE_URL}/me/change-email`, {
+        new_email: newEmail,
+    });
+    if (!response.data?.success) {
+        throw new Error(
+            response.data?.message || "Email change request failed",
+        );
+    }
+    return response.data?.message || "Confirmation email sent";
+}
+
+export async function confirmEmail(token: string): Promise<User> {
+    const response = await axios.get(`${USER_BASE_URL}/confirm-email`, {
+        params: { token },
+    });
+    if (!response.data?.success) {
+        throw new Error(response.data?.message || "Email confirmation failed");
+    }
+    return response.data.userData as User;
+}
+
 export const deleteMyAccount = async (): Promise<string> => {
     const response = await axios.delete(`${USER_BASE_URL}/me`, {
         withCredentials: true,

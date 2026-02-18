@@ -15,6 +15,7 @@ import OnlineHistoryPage from "../features/transcription/pages/OnlineHistoryPage
 import AccountPage from "../features/account/pages/AccountPage";
 import PreferencesPage from "../features/preferences/pages/PreferencesPage";
 import SettingsPage from "../features/settings/pages/SettingsPage";
+import ConfirmEmailPage from "../features/account/pages/ConfirmEmailPage";
 
 const AppRoutes = () => {
     return (
@@ -22,6 +23,7 @@ const AppRoutes = () => {
             {/* Public routes */}
             <Route path="/" element={<SignIn />} />
             <Route path="/sign-up" element={<SignUp />} />
+            <Route path="/confirm-email" element={<ConfirmEmailPage />} />
 
             {/* Protected dashboard routes */}
             <Route

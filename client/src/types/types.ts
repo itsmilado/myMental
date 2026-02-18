@@ -109,6 +109,7 @@ export interface User {
     last_name: string;
     isConfirmed: boolean;
     created_at: string;
+    pending_email?: string | null;
 }
 
 export type AuthState = {
