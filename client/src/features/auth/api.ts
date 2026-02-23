@@ -34,10 +34,12 @@ export const getUser = async (id: string): Promise<User> => {
 export const loginUser = async (
     email: string,
     password: string,
+    rememberMe: boolean,
 ): Promise<AuthResponse> => {
     const response = await apiClient.post(`${USER_BASE_PATH}/login`, {
         email,
         password,
+        rememberMe,
     });
     return response.data as AuthResponse;
 };

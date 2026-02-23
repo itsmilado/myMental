@@ -21,11 +21,7 @@ import { styled } from "@mui/material/styles";
 import ForgotPassword from "./ForgotPassword";
 import AppTheme from "../../../components/shared-theme/AppTheme";
 import ColorModeSelect from "../../../components/shared-theme/ColorModeSelect";
-import {
-    GoogleIcon,
-    FacebookIcon,
-    SitemarkIcon,
-} from "../../../components/CustomIcons";
+import { GoogleIcon, SitemarkIcon } from "../../../components/CustomIcons";
 
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../../store/useAuthStore";
@@ -84,6 +80,8 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
     const [email, setEmail] = React.useState(user?.email ?? "");
     const [password, setPassword] = React.useState("");
 
+    const [rememberMe, setRememberMe] = React.useState(false);
+
     const [emailError, setEmailError] = React.useState<string | null>(null);
     const [passwordError, setPasswordError] = React.useState<string | null>(
         null,
@@ -127,7 +125,11 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
 
         setLoading(true);
         try {
-            const response = await loginUser(values.email, values.password);
+            const response = await loginUser(
+                values.email,
+                values.password,
+                rememberMe,
+            );
 
             if (!response?.success || !response.userData) {
                 setFormError("Invalid email or password.");
@@ -229,7 +231,13 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
 
                         <FormControlLabel
                             control={
-                                <Checkbox value="remember" color="primary" />
+                                <Checkbox
+                                    checked={rememberMe}
+                                    onChange={(e) =>
+                                        setRememberMe(e.target.checked)
+                                    }
+                                    color="primary"
+                                />
                             }
                             label="Remember me"
                         />
