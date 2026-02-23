@@ -1,5 +1,4 @@
 import * as React from "react";
-import axios from "axios";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
@@ -124,7 +123,7 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
     const validateInputs = () => {
         const email = document.getElementById("email") as HTMLInputElement;
         const password = document.getElementById(
-            "password"
+            "password",
         ) as HTMLInputElement;
 
         let isValid = true;
@@ -141,7 +140,7 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
         if (!password.value || password.value.length < 6) {
             setPasswordError(true);
             setPasswordErrorMessage(
-                "Password must be at least 6 characters long."
+                "Password must be at least 6 characters long.",
             );
             isValid = false;
         } else {

@@ -1,6 +1,8 @@
 // src/routes/AppRoutes.tsx
 
 import { Routes, Route } from "react-router-dom";
+
+import LandingPage from "../features/landing/pages/LandingPage";
 import SignIn from "../features/auth/pages/Sign-In";
 import SignUp from "../features/auth/pages/SignUp";
 import Dashboard from "../pages/Dashboard";
@@ -21,7 +23,8 @@ const AppRoutes = () => {
     return (
         <Routes>
             {/* Public routes */}
-            <Route path="/" element={<SignIn />} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/sign-in" element={<SignIn />} />
             <Route path="/sign-up" element={<SignUp />} />
             <Route path="/confirm-email" element={<ConfirmEmailPage />} />
 

@@ -78,16 +78,16 @@ export default function SignUp(props: { disableCustomTheme?: boolean }) {
     const validateInputs = () => {
         const email = document.getElementById("email") as HTMLInputElement;
         const password = document.getElementById(
-            "password"
+            "password",
         ) as HTMLInputElement;
         const repeat_password = document.getElementById(
-            "repeat_password"
+            "repeat_password",
         ) as HTMLInputElement;
         const first_name = document.getElementById(
-            "first_name"
+            "first_name",
         ) as HTMLInputElement;
         const last_name = document.getElementById(
-            "last_name"
+            "last_name",
         ) as HTMLInputElement;
 
         let isValid = true;
@@ -104,7 +104,7 @@ export default function SignUp(props: { disableCustomTheme?: boolean }) {
         if (!password.value || password.value.length < 6) {
             setPasswordError(true);
             setPasswordErrorMessage(
-                "Password must be at least 6 characters long."
+                "Password must be at least 6 characters long.",
             );
             isValid = false;
         } else {
@@ -157,7 +157,7 @@ export default function SignUp(props: { disableCustomTheme?: boolean }) {
                 last_name as string,
                 email as string,
                 password as string,
-                repeat_password as string
+                repeat_password as string,
             );
             console.log("Response:", response.userData);
             if (!response.success) {
@@ -326,7 +326,7 @@ export default function SignUp(props: { disableCustomTheme?: boolean }) {
                         <Typography sx={{ textAlign: "center" }}>
                             Already have an account?{" "}
                             <Link
-                                href="/"
+                                href="/sign-in"
                                 variant="body2"
                                 sx={{ alignSelf: "center" }}
                             >
