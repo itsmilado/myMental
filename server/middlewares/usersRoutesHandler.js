@@ -93,7 +93,7 @@ const userLogin = async (request, response, next) => {
                 success: false,
                 message: "Email or Password is wrong!",
             });
-            return false; // Return false to exit the function
+            return false;
         }
         logger.info(
             `User logged in successfully: user_id ${JSON.stringify(
@@ -105,17 +105,31 @@ const userLogin = async (request, response, next) => {
             email: matchUser.email,
             role: matchUser.user_role,
         };
-        response.status(201).json({
-            success: true,
-            message: "login success",
-            userData: {
-                id: matchUser.id,
-                first_name: matchUser.first_name,
-                last_name: matchUser.last_name,
-                email: matchUser.email,
-                role: matchUser.user_role,
-                created_at: matchUser.created_at,
-            },
+
+        const rememberMe = Boolean(request.body?.rememberMe);
+
+        // - rememberMe=true  => persistent cookie ( 30 days)
+        // - rememberMe=false => session cookie (expires on browser close)
+        if (rememberMe) {
+            request.session.cookie.maxAge = 1000 * 60 * 60 * 24 * 30; // 30 days
+        } else {
+            request.session.cookie.expires = false;
+            request.session.cookie.maxAge = null;
+        }
+
+        request.session.save(() => {
+            response.status(201).json({
+                success: true,
+                message: "login success",
+                userData: {
+                    id: matchUser.id,
+                    first_name: matchUser.first_name,
+                    last_name: matchUser.last_name,
+                    email: matchUser.email,
+                    role: matchUser.user_role,
+                    created_at: matchUser.created_at,
+                },
+            });
         });
     } catch (error) {
         logger.error(`[userHandlers > userLogin] Error: ${error.message}`);
@@ -135,7 +149,11 @@ const userLoggedOut = async (request, response, next) => {
                 );
                 return next(error); // Pass the error to the error handler middleware
             }
-            response.clearCookie("sessionId"); // Clear the session cookie
+            response.clearCookie("sessionId", {
+                httpOnly: true,
+                sameSite: "lax",
+                secure: false, // true in production behind HTTPS
+            }); // Clear the session cookie
             logger.info("Session cookie cleared");
             response
                 .status(200)

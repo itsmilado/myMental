@@ -13,13 +13,13 @@ const redisClient = redis.createClient({
 
 redisClient.connect().catch((error) => {
     logger.error(
-        `[sessionMiddleware > - redisClient.connect()] Error => ${error.message}`
+        `[sessionMiddleware > - redisClient.connect()] Error => ${error.message}`,
     );
 });
 
 redisClient.on("connect", () => {
     logger.info(
-        `[sessionMiddleware > - redisClient.connect()] => Redis client succesfully connected.`
+        `[sessionMiddleware > - redisClient.connect()] => Redis client succesfully connected.`,
     );
 });
 
@@ -36,12 +36,11 @@ try {
             secure: false, // Set to true in production (true: only transmit cookies over HTTPS)
             httpOnly: true, // Set to true in production (true: client side JS cannot access the cookie)
             sameSite: "lax",
-            maxAge: 1000 * 60 * 30 * 24, // expires in 24 hours
         },
     });
 } catch (error) {
     logger.error(
-        `[sessionMiddleware > Error setting up session middleware: - redisClient.connect()] Error => ${error.message}`
+        `[sessionMiddleware > Error setting up session middleware: - redisClient.connect()] Error => ${error.message}`,
     );
 }
 

@@ -1,5 +1,3 @@
-// src/features/auth/pages/Sign-in.tsx
-
 import * as React from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -21,7 +19,11 @@ import { styled } from "@mui/material/styles";
 import ForgotPassword from "./ForgotPassword";
 import AppTheme from "../../../components/shared-theme/AppTheme";
 import ColorModeSelect from "../../../components/shared-theme/ColorModeSelect";
-import { GoogleIcon, SitemarkIcon } from "../../../components/CustomIcons";
+import {
+    GoogleIcon,
+    FacebookIcon,
+    SitemarkIcon,
+} from "../../../components/CustomIcons";
 
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../../store/useAuthStore";
@@ -239,7 +241,7 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
                                     color="primary"
                                 />
                             }
-                            label="Remember me"
+                            label="Keep me signed in"
                         />
 
                         <ForgotPassword
@@ -287,6 +289,16 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
                             startIcon={<GoogleIcon />}
                         >
                             Sign in with Google
+                        </Button>
+                        <Button
+                            fullWidth
+                            variant="outlined"
+                            onClick={() =>
+                                alert("Facebook login not implemented")
+                            }
+                            startIcon={<FacebookIcon />}
+                        >
+                            Sign in with Facebook
                         </Button>
                     </Box>
                 </Card>

@@ -29,8 +29,7 @@ const validateSignupRules = [
         .notEmpty()
         .withMessage("Email is required")
         .isEmail()
-        .withMessage("Invalid email format")
-        .normalizeEmail(),
+        .withMessage("Invalid email format"),
 
     // Validate password
     body("password")
@@ -56,8 +55,7 @@ const validationLoginRules = [
         .notEmpty()
         .withMessage("Email is required")
         .isEmail()
-        .withMessage("Invalid email format")
-        .normalizeEmail(),
+        .withMessage("Invalid email format"),
     body("password")
         .notEmpty()
         .withMessage("Password is required")
