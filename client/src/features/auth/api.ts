@@ -153,6 +153,17 @@ export const requestPasswordReset = async (
     return response.data as { success: boolean; message: string };
 };
 
+export const resetPassword = async (
+    token: string,
+    newPassword: string,
+): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.post(`/users/reset-password`, {
+        token,
+        new_password: newPassword,
+    });
+    return response.data as { success: boolean; message: string };
+};
+
 // SSE-based background job starter
 export const startTranscriptionJob = async (
     file: File,

@@ -18,12 +18,9 @@ const {
     setPendingEmailChangeQuery,
     confirmPendingEmailByTokenHashQuery,
     setPasswordResetTokenByIdQuery,
-    deleteUserByIdQuery,
+    getUserByPasswordResetTokenHashQuery,
+    clearPasswordResetTokenByIdQuery,
 } = require("../db/usersQueries");
-const {
-    deleteTranscriptionsByUserIdQuery,
-    deleteTranscriptionBackupsByUserIdQuery,
-} = require("../db/transcribeQueries");
 const {
     deleteTranscriptionTxtFile,
     deleteAudioFileCopy,
@@ -870,6 +867,69 @@ const requestPasswordReset = async (request, response, next) => {
     }
 };
 
+const resetPassword = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`,
+        );
+
+        const token = String(request.body?.token || "").trim();
+        const new_password = String(request.body?.new_password || "");
+
+        if (!token || !new_password) {
+            return response.status(400).json({
+                success: false,
+                message: "Token and new password are required",
+            });
+        }
+
+        const token_hash = crypto
+            .createHash("sha256")
+            .update(token)
+            .digest("hex");
+
+        const user = await getUserByPasswordResetTokenHashQuery({ token_hash });
+        if (!user) {
+            return response.status(400).json({
+                success: false,
+                message: "Invalid or expired reset token",
+            });
+        }
+
+        const expiresAt = user.password_reset_expires_at
+            ? new Date(user.password_reset_expires_at).getTime()
+            : 0;
+
+        if (!expiresAt || Date.now() > expiresAt) {
+            // Clear stale token
+            await clearPasswordResetTokenByIdQuery({ id: user.id });
+            return response.status(400).json({
+                success: false,
+                message: "Invalid or expired reset token",
+            });
+        }
+
+        const hashed = await hashPassword(new_password);
+
+        await updateUserPasswordByIdQuery({
+            id: user.id,
+            hashed_password: hashed,
+        });
+
+        await clearPasswordResetTokenByIdQuery({ id: user.id });
+
+        return response.status(200).json({
+            success: true,
+            message: "Password updated successfully",
+        });
+    } catch (error) {
+        logger.error(
+            `[usersRoutesHandler > resetPassword] => Error: ${error.message}`,
+        );
+        next(error);
+    }
+};
+
 // Helper function to filter sensitive fields
 const filterSensitiveFields = (body, fieldsToHide) => {
     const filteredBody = { ...body };
@@ -925,4 +985,5 @@ module.exports = {
     requestEmailChange,
     confirmEmailChange,
     requestPasswordReset,
+    resetPassword,
 };

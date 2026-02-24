@@ -18,12 +18,14 @@ const {
     requestEmailChange,
     confirmEmailChange,
     requestPasswordReset,
+    resetPassword,
 } = require("../middlewares/usersRoutesHandler");
 const errorHandler = require("../middlewares/errorHandler");
 const {
     validateSignupRules,
     validationLoginRules,
     validateForgotPasswordRules,
+    validateResetPasswordRules,
     handleValidationErrors,
 } = require("../middlewares/validationMiddleware");
 
@@ -54,6 +56,14 @@ usersRoutes.post(
     validateForgotPasswordRules,
     handleValidationErrors,
     requestPasswordReset,
+    errorHandler,
+);
+
+usersRoutes.post(
+    "/reset-password",
+    validateResetPasswordRules,
+    handleValidationErrors,
+    resetPassword,
     errorHandler,
 );
 

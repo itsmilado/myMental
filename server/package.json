@@ -39,6 +39,7 @@
         "winston": "^3.17.0"
     },
     "devDependencies": {
+        "@types/bcryptjs": "^2.4.6",
         "node-mocks-http": "^1.16.2"
     }
 }

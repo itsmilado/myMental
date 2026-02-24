@@ -72,6 +72,15 @@ const validateForgotPasswordRules = [
         .withMessage("Invalid email format"),
 ];
 
+const validateResetPasswordRules = [
+    body("token").trim().notEmpty().withMessage("Token is required"),
+    body("new_password")
+        .notEmpty()
+        .withMessage("New password is required")
+        .isLength({ min: 8 })
+        .withMessage("Password must be at least 8 characters"),
+];
+
 const handleValidationErrors = (request, response, next) => {
     const errors = validationResult(request);
     if (!errors.isEmpty()) {
@@ -91,4 +100,5 @@ module.exports = {
     validationLoginRules,
     validateForgotPasswordRules,
     handleValidationErrors,
+    validateResetPasswordRules,
 };

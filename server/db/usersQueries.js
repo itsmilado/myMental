@@ -230,6 +230,43 @@ const setPasswordResetTokenByIdQuery = async ({
     }
 };
 
+const getUserByPasswordResetTokenHashQuery = async ({ token_hash }) => {
+    try {
+        const q = `
+            SELECT id, email, user_role, password_reset_expires_at
+            FROM users
+            WHERE password_reset_token_hash = $1
+            LIMIT 1;
+        `;
+        const res = await pool.query(q, [token_hash]);
+        return res.rows[0] || null;
+    } catch (error) {
+        logger.error(
+            `[usersQueries > getUserByPasswordResetTokenHashQuery] => Error: ${error.message}`,
+        );
+        throw error;
+    }
+};
+
+const clearPasswordResetTokenByIdQuery = async ({ id }) => {
+    try {
+        const q = `
+            UPDATE users
+            SET password_reset_token_hash = NULL,
+                password_reset_expires_at = NULL
+            WHERE id = $1
+            RETURNING id;
+        `;
+        const res = await pool.query(q, [id]);
+        return res.rows[0] || null;
+    } catch (error) {
+        logger.error(
+            `[usersQueries > clearPasswordResetTokenByIdQuery] => Error: ${error.message}`,
+        );
+        throw error;
+    }
+};
+
 const confirmPendingEmailByTokenHashQuery = async ({ token_hash }) => {
     const q = `
         UPDATE users
@@ -261,4 +298,6 @@ module.exports = {
     setPendingEmailChangeQuery,
     confirmPendingEmailByTokenHashQuery,
     setPasswordResetTokenByIdQuery,
+    getUserByPasswordResetTokenHashQuery,
+    clearPasswordResetTokenByIdQuery,
 };
