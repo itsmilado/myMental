@@ -54,6 +54,12 @@ const createUsers = async (request, response, next) => {
             `New user created: user_id(${JSON.stringify(newUser.id)}) `,
         ); // Log the new user
 
+        request.session.user = {
+            id: newUser.id,
+            email: newUser.email,
+            role: newUser.user_role,
+        };
+
         response.status(201).json({
             success: true,
             message: "User created successfully",
