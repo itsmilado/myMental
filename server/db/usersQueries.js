@@ -206,6 +206,30 @@ const setPendingEmailChangeQuery = async ({
     return r.rows[0] || null;
 };
 
+const setPasswordResetTokenByIdQuery = async ({
+    id,
+    token_hash,
+    expires_at,
+}) => {
+    try {
+        const q = `
+            UPDATE users
+            SET password_reset_token_hash = $1,
+                password_reset_expires_at = $2
+            WHERE id = $3
+            RETURNING id;
+        `;
+        const values = [token_hash, expires_at, id];
+        const res = await pool.query(q, values);
+        return res.rows[0] || null;
+    } catch (error) {
+        logger.error(
+            `[usersQueries > setPasswordResetTokenByIdQuery] => Error: ${error.message}`,
+        );
+        throw error;
+    }
+};
+
 const confirmPendingEmailByTokenHashQuery = async ({ token_hash }) => {
     const q = `
         UPDATE users
@@ -236,4 +260,5 @@ module.exports = {
     updateUserPasswordByIdQuery,
     setPendingEmailChangeQuery,
     confirmPendingEmailByTokenHashQuery,
+    setPasswordResetTokenByIdQuery,
 };

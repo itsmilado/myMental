@@ -63,6 +63,15 @@ const validationLoginRules = [
         .withMessage("Password must be at least 6 characters long"),
 ];
 
+const validateForgotPasswordRules = [
+    body("email")
+        .trim()
+        .notEmpty()
+        .withMessage("Email is required")
+        .isEmail()
+        .withMessage("Invalid email format"),
+];
+
 const handleValidationErrors = (request, response, next) => {
     const errors = validationResult(request);
     if (!errors.isEmpty()) {
@@ -80,5 +89,6 @@ const handleValidationErrors = (request, response, next) => {
 module.exports = {
     validateSignupRules,
     validationLoginRules,
+    validateForgotPasswordRules,
     handleValidationErrors,
 };

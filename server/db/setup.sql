@@ -13,6 +13,8 @@ CREATE TABLE users (
   pending_email VARCHAR(255),
   email_confirm_token_hash TEXT,
   email_confirm_expires_at TIMESTAMPTZ,
+  password_reset_token_hash TEXT,
+  password_reset_expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 

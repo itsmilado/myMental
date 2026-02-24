@@ -17,6 +17,7 @@ const {
     updateUserPasswordByIdQuery,
     setPendingEmailChangeQuery,
     confirmPendingEmailByTokenHashQuery,
+    setPasswordResetTokenByIdQuery,
     deleteUserByIdQuery,
 } = require("../db/usersQueries");
 const {
@@ -807,6 +808,68 @@ const confirmEmailChange = async (request, response, next) => {
     }
 };
 
+const requestPasswordReset = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`,
+        );
+
+        const emailRaw = request.body?.email;
+
+        // Keep generic success response to prevent account enumeration
+        const genericResponse = () =>
+            response.status(200).json({
+                success: true,
+                message:
+                    "If an account exists for that email, a password reset link has been sent.",
+            });
+
+        if (!emailRaw || !isValidEmail(emailRaw)) {
+            // Still return generic success to avoid enumeration via validation
+            return genericResponse();
+        }
+
+        const email = String(emailRaw).trim().toLowerCase();
+
+        const user = await getUserByEmailQuery({ email });
+        if (!user) return genericResponse();
+
+        const token = crypto.randomBytes(32).toString("hex");
+        const token_hash = crypto
+            .createHash("sha256")
+            .update(token)
+            .digest("hex");
+        const expires_at = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+
+        await setPasswordResetTokenByIdQuery({
+            id: user.id,
+            token_hash,
+            expires_at,
+        });
+
+        const baseUrl = process.env.APP_ORIGIN || "http://localhost:3002";
+        const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+
+        await sendEmail({
+            to: email,
+            subject: "Reset your myMental password",
+            text: `Reset your password by opening this link: ${resetUrl}`,
+            html: `
+                <p>To reset your password, click the link below:</p>
+                <p><a href="${resetUrl}">Reset password</a></p>
+                <p>This link expires in 1 hour.</p>
+            `,
+        });
+
+        return genericResponse();
+    } catch (error) {
+        logger.error(
+            `[usersRoutesHandler > requestPasswordReset] => Error: ${error.message}`,
+        );
+        next(error);
+    }
+};
+
 // Helper function to filter sensitive fields
 const filterSensitiveFields = (body, fieldsToHide) => {
     const filteredBody = { ...body };
@@ -861,5 +924,5 @@ module.exports = {
     changeMyPassword,
     requestEmailChange,
     confirmEmailChange,
-    // checkloggedIn,
+    requestPasswordReset,
 };

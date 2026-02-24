@@ -17,12 +17,13 @@ const {
     changeMyPassword,
     requestEmailChange,
     confirmEmailChange,
-    // checkloggedIn,
+    requestPasswordReset,
 } = require("../middlewares/usersRoutesHandler");
 const errorHandler = require("../middlewares/errorHandler");
 const {
     validateSignupRules,
     validationLoginRules,
+    validateForgotPasswordRules,
     handleValidationErrors,
 } = require("../middlewares/validationMiddleware");
 
@@ -31,8 +32,6 @@ const {
     requireRecentReauth,
 } = require("../middlewares/authMiddleware");
 const { hasRole } = require("../middlewares/roleMiddleware");
-
-const { sendEmail } = require("../utils/mailer");
 
 usersRoutes.post(
     "/signup",
@@ -49,6 +48,15 @@ usersRoutes.post(
     userLogin,
     errorHandler,
 );
+
+usersRoutes.post(
+    "/forgot-password",
+    validateForgotPasswordRules,
+    handleValidationErrors,
+    requestPasswordReset,
+    errorHandler,
+);
+
 usersRoutes.post("/logout", userLoggedOut, errorHandler);
 usersRoutes.get("/profile/:id", isAuthenticated, getUserInfo, errorHandler);
 
