@@ -146,6 +146,13 @@ export async function changeMyPassword(newPassword: string): Promise<string> {
     return (res.data?.message as string) || "Password updated";
 }
 
+export const requestPasswordReset = async (
+    email: string,
+): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.post(`/users/forgot-password`, { email });
+    return response.data as { success: boolean; message: string };
+};
+
 // SSE-based background job starter
 export const startTranscriptionJob = async (
     file: File,
