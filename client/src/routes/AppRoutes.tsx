@@ -19,6 +19,7 @@ import PreferencesPage from "../features/preferences/pages/PreferencesPage";
 import SettingsPage from "../features/settings/pages/SettingsPage";
 import ConfirmEmailPage from "../features/account/pages/ConfirmEmailPage";
 import ResetPassword from "../features/auth/pages/ResetPassword";
+import OAuthCallback from "../features/auth/pages/OAuthCallback";
 
 const AppRoutes = () => {
     return (
@@ -29,6 +30,7 @@ const AppRoutes = () => {
             <Route path="/sign-up" element={<SignUp />} />
             <Route path="/confirm-email" element={<ConfirmEmailPage />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/oauth/callback" element={<OAuthCallback />} />
 
             {/* Protected dashboard routes */}
             <Route

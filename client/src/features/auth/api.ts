@@ -26,6 +26,11 @@ export type DeleteTranscriptionOptions = {
     deleteAudioFile?: boolean;
 };
 
+export const startGoogleOAuth = () => {
+    // server will redirect to Google and then back to APP_ORIGIN/oauth/callback
+    window.location.assign(`${API_BASE_URL}/auth/google`);
+};
+
 export const getUser = async (id: string): Promise<User> => {
     const response = await apiClient.get<User>(`${USER_BASE_PATH}/${id}`);
     return response.data;

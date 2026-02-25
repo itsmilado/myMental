@@ -1,3 +1,5 @@
+// src/features/auth/pages/Sign-In.tsx
+
 import * as React from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -19,15 +21,11 @@ import { styled } from "@mui/material/styles";
 import ForgotPassword from "./ForgotPassword";
 import AppTheme from "../../../components/shared-theme/AppTheme";
 import ColorModeSelect from "../../../components/shared-theme/ColorModeSelect";
-import {
-    GoogleIcon,
-    FacebookIcon,
-    SitemarkIcon,
-} from "../../../components/CustomIcons";
+import { GoogleIcon, SitemarkIcon } from "../../../components/CustomIcons";
 
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../../store/useAuthStore";
-import { loginUser } from "../api";
+import { loginUser, startGoogleOAuth } from "../api";
 
 const Card = styled(MuiCard)(({ theme }) => ({
     display: "flex",
@@ -285,20 +283,10 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
                         <Button
                             fullWidth
                             variant="outlined"
-                            onClick={() => alert("Google OAuth not wired yet")}
+                            onClick={() => startGoogleOAuth()}
                             startIcon={<GoogleIcon />}
                         >
                             Sign in with Google
-                        </Button>
-                        <Button
-                            fullWidth
-                            variant="outlined"
-                            onClick={() =>
-                                alert("Facebook login not implemented")
-                            }
-                            startIcon={<FacebookIcon />}
-                        >
-                            Sign in with Facebook
                         </Button>
                     </Box>
                 </Card>
