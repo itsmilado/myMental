@@ -23,7 +23,7 @@ import AppTheme from "../../../components/shared-theme/AppTheme";
 import ColorModeSelect from "../../../components/shared-theme/ColorModeSelect";
 import { GoogleIcon, SitemarkIcon } from "../../../components/CustomIcons";
 import { useAuthStore } from "../../../store/useAuthStore";
-import { signupUser } from "../api";
+import { signupUser, startGoogleOAuth } from "../api";
 
 const Card = styled(MuiCard)(({ theme }) => ({
     display: "flex",
@@ -419,7 +419,7 @@ const SignUp: React.FC<Props> = (props) => {
                         <Button
                             fullWidth
                             variant="outlined"
-                            onClick={() => alert("Google OAuth not wired yet")}
+                            onClick={() => startGoogleOAuth()}
                             startIcon={<GoogleIcon />}
                             sx={{ py: 1.1 }}
                         >
