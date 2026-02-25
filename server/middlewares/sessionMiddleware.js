@@ -5,6 +5,7 @@ const session = require("express-session");
 const { RedisStore } = require("connect-redis");
 const redis = require("redis");
 const logger = require("../utils/logger");
+const isProd = process.env.NODE_ENV === "production";
 
 const redisClient = redis.createClient({
     url: process.env.REDIS_URL,
@@ -33,7 +34,7 @@ try {
         saveUninitialized: false,
         name: "sessionId",
         cookie: {
-            secure: false, // Set to true in production (true: only transmit cookies over HTTPS)
+            secure: isProd, // Set to true in production (true: only transmit cookies over HTTPS)
             httpOnly: true, // Set to true in production (true: client side JS cannot access the cookie)
             sameSite: "lax",
         },

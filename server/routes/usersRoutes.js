@@ -1,4 +1,4 @@
-// middlewares/usersRoutesHandler.js
+// routes/usersRoutes.js
 
 const express = require("express");
 const usersRoutes = express.Router();
@@ -28,6 +28,7 @@ const {
     validateResetPasswordRules,
     handleValidationErrors,
 } = require("../middlewares/validationMiddleware");
+const { loginLimiter } = require("../middlewares/rateLimiters");
 
 const {
     isAuthenticated,
@@ -37,6 +38,7 @@ const { hasRole } = require("../middlewares/roleMiddleware");
 
 usersRoutes.post(
     "/signup",
+    loginLimiter,
     validateSignupRules,
     handleValidationErrors,
     createUsers,
@@ -45,6 +47,7 @@ usersRoutes.post(
 
 usersRoutes.post(
     "/login",
+    loginLimiter,
     validationLoginRules,
     handleValidationErrors,
     userLogin,
@@ -53,6 +56,7 @@ usersRoutes.post(
 
 usersRoutes.post(
     "/forgot-password",
+    loginLimiter,
     validateForgotPasswordRules,
     handleValidationErrors,
     requestPasswordReset,
@@ -61,6 +65,7 @@ usersRoutes.post(
 
 usersRoutes.post(
     "/reset-password",
+    loginLimiter,
     validateResetPasswordRules,
     handleValidationErrors,
     resetPassword,
@@ -84,6 +89,7 @@ usersRoutes.patch("/me", isAuthenticated, updateCurrentUser, errorHandler);
 
 usersRoutes.post(
     "/me/reauth",
+    loginLimiter,
     isAuthenticated,
     reauthCurrentUser,
     errorHandler,

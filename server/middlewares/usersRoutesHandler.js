@@ -1,5 +1,6 @@
 // middlwares/usersRoutesHandler.js
 
+require("dotenv").config();
 const { compare } = require("bcryptjs");
 const crypto = require("crypto");
 const { hashPassword } = require("../utils/hashPass");
@@ -89,6 +90,8 @@ const userLogin = async (request, response, next) => {
         logger.info(`Request body: ${JSON.stringify(filteredBody)}`); // Log filtered body
 
         const matchUser = await loginCheck({ ...request.body });
+
+        // wrong credentials
         if (!matchUser) {
             logger.error(
                 `[userHandlers > userLogin] User login failed: email or password is wrong!`,
@@ -99,6 +102,16 @@ const userLogin = async (request, response, next) => {
             });
             return false;
         }
+
+        // google-only accounts
+        if (matchUser?.blocked && matchUser?.reason === "google_only") {
+            return response.status(401).json({
+                success: false,
+                message: "Please sign in with Google for this account.",
+                reason: "google_only",
+            });
+        }
+
         logger.info(
             `User logged in successfully: user_id ${JSON.stringify(
                 matchUser.id,
@@ -153,10 +166,11 @@ const userLoggedOut = async (request, response, next) => {
                 );
                 return next(error); // Pass the error to the error handler middleware
             }
+            const isProd = process.env.NODE_ENV === "production";
             response.clearCookie("sessionId", {
                 httpOnly: true,
                 sameSite: "lax",
-                secure: false, // true in production behind HTTPS
+                secure: isProd, // true in production behind HTTPS
             }); // Clear the session cookie
             logger.info("Session cookie cleared");
             response

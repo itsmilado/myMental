@@ -1,5 +1,6 @@
 // middlewares/oauthRoutesHandler.js
 
+require("dotenv").config();
 const crypto = require("crypto");
 const { OAuth2Client } = require("google-auth-library");
 const logger = require("../utils/logger");
