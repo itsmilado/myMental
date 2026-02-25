@@ -8,6 +8,8 @@ CREATE TABLE users (
   email VARCHAR(255) UNIQUE NOT NULL,
   isconfirmed BOOLEAN DEFAULT false,
   hashed_password VARCHAR(255) NOT NULL,
+  auth_provider VARCHAR(20) NOT NULL DEFAULT 'local',
+  google_sub TEXT UNIQUE,
   user_role VARCHAR(50) NOT NULL,
   preferences JSONB NOT NULL DEFAULT '{}'::JSONB,
   pending_email VARCHAR(255),

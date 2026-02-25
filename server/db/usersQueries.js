@@ -9,28 +9,59 @@ const createUserQuery = async ({
     email,
     hashed_password,
     user_role,
+    auth_provider = "local",
+    google_sub = null,
 }) => {
     try {
-        const insertQuery = `INSERT INTO users (first_name, last_name, email, hashed_password, user_role) 
-            VALUES ($1, $2, $3, $4, $5) RETURNING *`;
+        const insertQuery = `
+            INSERT INTO users (
+                first_name,
+                last_name,
+                email,
+                hashed_password,
+                user_role,
+                auth_provider,
+                google_sub
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *;
+        `;
+
         const insertValues = [
             first_name,
             last_name,
             email,
             hashed_password,
             user_role,
+            auth_provider,
+            google_sub,
         ];
 
         const createdUser = await pool.query(insertQuery, insertValues);
-
         return createdUser.rows[0];
     } catch (error) {
-        logger.error(
-            `[usersQueries > createUser] => Error creating user: ${error.message}`,
-        );
-
-        throw error; // Rethrow the error to be caught in the calling function
+        logger.error(`[createUserQuery] Error: ${error.message}`);
+        throw error;
     }
+};
+
+// find by google_sub
+const getUserByGoogleSubQuery = async ({ google_sub }) => {
+    const q = `SELECT * FROM users WHERE google_sub = $1 LIMIT 1;`;
+    const r = await pool.query(q, [google_sub]);
+    return r.rows[0] || null;
+};
+
+// link google_sub/auth_provider to existing user
+const linkGoogleSubByIdQuery = async ({ id, google_sub }) => {
+    const q = `
+        UPDATE users
+        SET google_sub = COALESCE(google_sub, $2)
+        WHERE id = $1
+        RETURNING *;
+    `;
+    const r = await pool.query(q, [id, google_sub]);
+    return r.rows[0] || null;
 };
 
 const getUserByIdQuery = async ({ id }) => {
@@ -300,4 +331,6 @@ module.exports = {
     setPasswordResetTokenByIdQuery,
     getUserByPasswordResetTokenHashQuery,
     clearPasswordResetTokenByIdQuery,
+    getUserByGoogleSubQuery,
+    linkGoogleSubByIdQuery,
 };

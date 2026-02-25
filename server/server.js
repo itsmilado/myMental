@@ -9,6 +9,7 @@ const logger = require("./utils/logger");
 const { sessionMiddleware } = require("./middlewares/sessionMiddleware");
 const { usersRoutes } = require("./routes/usersRoutes");
 const { transcriptionRoutes } = require("./routes/transcriptionRoutes");
+const { oauthRoutes } = require("./routes/oauthRoutes");
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "client", "public")));
@@ -18,6 +19,7 @@ app.use(bodyParser.json());
 app.use(sessionMiddleware);
 app.use("/transcription", transcriptionRoutes);
 app.use("/users", usersRoutes);
+app.use("/auth", oauthRoutes);
 
 // Start the server
 const PORT = process.env.PORT || 5000;
