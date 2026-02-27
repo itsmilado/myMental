@@ -6,7 +6,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     user: null,
     authReady: false,
 
-    setUser: (user) => set({ user }),
+    setUser: (user) => set({ user, authReady: true }),
     clearUser: () => set({ user: null, authReady: true }),
 
     hydrateUser: async () => {

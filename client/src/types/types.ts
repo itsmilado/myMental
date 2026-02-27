@@ -110,6 +110,9 @@ export interface User {
     isconfirmed: boolean;
     created_at: string;
     pending_email?: string | null;
+    user_role?: string;
+    auth_provider?: "local" | "google";
+    google_sub?: string | null;
 }
 
 export type AuthState = {

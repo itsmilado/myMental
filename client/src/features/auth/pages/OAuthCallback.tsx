@@ -22,6 +22,21 @@ const OAuthCallback = () => {
     useEffect(() => {
         const run = async () => {
             const err = params.get("error");
+            const linkRequired = params.get("link_required") === "1";
+
+            if (linkRequired) {
+                if (err === "reauth_required") {
+                    setError(
+                        "Re-authentication is required to link Google. Go to Account and try again.",
+                    );
+                } else {
+                    setError(
+                        "A local account already exists for this email. For security, Google was not linked automatically. Please sign in with email/password and link Google from Account settings.",
+                    );
+                }
+                return;
+            }
+
             if (err) {
                 setError("Google sign-in failed. Please try again.");
                 return;
@@ -31,7 +46,7 @@ const OAuthCallback = () => {
                 const me = await fetchCurrentUser();
                 if (!me?.userData) throw new Error("Missing user");
                 setUser(me.userData);
-                navigate("/dashboard/transcriptions/history", {
+                navigate("/dashboard", {
                     replace: true,
                 });
             } catch {

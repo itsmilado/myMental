@@ -20,7 +20,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
     // Block rendering until auth state is known
     if (!authReady) {
-        return null; // Can replace with full-page loader later
+        return <div style={{ padding: 24 }}>Loading…</div>;
     }
 
     // Redirect only after hydration completes
