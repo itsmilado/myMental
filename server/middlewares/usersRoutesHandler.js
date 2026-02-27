@@ -965,6 +965,8 @@ const serializeUserInfo = (user) => {
         isconfirmed: user.isconfirmed,
         user_role: user.user_role,
         created_at: user.created_at,
+        auth_provider: user.auth_provider,
+        google_sub: user.google_sub,
     };
 };
 

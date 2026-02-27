@@ -1,6 +1,5 @@
 // middlewares/oauthRoutesHandler.js
 
-require("dotenv").config();
 const crypto = require("crypto");
 const { OAuth2Client } = require("google-auth-library");
 const logger = require("../utils/logger");
@@ -34,12 +33,27 @@ const requireGoogleEnv = () => {
     }
 };
 
+const getOAuthIntent = (req) => {
+    const raw = String(req.query?.intent || "signin").toLowerCase();
+    if (raw !== "signin" && raw !== "link") return "signin";
+    return raw;
+};
+
+const hasRecentReauth = (req, windowMs = 1000 * 60 * 5) => {
+    const ts = req.session?.reauthenticatedAt;
+    if (!ts) return false;
+    return Date.now() - ts <= windowMs;
+};
+
 const startGoogleOAuth = async (req, res, next) => {
     try {
         requireGoogleEnv();
 
         const state = crypto.randomBytes(24).toString("hex");
         req.session.oauthState = state;
+
+        // persist intent through the redirect round-trip
+        req.session.oauthIntent = getOAuthIntent(req);
 
         const url = oauth2.generateAuthUrl({
             access_type: "online",
@@ -62,16 +76,17 @@ const googleOAuthCallback = async (req, res, next) => {
         const code = String(req.query?.code || "");
         const state = String(req.query?.state || "");
         const sessionState = String(req.session?.oauthState || "");
+        const intent = String(req.session?.oauthIntent || "signin");
 
-        // one-time state
+        // one-time state/intent
         req.session.oauthState = null;
+        req.session.oauthIntent = null;
 
         if (!code || !state || !sessionState || state !== sessionState) {
             return res.redirect(oauthErrorRedirect);
         }
 
         const { tokens } = await oauth2.getToken(code);
-
         if (!tokens?.id_token) {
             return res.redirect(oauthErrorRedirect);
         }
@@ -95,53 +110,102 @@ const googleOAuthCallback = async (req, res, next) => {
             return res.redirect(oauthErrorRedirect);
         }
 
-        // 1) already linked by google_sub
+        // 1) already linked by google_sub -> login
         let user = await getUserByGoogleSubQuery({ google_sub });
-
-        // 2) else: match by email (link local account)
-        if (!user) {
-            const byEmail = await getUserByEmailQuery({ email });
-            if (byEmail) {
-                // if account exists but is linked to different google_sub, block
-                if (byEmail.google_sub && byEmail.google_sub !== google_sub) {
-                    return res.redirect(
-                        `${oauthErrorRedirect}&reason=conflict`,
-                    );
-                }
-
-                user = await linkGoogleSubByIdQuery({
-                    id: byEmail.id,
-                    google_sub,
-                });
-            }
+        if (user) {
+            req.session.user = {
+                id: user.id,
+                email: user.email,
+                role: user.user_role,
+            };
+            return req.session.save(() => res.redirect(oauthSuccessRedirect));
         }
 
-        // 3) else: create a new user with provider=google
-        if (!user) {
-            // required by schema; do not allow password login for google users unless later “set password”
-            const randomPassword = crypto.randomBytes(32).toString("hex");
-            const hashed_password = await hashPassword(randomPassword);
+        // 2) LINK INTENT: only explicit linking allowed (no silent linking)
+        if (intent === "link") {
+            const sessionUser = req.session?.user;
 
-            user = await createUserQuery({
-                first_name,
-                last_name,
-                email,
-                hashed_password,
-                user_role: "user",
-                auth_provider: "google",
+            if (!sessionUser) {
+                return res.redirect(
+                    `${oauthSuccessRedirect}?error=login_required&link_required=1`,
+                );
+            }
+
+            if (!hasRecentReauth(req)) {
+                return res.redirect(
+                    `${oauthSuccessRedirect}?error=reauth_required&link_required=1`,
+                );
+            }
+
+            // must match the currently logged-in account (prevents linking wrong google identity)
+            if (String(sessionUser.email || "").toLowerCase() !== email) {
+                return res.redirect(
+                    `${oauthSuccessRedirect}?error=email_mismatch&link_required=1`,
+                );
+            }
+
+            const byEmail = await getUserByEmailQuery({ email });
+            if (!byEmail || byEmail.id !== sessionUser.id) {
+                return res.redirect(
+                    `${oauthSuccessRedirect}?error=account_mismatch&link_required=1`,
+                );
+            }
+
+            // collision guard
+            if (byEmail.google_sub && byEmail.google_sub !== google_sub) {
+                return res.redirect(`${oauthErrorRedirect}&reason=conflict`);
+            }
+
+            user = await linkGoogleSubByIdQuery({
+                id: byEmail.id,
                 google_sub,
             });
+
+            req.session.user = {
+                id: user.id,
+                email: user.email,
+                role: user.user_role,
+            };
+
+            return req.session.save(() =>
+                res.redirect(`${oauthSuccessRedirect}?linked=1`),
+            );
         }
 
-        // session login
+        // 3) SIGNIN INTENT: if email matches existing user, DO NOT auto-link
+        const byEmail = await getUserByEmailQuery({ email });
+        if (byEmail) {
+            // if email is already linked to a different google_sub, block
+            if (byEmail.google_sub && byEmail.google_sub !== google_sub) {
+                return res.redirect(`${oauthErrorRedirect}&reason=conflict`);
+            }
+
+            // Secure policy (#103): prevent silent linking
+            // Require user to link explicitly from Account settings with reauth.
+            return res.redirect(`${oauthSuccessRedirect}?link_required=1`);
+        }
+
+        // 4) else: create a new user with provider=google
+        const randomPassword = crypto.randomBytes(32).toString("hex");
+        const hashed_password = await hashPassword(randomPassword);
+
+        user = await createUserQuery({
+            first_name,
+            last_name,
+            email,
+            hashed_password,
+            user_role: "user",
+            auth_provider: "google",
+            google_sub,
+        });
+
         req.session.user = {
             id: user.id,
             email: user.email,
             role: user.user_role,
         };
 
-        // persistent cookie behavior
-        req.session.save(() => res.redirect(oauthSuccessRedirect));
+        return req.session.save(() => res.redirect(oauthSuccessRedirect));
     } catch (err) {
         logger.error(`[googleOAuthCallback] => ${err.message}`);
         return res.redirect(oauthErrorRedirect);
