@@ -1,7 +1,7 @@
 // src/features/auth/pages/SignUp.tsx
 
 import * as React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link as RouterLink } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
@@ -185,11 +185,6 @@ const SignUp: React.FC<Props> = (props) => {
             );
             setLoading(false);
         }
-    };
-
-    const goToSignIn = (e: React.MouseEvent) => {
-        e.preventDefault();
-        navigate("/sign-in", { replace: true });
     };
 
     return (
@@ -432,9 +427,9 @@ const SignUp: React.FC<Props> = (props) => {
                         >
                             Already have an account?{" "}
                             <Link
-                                href="/sign-in"
-                                onClick={goToSignIn}
-                                variant="body2"
+                                component={RouterLink}
+                                to="/sign-in"
+                                underline="hover"
                             >
                                 Sign in
                             </Link>

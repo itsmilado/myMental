@@ -1,6 +1,7 @@
 // src/features/auth/pages/Sign-In.tsx
 
 import * as React from "react";
+import { Link as RouterLink } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
@@ -289,6 +290,19 @@ export default function SignIn(props: { disableCustomTheme?: boolean }) {
                             Sign in with Google
                         </Button>
                     </Box>
+                    <Typography
+                        variant="body2"
+                        sx={{ mt: 2, textAlign: "center" }}
+                    >
+                        Don't have an account?{" "}
+                        <Link
+                            component={RouterLink}
+                            to="/sign-up"
+                            underline="hover"
+                        >
+                            Sign up
+                        </Link>
+                    </Typography>
                 </Card>
             </SignInContainer>
         </AppTheme>
