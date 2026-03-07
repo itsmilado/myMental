@@ -6,6 +6,7 @@ const logger = require("../utils/logger");
 const { hashPassword } = require("../utils/hashPass");
 const {
     getUserByEmailQuery,
+    getUserByIdQuery,
     createUserQuery,
     getUserByGoogleSubQuery,
     linkGoogleSubByIdQuery,
@@ -17,7 +18,8 @@ const googleRedirectUri = process.env.GOOGLE_REDIRECT_URI;
 
 const appOrigin = process.env.APP_ORIGIN || "http://localhost:3002";
 const oauthSuccessRedirect = `${appOrigin}/oauth/callback`;
-const oauthErrorRedirect = `${appOrigin}/oauth/callback?error=oauth_failed`;
+const oauthErrorRedirect = `${appOrigin}/oauth/callback?error=Google sign-in failed. Please try again.`;
+const accountRedirectBase = `${appOrigin}/dashboard/account`;
 
 const oauth2 = new OAuth2Client({
     clientId: googleClientId,
@@ -33,10 +35,28 @@ const requireGoogleEnv = () => {
     }
 };
 
+const redirectWithParams = (base, params = {}) => {
+    const url = new URL(base);
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+            url.searchParams.set(key, String(value));
+        }
+    });
+    return url.toString();
+};
+
 const getOAuthIntent = (req) => {
     const raw = String(req.query?.intent || "signin").toLowerCase();
-    if (raw !== "signin" && raw !== "link") return "signin";
-    return raw;
+
+    const allowed = new Set([
+        "signin",
+        "link",
+        "reauth_email",
+        "reauth_delete",
+        "reauth_unlink",
+    ]);
+
+    return allowed.has(raw) ? raw : "signin";
 };
 
 const hasRecentReauth = (req, windowMs = 1000 * 60 * 5) => {
@@ -51,8 +71,6 @@ const startGoogleOAuth = async (req, res, next) => {
 
         const state = crypto.randomBytes(24).toString("hex");
         req.session.oauthState = state;
-
-        // persist intent through the redirect round-trip
         req.session.oauthIntent = getOAuthIntent(req);
 
         const url = oauth2.generateAuthUrl({
@@ -69,7 +87,7 @@ const startGoogleOAuth = async (req, res, next) => {
     }
 };
 
-const googleOAuthCallback = async (req, res, next) => {
+const googleOAuthCallback = async (req, res) => {
     try {
         requireGoogleEnv();
 
@@ -78,7 +96,6 @@ const googleOAuthCallback = async (req, res, next) => {
         const sessionState = String(req.session?.oauthState || "");
         const intent = String(req.session?.oauthIntent || "signin");
 
-        // one-time state/intent
         req.session.oauthState = null;
         req.session.oauthIntent = null;
 
@@ -110,53 +127,112 @@ const googleOAuthCallback = async (req, res, next) => {
             return res.redirect(oauthErrorRedirect);
         }
 
-        // 1) already linked by google_sub -> login
-        let user = await getUserByGoogleSubQuery({ google_sub });
-        if (user) {
-            req.session.user = {
-                id: user.id,
-                email: user.email,
-                role: user.user_role,
-            };
-            return req.session.save(() => res.redirect(oauthSuccessRedirect));
+        const isReauthIntent =
+            intent === "reauth_email" ||
+            intent === "reauth_delete" ||
+            intent === "reauth_unlink";
+
+        if (isReauthIntent) {
+            const sessionUser = req.session?.user;
+
+            if (!sessionUser?.id) {
+                return res.redirect(
+                    redirectWithParams(accountRedirectBase, {
+                        error: "Please sign in again to continue.",
+                    }),
+                );
+            }
+
+            const currentUser = await getUserByIdQuery({ id: sessionUser.id });
+            if (!currentUser) {
+                return res.redirect(
+                    redirectWithParams(accountRedirectBase, {
+                        error: "User not found.",
+                    }),
+                );
+            }
+
+            if (!currentUser.google_sub) {
+                return res.redirect(
+                    redirectWithParams(accountRedirectBase, {
+                        error: "Google sign-in is not linked to this account.",
+                    }),
+                );
+            }
+
+            if (String(currentUser.google_sub) !== String(google_sub)) {
+                return res.redirect(
+                    redirectWithParams(accountRedirectBase, {
+                        error: "The selected Google account does not match this user.",
+                    }),
+                );
+            }
+
+            req.session.reauthenticatedAt = Date.now();
+
+            const mappedIntent =
+                intent === "reauth_email"
+                    ? "email"
+                    : intent === "reauth_delete"
+                      ? "delete"
+                      : "unlink";
+
+            return req.session.save(() =>
+                res.redirect(
+                    redirectWithParams(accountRedirectBase, {
+                        reauth: "success",
+                        intent: mappedIntent,
+                        message: "Identity verified successfully.",
+                    }),
+                ),
+            );
         }
 
-        // 2) LINK INTENT: only explicit linking allowed (no silent linking)
         if (intent === "link") {
             const sessionUser = req.session?.user;
 
             if (!sessionUser) {
                 return res.redirect(
-                    `${oauthSuccessRedirect}?error=login_required&link_required=1`,
+                    redirectWithParams(accountRedirectBase, {
+                        error: "You need to be signed in before linking Google.",
+                    }),
                 );
             }
 
             if (!hasRecentReauth(req)) {
                 return res.redirect(
-                    `${oauthSuccessRedirect}?error=reauth_required&link_required=1`,
+                    redirectWithParams(accountRedirectBase, {
+                        error: "Please re-authenticate before linking Google.",
+                    }),
                 );
             }
 
-            // must match the currently logged-in account (prevents linking wrong google identity)
             if (String(sessionUser.email || "").toLowerCase() !== email) {
                 return res.redirect(
-                    `${oauthSuccessRedirect}?error=email_mismatch&link_required=1`,
+                    redirectWithParams(accountRedirectBase, {
+                        error: "Use the Google account that matches your current email address.",
+                    }),
                 );
             }
 
             const byEmail = await getUserByEmailQuery({ email });
             if (!byEmail || byEmail.id !== sessionUser.id) {
                 return res.redirect(
-                    `${oauthSuccessRedirect}?error=account_mismatch&link_required=1`,
+                    redirectWithParams(accountRedirectBase, {
+                        error: "This Google account does not match the signed-in user.",
+                    }),
                 );
             }
 
-            // collision guard
             if (byEmail.google_sub && byEmail.google_sub !== google_sub) {
-                return res.redirect(`${oauthErrorRedirect}&reason=conflict`);
+                return res.redirect(
+                    redirectWithParams(accountRedirectBase, {
+                        error: "A different Google account is already linked here.",
+                    }),
+                );
             }
 
-            user = await linkGoogleSubByIdQuery({
+            const user = await linkGoogleSubByIdQuery({
                 id: byEmail.id,
                 google_sub,
             });
@@ -168,24 +244,38 @@ const googleOAuthCallback = async (req, res, next) => {
             };
 
             return req.session.save(() =>
-                res.redirect(`${oauthSuccessRedirect}?linked=1`),
+                res.redirect(
+                    redirectWithParams(accountRedirectBase, {
+                        linked: 1,
+                        message: "Google sign-in linked successfully.",
+                    }),
+                ),
             );
         }
 
-        // 3) SIGNIN INTENT: if email matches existing user, DO NOT auto-link
-        const byEmail = await getUserByEmailQuery({ email });
-        if (byEmail) {
-            // if email is already linked to a different google_sub, block
-            if (byEmail.google_sub && byEmail.google_sub !== google_sub) {
-                return res.redirect(`${oauthErrorRedirect}&reason=conflict`);
-            }
-
-            // Secure policy (#103): prevent silent linking
-            // Require user to link explicitly from Account settings with reauth.
-            return res.redirect(`${oauthSuccessRedirect}?link_required=1`);
+        let user = await getUserByGoogleSubQuery({ google_sub });
+        if (user) {
+            req.session.user = {
+                id: user.id,
+                email: user.email,
+                role: user.user_role,
+            };
+            return req.session.save(() => res.redirect(oauthSuccessRedirect));
         }
 
-        // 4) else: create a new user with provider=google
+        const byEmail = await getUserByEmailQuery({ email });
+        if (byEmail) {
+            if (byEmail.google_sub && byEmail.google_sub !== google_sub) {
+                return res.redirect(
+                    `${oauthSuccessRedirect}?error=This Google account conflicts with an existing linked account.`,
+                );
+            }
+
+            return res.redirect(
+                `${oauthSuccessRedirect}?error=This email already exists. Sign in normally and link Google from Account settings.`,
+            );
+        }
+
         const randomPassword = crypto.randomBytes(32).toString("hex");
         const hashed_password = await hashPassword(randomPassword);
 
