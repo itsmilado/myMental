@@ -15,8 +15,10 @@ const {
     reauthCurrentUser,
     deleteMe,
     changeMyPassword,
+    requestCurrentEmailConfirmation,
     requestEmailChange,
-    confirmEmailChange,
+    confirmEmail,
+    unlinkMyGoogle,
     requestPasswordReset,
     resetPassword,
 } = require("../middlewares/usersRoutesHandler");
@@ -133,29 +135,21 @@ usersRoutes.post(
     errorHandler,
 );
 
-usersRoutes.get("/confirm-email", confirmEmailChange, errorHandler);
+usersRoutes.post(
+    "/me/confirm-email/request",
+    isAuthenticated,
+    requestCurrentEmailConfirmation,
+    errorHandler,
+);
 
-// usersRoutes.get("/test-email", async (req, res) => {
-//     try {
-//         await sendEmail({
-//             to: "khoshkaran.milad@gmail.com", // must be verified if in sandbox
-//             subject: "SES Test Email",
-//             text: "If you received this, SES is working correctly.",
-//         });
+usersRoutes.post(
+    "/me/unlink-google",
+    isAuthenticated,
+    requireRecentReauth(),
+    unlinkMyGoogle,
+    errorHandler,
+);
 
-//         res.json({ message: "Email sent successfully" });
-//     } catch (error) {
-//         console.error("SES Error:", error);
-//         res.status(500).json({ error: "Failed to send email" });
-//     }
-// });
+usersRoutes.get("/confirm-email", confirmEmail, errorHandler);
 
 module.exports = { usersRoutes };
-
-// usersRoutes.get(
-//     "/admin",
-//     isAuthenticated,
-//     hasRole("admin"),
-//     adminProfile,
-//     errorHandler
-// );

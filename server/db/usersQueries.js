@@ -204,9 +204,13 @@ const updateUserPasswordByIdQuery = async ({ id, hashed_password }) => {
     try {
         const q = `
             UPDATE users
-            SET hashed_password = $2
+            SET hashed_password = $2,
+                auth_provider = CASE
+                    WHEN google_sub IS NOT NULL THEN 'local'
+                    ELSE auth_provider
+                END
             WHERE id = $1
-            RETURNING id;
+            RETURNING *;
         `;
         const res = await pool.query(q, [id, hashed_password]);
         return res.rows[0] || null;
@@ -228,12 +232,56 @@ const setPendingEmailChangeQuery = async ({
         UPDATE users
         SET pending_email = $2,
             email_confirm_token_hash = $3,
-            email_confirm_expires_at = $4,
-            "isconfirmed" = FALSE
+            email_confirm_expires_at = $4
         WHERE id = $1
         RETURNING *;
     `;
     const r = await pool.query(q, [id, pending_email, token_hash, expires_at]);
+    return r.rows[0] || null;
+};
+
+const setEmailConfirmationTokenByIdQuery = async ({
+    id,
+    token_hash,
+    expires_at,
+}) => {
+    const q = `
+        UPDATE users
+        SET email_confirm_token_hash = $2,
+            email_confirm_expires_at = $3
+        WHERE id = $1
+        RETURNING *;
+    `;
+    const r = await pool.query(q, [id, token_hash, expires_at]);
+    return r.rows[0] || null;
+};
+
+const confirmEmailByTokenHashQuery = async ({ token_hash }) => {
+    const q = `
+        UPDATE users
+        SET email = COALESCE(pending_email, email),
+            pending_email = NULL,
+            email_confirm_token_hash = NULL,
+            email_confirm_expires_at = NULL,
+            "isconfirmed" = TRUE
+        WHERE email_confirm_token_hash = $1
+          AND email_confirm_expires_at IS NOT NULL
+          AND email_confirm_expires_at > NOW()
+        RETURNING *;
+    `;
+    const r = await pool.query(q, [token_hash]);
+    return r.rows[0] || null;
+};
+
+const unlinkGoogleByIdQuery = async ({ id }) => {
+    const q = `
+        UPDATE users
+        SET google_sub = NULL,
+            auth_provider = 'local'
+        WHERE id = $1
+        RETURNING *;
+    `;
+    const r = await pool.query(q, [id]);
     return r.rows[0] || null;
 };
 
@@ -333,4 +381,7 @@ module.exports = {
     clearPasswordResetTokenByIdQuery,
     getUserByGoogleSubQuery,
     linkGoogleSubByIdQuery,
+    unlinkGoogleByIdQuery,
+    confirmEmailByTokenHashQuery,
+    setEmailConfirmationTokenByIdQuery,
 };

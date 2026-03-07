@@ -17,10 +17,13 @@ const {
     updateUserPreferencesByIdQuery,
     updateUserPasswordByIdQuery,
     setPendingEmailChangeQuery,
-    confirmPendingEmailByTokenHashQuery,
+    // confirmPendingEmailByTokenHashQuery,
     setPasswordResetTokenByIdQuery,
     getUserByPasswordResetTokenHashQuery,
     clearPasswordResetTokenByIdQuery,
+    unlinkGoogleByIdQuery,
+    confirmEmailByTokenHashQuery,
+    setEmailConfirmationTokenByIdQuery,
 } = require("../db/usersQueries");
 const {
     deleteTranscriptionTxtFile,
@@ -472,7 +475,7 @@ const reauthCurrentUser = async (request, response, next) => {
         if (!password || typeof password !== "string" || password.length < 1) {
             return response.status(400).json({
                 success: false,
-                message: "Password is required",
+                message: "Password is required.",
             });
         }
 
@@ -480,7 +483,15 @@ const reauthCurrentUser = async (request, response, next) => {
         if (!user) {
             return response.status(404).json({
                 success: false,
-                message: "User not found",
+                message: "User not found.",
+            });
+        }
+
+        if (user.auth_provider === "google") {
+            return response.status(400).json({
+                success: false,
+                message:
+                    "This account uses Google sign-in. Please continue with Google to verify your identity.",
             });
         }
 
@@ -488,7 +499,7 @@ const reauthCurrentUser = async (request, response, next) => {
         if (!ok) {
             return response.status(401).json({
                 success: false,
-                message: "Password is incorrect",
+                message: "Password is incorrect.",
             });
         }
 
@@ -497,12 +508,63 @@ const reauthCurrentUser = async (request, response, next) => {
 
         return response.status(200).json({
             success: true,
-            message: "Re-authenticated",
+            message: "Re-authenticated.",
             reauthenticatedAt: now,
             validForMs: REAUTH_WINDOW_MS,
         });
     } catch (error) {
         logger.error(`[reauthCurrentUser] => Error: ${error.message}`);
+        next(error);
+    }
+};
+
+const unlinkMyGoogle = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`,
+        );
+
+        const sessionUser = request.session?.user;
+        if (!sessionUser?.id) {
+            return response.status(401).json({
+                success: false,
+                message: "Not authenticated.",
+            });
+        }
+
+        const user = await getUserByIdQuery({ id: sessionUser.id });
+        if (!user) {
+            return response.status(404).json({
+                success: false,
+                message: "User not found.",
+            });
+        }
+
+        if (!user.google_sub) {
+            return response.status(400).json({
+                success: false,
+                message: "Google sign-in is not linked to this account.",
+            });
+        }
+
+        if (user.auth_provider === "google") {
+            return response.status(400).json({
+                success: false,
+                message:
+                    "Set a password first from the password reset flow, then remove Google sign-in.",
+            });
+        }
+
+        const updated = await unlinkGoogleByIdQuery({ id: user.id });
+        request.session.reauthenticatedAt = null;
+
+        return response.status(200).json({
+            success: true,
+            message: "Google sign-in removed successfully.",
+            userData: serializeUserInfo(updated),
+        });
+    } catch (error) {
+        logger.error(`[unlinkMyGoogle] => Error: ${error.message}`);
         next(error);
     }
 };
@@ -699,6 +761,76 @@ const changeMyPassword = async (request, response, next) => {
     }
 };
 
+const requestCurrentEmailConfirmation = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`,
+        );
+
+        const sessionUser = request.session?.user;
+        if (!sessionUser?.id) {
+            return response.status(401).json({
+                success: false,
+                message: "Not authenticated.",
+            });
+        }
+
+        const user = await getUserByIdQuery({ id: sessionUser.id });
+        if (!user) {
+            return response.status(404).json({
+                success: false,
+                message: "User not found.",
+            });
+        }
+
+        if (user.pending_email) {
+            return response.status(409).json({
+                success: false,
+                message:
+                    "Finish confirming your pending email change before confirming your current email again.",
+            });
+        }
+
+        if (user.isconfirmed) {
+            return response.status(200).json({
+                success: true,
+                message: "Your current email is already confirmed.",
+            });
+        }
+
+        const { token, token_hash, expires_at } = createEmailToken();
+
+        await setEmailConfirmationTokenByIdQuery({
+            id: user.id,
+            token_hash,
+            expires_at,
+        });
+
+        const confirmUrl = buildConfirmEmailUrl(token);
+
+        await sendEmail({
+            to: user.email,
+            subject: "Confirm your email for myMental",
+            text: `Confirm your email by opening this link: ${confirmUrl}`,
+            html: `
+                <p>Please confirm your email by clicking the link below:</p>
+                <p><a href="${confirmUrl}">Confirm email</a></p>
+                <p>This link expires in 24 hours.</p>
+            `,
+        });
+
+        return response.status(200).json({
+            success: true,
+            message: "Confirmation email sent to your current email address.",
+        });
+    } catch (error) {
+        logger.error(
+            `[requestCurrentEmailConfirmation] => Error: ${error.message}`,
+        );
+        next(error);
+    }
+};
+
 const requestEmailChange = async (request, response, next) => {
     try {
         logger.info(
@@ -709,7 +841,15 @@ const requestEmailChange = async (request, response, next) => {
         if (!sessionUser?.id) {
             return response.status(401).json({
                 success: false,
-                message: "Not authenticated",
+                message: "Not authenticated.",
+            });
+        }
+
+        const user = await getUserByIdQuery({ id: sessionUser.id });
+        if (!user) {
+            return response.status(404).json({
+                success: false,
+                message: "User not found.",
             });
         }
 
@@ -717,27 +857,36 @@ const requestEmailChange = async (request, response, next) => {
         if (!newEmailRaw || !isValidEmail(newEmailRaw)) {
             return response.status(400).json({
                 success: false,
-                message: "Invalid email",
+                message: "Enter a valid email address.",
             });
         }
 
         const new_email = String(newEmailRaw).trim().toLowerCase();
 
+        if (new_email === String(user.email).trim().toLowerCase()) {
+            return response.status(400).json({
+                success: false,
+                message: "Enter a different email address.",
+            });
+        }
+
+        if (user.pending_email && user.pending_email !== new_email) {
+            return response.status(409).json({
+                success: false,
+                message:
+                    "You already have a pending email change. Confirm it first before starting another one.",
+            });
+        }
+
         const existing = await getUserByEmailQuery({ email: new_email });
         if (existing && String(existing.id) !== String(sessionUser.id)) {
             return response.status(409).json({
                 success: false,
-                message: "Email already in use",
+                message: "That email is already in use.",
             });
         }
 
-        const token = crypto.randomBytes(32).toString("hex");
-        const token_hash = crypto
-            .createHash("sha256")
-            .update(token)
-            .digest("hex");
-
-        const expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24h
+        const { token, token_hash, expires_at } = createEmailToken();
 
         await setPendingEmailChangeQuery({
             id: sessionUser.id,
@@ -746,23 +895,22 @@ const requestEmailChange = async (request, response, next) => {
             expires_at,
         });
 
-        const baseUrl = process.env.APP_ORIGIN || "http://localhost:3002";
-        const confirmUrl = `${baseUrl}/confirm-email?token=${token}`;
+        const confirmUrl = buildConfirmEmailUrl(token);
 
         await sendEmail({
             to: new_email,
-            subject: "Confirm your email for myMental",
+            subject: "Confirm your new email for myMental",
             text: `Confirm your email change by opening this link: ${confirmUrl}`,
             html: `
-                <p>Confirm your email change by clicking the link below:</p>
-                <p><a href="${confirmUrl}">Confirm email</a></p>
+                <p>Confirm your new email address by clicking the link below:</p>
+                <p><a href="${confirmUrl}">Confirm email change</a></p>
                 <p>This link expires in 24 hours.</p>
             `,
         });
 
         return response.status(200).json({
             success: true,
-            message: "Confirmation email sent",
+            message: "Confirmation email sent to your new email address.",
             pending_email: new_email,
         });
     } catch (error) {
@@ -771,7 +919,7 @@ const requestEmailChange = async (request, response, next) => {
     }
 };
 
-const confirmEmailChange = async (request, response, next) => {
+const confirmEmail = async (request, response, next) => {
     try {
         logger.info(
             `Incoming request to ${request.method} ${request.originalUrl}`,
@@ -781,7 +929,7 @@ const confirmEmailChange = async (request, response, next) => {
         if (!token) {
             return response.status(400).json({
                 success: false,
-                message: "Missing token",
+                message: "Missing confirmation token.",
             });
         }
 
@@ -790,14 +938,12 @@ const confirmEmailChange = async (request, response, next) => {
             .update(token)
             .digest("hex");
 
-        const updated = await confirmPendingEmailByTokenHashQuery({
-            token_hash,
-        });
+        const updated = await confirmEmailByTokenHashQuery({ token_hash });
 
         if (!updated) {
             return response.status(400).json({
                 success: false,
-                message: "Invalid or expired token",
+                message: "This confirmation link is invalid or has expired.",
             });
         }
 
@@ -810,11 +956,11 @@ const confirmEmailChange = async (request, response, next) => {
 
         return response.status(200).json({
             success: true,
-            message: "Email confirmed",
+            message: "Email confirmed successfully.",
             userData: serializeUserInfo(updated),
         });
     } catch (error) {
-        logger.error(`[confirmEmailChange] => Error: ${error.message}`);
+        logger.error(`[confirmEmail] => Error: ${error.message}`);
         next(error);
     }
 };
@@ -986,6 +1132,18 @@ const isValidEmail = (value) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 };
 
+const buildConfirmEmailUrl = (token) => {
+    const baseUrl = process.env.APP_ORIGIN || "http://localhost:3002";
+    return `${baseUrl}/confirm-email?token=${token}`;
+};
+
+const createEmailToken = () => {
+    const token = crypto.randomBytes(32).toString("hex");
+    const token_hash = crypto.createHash("sha256").update(token).digest("hex");
+    const expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24);
+    return { token, token_hash, expires_at };
+};
+
 module.exports = {
     createUsers,
     userLogin,
@@ -1000,7 +1158,9 @@ module.exports = {
     deleteMe,
     changeMyPassword,
     requestEmailChange,
-    confirmEmailChange,
+    requestCurrentEmailConfirmation,
+    confirmEmail,
     requestPasswordReset,
     resetPassword,
+    unlinkMyGoogle,
 };
