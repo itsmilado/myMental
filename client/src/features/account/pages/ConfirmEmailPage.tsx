@@ -1,4 +1,4 @@
-// src/features/account/pages/ConffirmEmailChange.tsx
+// src/features/account/pages/ConfirmEmailPage.tsx
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -37,7 +37,7 @@ const ConfirmEmailPage = () => {
         const run = async () => {
             if (!token) {
                 setSuccess(false);
-                setError("Missing token");
+                setError("Missing confirmation token.");
                 setLoading(false);
                 return;
             }
@@ -51,48 +51,42 @@ const ConfirmEmailPage = () => {
                 setUser(updated);
 
                 setSuccess(true);
-                setError("");
             } catch (e: any) {
-                // If success already happened (e.g., duplicate run), ignore the error
-                setSuccess((prev) => {
-                    if (prev) return prev;
-                    return false;
-                });
-
-                setError((prev) => {
-                    // If already confirmed successfully, keep UI success-only
-                    if (success) return "";
-                    return e?.message || "Email confirmation failed";
-                });
+                setError(e?.message || "Email confirmation failed.");
+                setSuccess(false);
             } finally {
                 setLoading(false);
             }
         };
 
         run();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token, setUser]);
 
     return (
         <Box sx={{ display: "flex", justifyContent: "center", mt: 6, px: 2 }}>
-            <Paper sx={{ p: 3, maxWidth: 520, width: "100%" }}>
+            <Paper sx={{ p: 3, maxWidth: 560, width: "100%", borderRadius: 3 }}>
                 <Stack spacing={2}>
                     <Typography variant="h5" fontWeight="bold">
                         Confirm email
+                    </Typography>
+
+                    <Typography variant="body2" color="text.secondary">
+                        This confirmation secures account recovery and completes
+                        any pending email verification or email-change request.
                     </Typography>
 
                     {loading ? (
                         <Stack direction="row" spacing={2} alignItems="center">
                             <CircularProgress size={22} />
                             <Typography color="text.secondary">
-                                Verifying…
+                                Verifying your email…
                             </Typography>
                         </Stack>
                     ) : null}
 
                     {!loading && success ? (
                         <Alert severity="success">
-                            Your email has been confirmed.
+                            Your email has been confirmed successfully.
                         </Alert>
                     ) : null}
 

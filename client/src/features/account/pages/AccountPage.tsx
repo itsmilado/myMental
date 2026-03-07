@@ -2,32 +2,34 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-    Box,
-    Paper,
-    Typography,
-    Stack,
-    Divider,
-    Button,
-    Snackbar,
     Alert,
-    TextField,
+    Avatar,
+    Box,
+    Button,
     Chip,
+    Divider,
+    Paper,
+    Snackbar,
+    Stack,
+    TextField,
+    Typography,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuthStore } from "../../../store/useAuthStore";
-
 import ReauthDialog from "../components/ReauthDialog";
 import DeleteAccountConfirmDialog from "../components/DeleteAccountConfirmDialog";
 import ChangePasswordDialog from "../components/ChangePasswordDialog";
 import ChangeEmailDialog from "../components/ChangeEmailDialog";
 
 import {
-    deleteMyAccount,
     changeMyPassword,
+    deleteMyAccount,
+    requestCurrentEmailConfirmation,
+    requestPasswordReset,
+    unlinkGoogleAccount,
     updateCurrentUser,
 } from "../../auth/api";
-
 import { API_BASE_URL } from "../../../api/apiClient";
 
 const isValidName = (value: string) => {
@@ -36,18 +38,53 @@ const isValidName = (value: string) => {
     return /^[A-Za-zÀ-ÖØ-öø-ÿ -]+$/.test(v);
 };
 
+const sectionCardSx = {
+    p: { xs: 2, md: 3 },
+    borderRadius: 3,
+};
+
+type ReauthAction = "delete" | "email" | "link" | "unlink" | null;
+
 const AccountPage = () => {
     const user = useAuthStore((s) => s.user);
     const setUser = useAuthStore((s) => s.setUser);
     const clearUser = useAuthStore((s) => s.clearUser);
 
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
 
-    // Profile edit state
     const [editingProfile, setEditingProfile] = useState(false);
     const [savingProfile, setSavingProfile] = useState(false);
     const [firstName, setFirstName] = useState(user?.first_name ?? "");
     const [lastName, setLastName] = useState(user?.last_name ?? "");
+
+    const [reauthOpen, setReauthOpen] = useState(false);
+    const [reauthAction, setReauthAction] = useState<ReauthAction>(null);
+    const [reauthMode, setReauthMode] = useState<"password" | "google">(
+        "password",
+    );
+    const [reauthTitle, setReauthTitle] = useState("Re-authenticate");
+    const [reauthDescription, setReauthDescription] = useState("");
+    const [reauthGoogleIntent, setReauthGoogleIntent] = useState<
+        "link" | "reauth_email" | "reauth_delete" | "reauth_unlink"
+    >("reauth_email");
+
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+
+    const [changePwOpen, setChangePwOpen] = useState(false);
+    const [changingPw, setChangingPw] = useState(false);
+
+    const [changeEmailOpen, setChangeEmailOpen] = useState(false);
+
+    const [sendingEmailConfirm, setSendingEmailConfirm] = useState(false);
+    const [removingGoogle, setRemovingGoogle] = useState(false);
+
+    const [toast, setToast] = useState<{
+        open: boolean;
+        message: string;
+        severity: "success" | "error" | "info";
+    }>({ open: false, message: "", severity: "success" });
 
     useEffect(() => {
         setFirstName(user?.first_name ?? "");
@@ -56,137 +93,128 @@ const AccountPage = () => {
 
     const profileValidation = useMemo(() => {
         if (!editingProfile) return { ok: true, reason: "" };
-        if (!isValidName(firstName))
-            return { ok: false, reason: "Invalid first name" };
-        if (!isValidName(lastName))
-            return { ok: false, reason: "Invalid last name" };
+
+        if (!isValidName(firstName)) {
+            return { ok: false, reason: "First name must be 1–30 letters." };
+        }
+
+        if (!isValidName(lastName)) {
+            return { ok: false, reason: "Last name must be 1–30 letters." };
+        }
+
         return { ok: true, reason: "" };
     }, [editingProfile, firstName, lastName]);
 
-    // Reauth gated flows
-    const [reauthDeleteOpen, setReauthDeleteOpen] = useState(false);
-    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-    const [deleting, setDeleting] = useState(false);
+    const authProvider = user?.auth_provider ?? "local";
+    const hasGoogleConnection = Boolean(user?.google_sub);
+    const isGooglePrimaryAccount = authProvider === "google";
+    const isEmailConfirmed = Boolean(user?.isconfirmed);
+    const pendingEmail = user?.pending_email ?? null;
+    const role = user?.user_role;
 
-    const [reauthPwOpen, setReauthPwOpen] = useState(false);
-    const [changePwOpen, setChangePwOpen] = useState(false);
-    const [changingPw, setChangingPw] = useState(false);
+    const initials =
+        `${user?.first_name?.[0] ?? ""}${user?.last_name?.[0] ?? ""}`.toUpperCase() ||
+        "U";
 
-    const [reauthEmailOpen, setReauthEmailOpen] = useState(false);
-    const [changeEmailOpen, setChangeEmailOpen] = useState(false);
-
-    // Link Google (explicit + reauth required)
-    const [reauthLinkGoogleOpen, setReauthLinkGoogleOpen] = useState(false);
-
-    const [toast, setToast] = useState<{
-        open: boolean;
-        message: string;
-        severity: "success" | "error" | "info";
-    }>({ open: false, message: "", severity: "success" });
-
-    const authProvider = (user as any)?.auth_provider as string | undefined;
-    const googleSub = (user as any)?.google_sub as string | undefined | null;
-    const role =
-        ((user as any)?.user_role as string | undefined) ??
-        ((user as any)?.role as string | undefined);
-
-    const isGoogleLinked = Boolean(googleSub) || authProvider === "google";
-
-    // Delete flow
-    const startDeleteFlow = () => setReauthDeleteOpen(true);
-    const handleReauthDeleteSuccess = () => {
-        setReauthDeleteOpen(false);
-        setDeleteConfirmOpen(true);
+    const openToast = (
+        message: string,
+        severity: "success" | "error" | "info",
+    ) => {
+        setToast({ open: true, message, severity });
     };
 
-    const handleDelete = async () => {
-        try {
-            setDeleting(true);
-            await deleteMyAccount();
-            clearUser();
-            setToast({
-                open: true,
-                message: "Account deleted",
-                severity: "success",
-            });
-            navigate("/", { replace: true });
-        } catch (e: any) {
-            setToast({
-                open: true,
-                message: e?.message || "Failed to delete account",
-                severity: "error",
-            });
-        } finally {
-            setDeleting(false);
-            setDeleteConfirmOpen(false);
+    const clearAccountQueryState = () => {
+        navigate("/dashboard/account", { replace: true });
+    };
+
+    const handlePostGoogleUnlinkFlow = async () => {
+        if (!user?.email) return;
+
+        if (isGooglePrimaryAccount) {
+            const response = await requestPasswordReset(user.email);
+            openToast(
+                response?.message ||
+                    "We sent a password setup link. Set your password first, then return here and remove Google sign-in.",
+                "info",
+            );
+            return;
         }
+
+        const updated = await unlinkGoogleAccount();
+        setUser(updated);
+        openToast(
+            "Google sign-in has been removed from your account.",
+            "success",
+        );
     };
 
-    // Change password flow
-    const startChangePasswordFlow = () => setReauthPwOpen(true);
-    const handleReauthPwSuccess = () => {
-        setReauthPwOpen(false);
-        setChangePwOpen(true);
-    };
+    useEffect(() => {
+        const reauth = searchParams.get("reauth");
+        const intent = searchParams.get("intent");
+        const linked = searchParams.get("linked");
+        const message = searchParams.get("message");
+        const error = searchParams.get("error");
 
-    const handleChangePassword = async (newPassword: string) => {
-        try {
-            setChangingPw(true);
-            const msg = await changeMyPassword(newPassword);
-            setToast({
-                open: true,
-                message: msg || "Password updated",
-                severity: "success",
-            });
-            setChangePwOpen(false);
-        } catch (e: any) {
-            setToast({
-                open: true,
-                message: e?.message || "Failed to update password",
-                severity: "error",
-            });
-        } finally {
-            setChangingPw(false);
-        }
-    };
+        if (!reauth && !linked && !message && !error) return;
 
-    // Change email flow
-    const startChangeEmailFlow = () => setReauthEmailOpen(true);
-    const handleReauthEmailSuccess = () => {
-        setReauthEmailOpen(false);
-        setChangeEmailOpen(true);
-    };
+        const run = async () => {
+            try {
+                if (linked === "1") {
+                    openToast(
+                        message || "Google account linked successfully.",
+                        "success",
+                    );
+                }
 
-    // Save profile
+                if (reauth === "success") {
+                    if (intent === "email") {
+                        setChangeEmailOpen(true);
+                    } else if (intent === "delete") {
+                        setDeleteConfirmOpen(true);
+                    } else if (intent === "unlink") {
+                        setRemovingGoogle(true);
+                        await handlePostGoogleUnlinkFlow();
+                    }
+
+                    if (intent !== "unlink") {
+                        openToast(message || "Identity confirmed.", "success");
+                    }
+                }
+
+                if (error) {
+                    openToast(error, "error");
+                }
+            } catch (e: any) {
+                openToast(e?.message || "Action failed.", "error");
+            } finally {
+                setRemovingGoogle(false);
+                clearAccountQueryState();
+            }
+        };
+
+        void run();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams, user?.id, user?.email, authProvider]);
+
     const handleSaveProfile = async () => {
         if (!profileValidation.ok) {
-            setToast({
-                open: true,
-                message: profileValidation.reason,
-                severity: "error",
-            });
+            openToast(profileValidation.reason, "error");
             return;
         }
 
         try {
             setSavingProfile(true);
+
             const updatedUser = await updateCurrentUser({
                 first_name: firstName.trim(),
                 last_name: lastName.trim(),
             });
+
             setUser(updatedUser);
             setEditingProfile(false);
-            setToast({
-                open: true,
-                message: "Profile updated",
-                severity: "success",
-            });
+            openToast("Profile updated.", "success");
         } catch (e: any) {
-            setToast({
-                open: true,
-                message: e?.message || "Failed to update profile",
-                severity: "error",
-            });
+            openToast(e?.message || "Failed to update profile.", "error");
         } finally {
             setSavingProfile(false);
         }
@@ -198,18 +226,155 @@ const AccountPage = () => {
         setEditingProfile(false);
     };
 
-    // explicit linking (reauth gated) -> redirect to server intent=link
-    const startLinkGoogleFlow = () => setReauthLinkGoogleOpen(true);
-    const handleReauthLinkGoogleSuccess = () => {
-        setReauthLinkGoogleOpen(false);
+    const handleDelete = async () => {
+        try {
+            setDeleting(true);
+            await deleteMyAccount();
+            clearUser();
+            navigate("/", { replace: true });
+        } catch (e: any) {
+            openToast(e?.message || "Failed to delete account.", "error");
+        } finally {
+            setDeleting(false);
+            setDeleteConfirmOpen(false);
+        }
+    };
 
-        window.location.assign(`${API_BASE_URL}/auth/google?intent=link`);
+    const handleChangePassword = async (newPassword: string) => {
+        try {
+            setChangingPw(true);
+            const msg = await changeMyPassword(newPassword);
+            openToast(msg || "Password updated.", "success");
+            setChangePwOpen(false);
+        } catch (e: any) {
+            openToast(e?.message || "Failed to update password.", "error");
+        } finally {
+            setChangingPw(false);
+        }
+    };
+
+    const handleSendCurrentEmailConfirmation = async () => {
+        try {
+            setSendingEmailConfirm(true);
+            const msg = await requestCurrentEmailConfirmation();
+            openToast(
+                msg || "Confirmation email sent. Please check your inbox.",
+                "success",
+            );
+        } catch (e: any) {
+            openToast(
+                e?.message || "Failed to send confirmation email.",
+                "error",
+            );
+        } finally {
+            setSendingEmailConfirm(false);
+        }
+    };
+
+    const openPasswordReauth = (
+        action: Exclude<ReauthAction, null>,
+        title: string,
+        description: string,
+    ) => {
+        setReauthAction(action);
+        setReauthMode("password");
+        setReauthTitle(title);
+        setReauthDescription(description);
+        setReauthGoogleIntent("reauth_email");
+        setReauthOpen(true);
+    };
+
+    const openGoogleReauth = (
+        action: Exclude<ReauthAction, null>,
+        title: string,
+        description: string,
+        intent: "link" | "reauth_email" | "reauth_delete" | "reauth_unlink",
+    ) => {
+        setReauthAction(action);
+        setReauthMode("google");
+        setReauthTitle(title);
+        setReauthDescription(description);
+        setReauthGoogleIntent(intent);
+        setReauthOpen(true);
+    };
+
+    const startChangeEmailFlow = () => {
+        if (hasGoogleConnection) {
+            openGoogleReauth(
+                "email",
+                "Confirm email change",
+                "Continue with Google to verify your identity before changing your email.",
+                "reauth_email",
+            );
+            return;
+        }
+
+        openPasswordReauth(
+            "email",
+            "Confirm email change",
+            "Enter your current password to continue with the email change.",
+        );
+    };
+
+    const startDeleteFlow = () => {
+        if (hasGoogleConnection) {
+            openGoogleReauth(
+                "delete",
+                "Confirm account deletion",
+                "Continue with Google to verify your identity before deleting your account.",
+                "reauth_delete",
+            );
+            return;
+        }
+
+        openPasswordReauth(
+            "delete",
+            "Confirm account deletion",
+            "Enter your current password before deleting your account.",
+        );
+    };
+
+    const startLinkGoogleFlow = () => {
+        openPasswordReauth(
+            "link",
+            "Confirm Google linking",
+            "Enter your password before linking Google sign-in to this account.",
+        );
+    };
+
+    const startUnlinkGoogleFlow = () => {
+        openGoogleReauth(
+            "unlink",
+            "Confirm Google removal",
+            isGooglePrimaryAccount
+                ? "Continue with Google first. After verification, we’ll send a password setup link so you can safely remove Google sign-in."
+                : "Continue with Google to verify your identity before removing Google sign-in.",
+            "reauth_unlink",
+        );
+    };
+
+    const handlePasswordReauthSuccess = () => {
+        setReauthOpen(false);
+
+        if (reauthAction === "email") {
+            setChangeEmailOpen(true);
+            return;
+        }
+
+        if (reauthAction === "delete") {
+            setDeleteConfirmOpen(true);
+            return;
+        }
+
+        if (reauthAction === "link") {
+            window.location.assign(`${API_BASE_URL}/auth/google?intent=link`);
+        }
     };
 
     if (!user) {
         return (
             <Box>
-                <Typography variant="h4" fontWeight="bold" gutterBottom>
+                <Typography variant="h4" fontWeight={700} gutterBottom>
                     Account
                 </Typography>
                 <Alert severity="info">
@@ -220,31 +385,179 @@ const AccountPage = () => {
     }
 
     return (
-        <Box>
-            <Typography variant="h4" fontWeight="bold" gutterBottom>
-                Account
-            </Typography>
+        <Box sx={{ maxWidth: 980, mx: "auto", pb: 4 }}>
+            <Stack spacing={3}>
+                <Box>
+                    <Typography variant="h4" fontWeight={700} gutterBottom>
+                        Account
+                    </Typography>
+                    <Typography color="text.secondary">
+                        Manage your profile, email status, connected sign-in
+                        methods, and account security.
+                    </Typography>
+                </Box>
 
-            <Stack spacing={2}>
-                {/* Profile */}
-                <Paper sx={{ p: 3 }}>
+                <Paper sx={sectionCardSx}>
+                    <Stack
+                        direction={{ xs: "column", md: "row" }}
+                        spacing={3}
+                        alignItems={{ xs: "flex-start", md: "center" }}
+                        justifyContent="space-between"
+                    >
+                        <Stack direction="row" spacing={2} alignItems="center">
+                            <Avatar
+                                sx={{
+                                    width: 64,
+                                    height: 64,
+                                    fontSize: 24,
+                                    fontWeight: 700,
+                                }}
+                            >
+                                {initials}
+                            </Avatar>
+
+                            <Box>
+                                <Typography variant="h5" fontWeight={700}>
+                                    {user.first_name} {user.last_name}
+                                </Typography>
+
+                                <Typography color="text.secondary">
+                                    {user.email}
+                                </Typography>
+
+                                <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    useFlexGap
+                                    flexWrap="wrap"
+                                    sx={{ mt: 1.5 }}
+                                >
+                                    <Chip
+                                        size="small"
+                                        label={
+                                            isEmailConfirmed
+                                                ? "Email confirmed"
+                                                : "Email not confirmed"
+                                        }
+                                        color={
+                                            isEmailConfirmed
+                                                ? "success"
+                                                : "warning"
+                                        }
+                                        variant={
+                                            isEmailConfirmed
+                                                ? "filled"
+                                                : "outlined"
+                                        }
+                                    />
+                                    <Chip
+                                        size="small"
+                                        label={`Provider: ${authProvider}`}
+                                        variant="outlined"
+                                    />
+                                    <Chip
+                                        size="small"
+                                        label={
+                                            hasGoogleConnection
+                                                ? "Google connected"
+                                                : "Google not connected"
+                                        }
+                                        variant={
+                                            hasGoogleConnection
+                                                ? "filled"
+                                                : "outlined"
+                                        }
+                                    />
+                                    {role ? (
+                                        <Chip
+                                            size="small"
+                                            label={`Role: ${role}`}
+                                            variant="outlined"
+                                        />
+                                    ) : null}
+                                </Stack>
+                            </Box>
+                        </Stack>
+                    </Stack>
+                </Paper>
+
+                <Paper sx={sectionCardSx}>
                     <Stack spacing={2}>
+                        <Box>
+                            <Typography variant="h6" fontWeight={700}>
+                                Email status
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Confirming your email helps secure account
+                                recovery and ensures you can receive password
+                                reset links, confirmation links, and other
+                                important account notices.
+                            </Typography>
+                        </Box>
+
+                        {pendingEmail ? (
+                            <Alert severity="info">
+                                Pending confirmation for{" "}
+                                <strong>{pendingEmail}</strong>. Check that
+                                inbox and click the confirmation link to finish
+                                the email change.
+                            </Alert>
+                        ) : null}
+
+                        {!isEmailConfirmed ? (
+                            <Stack
+                                direction={{ xs: "column", sm: "row" }}
+                                spacing={2}
+                                justifyContent="space-between"
+                                alignItems={{ xs: "flex-start", sm: "center" }}
+                            >
+                                <Alert severity="warning" sx={{ flex: 1 }}>
+                                    Your current email is not confirmed yet.
+                                </Alert>
+
+                                <Button
+                                    variant="contained"
+                                    onClick={handleSendCurrentEmailConfirmation}
+                                    disabled={sendingEmailConfirm}
+                                >
+                                    Confirm email
+                                </Button>
+                            </Stack>
+                        ) : (
+                            <Alert severity="success">
+                                Your current email is confirmed.
+                            </Alert>
+                        )}
+                    </Stack>
+                </Paper>
+
+                <Paper sx={sectionCardSx}>
+                    <Stack spacing={2.5}>
                         <Stack
                             direction={{ xs: "column", sm: "row" }}
-                            spacing={1}
                             alignItems={{ xs: "flex-start", sm: "center" }}
                             justifyContent="space-between"
+                            spacing={1.5}
                         >
-                            <Typography variant="h6" fontWeight={700}>
-                                Profile
-                            </Typography>
+                            <Box>
+                                <Typography variant="h6" fontWeight={700}>
+                                    Profile
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                >
+                                    Keep your account identity accurate and easy
+                                    to recognize.
+                                </Typography>
+                            </Box>
 
                             {!editingProfile ? (
                                 <Button
-                                    variant="outlined"
+                                    variant="contained"
                                     onClick={() => setEditingProfile(true)}
                                 >
-                                    Edit
+                                    Edit profile
                                 </Button>
                             ) : (
                                 <Stack direction="row" spacing={1}>
@@ -262,7 +575,7 @@ const AccountPage = () => {
                                             !profileValidation.ok
                                         }
                                     >
-                                        Save
+                                        Save changes
                                     </Button>
                                 </Stack>
                             )}
@@ -270,197 +583,381 @@ const AccountPage = () => {
 
                         <Divider />
 
-                        <Box>
-                            <Typography
-                                variant="subtitle2"
-                                color="text.secondary"
+                        {!editingProfile ? (
+                            <Box
+                                sx={{
+                                    display: "grid",
+                                    gridTemplateColumns: {
+                                        xs: "1fr",
+                                        sm: "1fr 1fr",
+                                    },
+                                    gap: 2,
+                                }}
                             >
-                                Name
-                            </Typography>
+                                <Box>
+                                    <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                    >
+                                        First name
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        fontWeight={600}
+                                    >
+                                        {user.first_name}
+                                    </Typography>
+                                </Box>
 
-                            {!editingProfile ? (
-                                <Typography>
-                                    {user?.first_name} {user?.last_name}
-                                </Typography>
-                            ) : (
-                                <Stack
-                                    direction={{ xs: "column", sm: "row" }}
-                                    spacing={2}
-                                >
-                                    <TextField
-                                        label="First name"
-                                        value={firstName}
-                                        onChange={(e) =>
-                                            setFirstName(e.target.value)
-                                        }
-                                        disabled={savingProfile}
-                                        fullWidth
-                                    />
-                                    <TextField
-                                        label="Last name"
-                                        value={lastName}
-                                        onChange={(e) =>
-                                            setLastName(e.target.value)
-                                        }
-                                        disabled={savingProfile}
-                                        fullWidth
-                                    />
-                                </Stack>
-                            )}
-                        </Box>
-
-                        <Box>
-                            <Typography
-                                variant="subtitle2"
-                                color="text.secondary"
+                                <Box>
+                                    <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                    >
+                                        Last name
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        fontWeight={600}
+                                    >
+                                        {user.last_name}
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        ) : (
+                            <Box
+                                sx={{
+                                    display: "grid",
+                                    gridTemplateColumns: {
+                                        xs: "1fr",
+                                        sm: "1fr 1fr",
+                                    },
+                                    gap: 2,
+                                }}
                             >
-                                Email
-                            </Typography>
-                            <Stack
-                                direction={{ xs: "column", sm: "row" }}
-                                spacing={1}
-                                alignItems={{ xs: "flex-start", sm: "center" }}
-                                justifyContent="space-between"
-                            >
-                                <Typography>{user?.email}</Typography>
-
-                                <Button
-                                    variant="outlined"
-                                    onClick={startChangeEmailFlow}
-                                >
-                                    Change email
-                                </Button>
-                            </Stack>
-                        </Box>
-
-                        <Box>
-                            <Typography
-                                variant="subtitle2"
-                                color="text.secondary"
-                            >
-                                Account meta
-                            </Typography>
-
-                            <Stack
-                                direction="row"
-                                spacing={1}
-                                flexWrap="wrap"
-                                sx={{ mt: 1 }}
-                            >
-                                {role ? <Chip label={`Role: ${role}`} /> : null}
-                                <Chip
-                                    label={`Provider: ${authProvider || "local"}`}
-                                />
-                                <Chip
-                                    label={
-                                        googleSub
-                                            ? "Google: linked"
-                                            : "Google: not linked"
+                                <TextField
+                                    label="First name"
+                                    value={firstName}
+                                    onChange={(e) =>
+                                        setFirstName(e.target.value)
                                     }
-                                    variant={googleSub ? "filled" : "outlined"}
+                                    disabled={savingProfile}
+                                    fullWidth
+                                    helperText="Use your preferred first name."
                                 />
-                            </Stack>
-                        </Box>
+
+                                <TextField
+                                    label="Last name"
+                                    value={lastName}
+                                    onChange={(e) =>
+                                        setLastName(e.target.value)
+                                    }
+                                    disabled={savingProfile}
+                                    fullWidth
+                                    helperText="Use your preferred last name."
+                                />
+                            </Box>
+                        )}
                     </Stack>
                 </Paper>
 
-                {/* Security */}
-                <Paper sx={{ p: 3 }}>
-                    <Typography variant="h6" fontWeight={700} gutterBottom>
-                        Security
-                    </Typography>
-                    <Divider sx={{ mb: 2 }} />
-
-                    <Stack spacing={2}>
+                <Paper sx={sectionCardSx}>
+                    <Stack spacing={2.5}>
                         <Stack
                             direction={{ xs: "column", sm: "row" }}
-                            spacing={1}
-                            alignItems={{ xs: "stretch", sm: "center" }}
-                            justifyContent="space-between"
-                        >
-                            <Typography color="text.secondary">
-                                Change your password
-                            </Typography>
-                            <Button
-                                variant="outlined"
-                                onClick={startChangePasswordFlow}
-                            >
-                                Change password
-                            </Button>
-                        </Stack>
-
-                        <Divider />
-
-                        {/* Link Google */}
-                        <Stack
-                            direction={{ xs: "column", sm: "row" }}
-                            spacing={1}
-                            alignItems={{ xs: "stretch", sm: "center" }}
+                            spacing={2}
+                            alignItems={{ xs: "flex-start", sm: "center" }}
                             justifyContent="space-between"
                         >
                             <Box>
-                                <Typography color="text.secondary">
-                                    Link Google account
+                                <Typography variant="h6" fontWeight={700}>
+                                    Email
                                 </Typography>
                                 <Typography
                                     variant="body2"
                                     color="text.secondary"
                                 >
-                                    Linking requires re-authentication and is
-                                    never automatic.
+                                    Changing your email requires identity
+                                    verification and inbox confirmation to
+                                    prevent unauthorized account changes.
                                 </Typography>
                             </Box>
 
                             <Button
                                 variant="outlined"
-                                onClick={startLinkGoogleFlow}
+                                onClick={startChangeEmailFlow}
                             >
-                                {isGoogleLinked
-                                    ? "Re-link Google"
-                                    : "Link Google"}
+                                Change email
                             </Button>
+                        </Stack>
+
+                        <Divider />
+
+                        <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={2}
+                            alignItems={{ xs: "flex-start", sm: "center" }}
+                            justifyContent="space-between"
+                        >
+                            <Box>
+                                <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                >
+                                    Current email
+                                </Typography>
+                                <Typography variant="body1" fontWeight={600}>
+                                    {user.email}
+                                </Typography>
+                            </Box>
+
+                            <Chip
+                                label={
+                                    isEmailConfirmed
+                                        ? "Confirmed"
+                                        : "Not confirmed"
+                                }
+                                color={isEmailConfirmed ? "success" : "warning"}
+                                variant={
+                                    isEmailConfirmed ? "filled" : "outlined"
+                                }
+                            />
                         </Stack>
                     </Stack>
                 </Paper>
 
-                {/* Danger zone */}
-                <Paper sx={{ p: 3 }}>
-                    <Typography
-                        variant="h6"
-                        fontWeight={700}
-                        gutterBottom
-                        color="error"
-                    >
-                        Danger zone
-                    </Typography>
-                    <Divider sx={{ mb: 2 }} />
+                {hasGoogleConnection ? (
+                    <Paper sx={sectionCardSx}>
+                        <Stack spacing={2.5}>
+                            <Box>
+                                <Typography variant="h6" fontWeight={700}>
+                                    Connected accounts
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                >
+                                    Manage third-party sign-in methods linked to
+                                    this account.
+                                </Typography>
+                            </Box>
 
-                    <Stack
-                        direction={{ xs: "column", sm: "row" }}
-                        spacing={1}
-                        alignItems={{ xs: "stretch", sm: "center" }}
-                        justifyContent="space-between"
-                    >
-                        <Typography color="text.secondary">
-                            Permanently delete your account and all data
-                        </Typography>
-                        <Button
-                            color="error"
-                            variant="contained"
-                            onClick={startDeleteFlow}
+                            <Divider />
+
+                            <Stack
+                                direction={{ xs: "column", sm: "row" }}
+                                spacing={2}
+                                alignItems={{ xs: "flex-start", sm: "center" }}
+                                justifyContent="space-between"
+                            >
+                                <Box>
+                                    <Typography fontWeight={600}>
+                                        Google
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{ mt: 0.5 }}
+                                    >
+                                        {isGooglePrimaryAccount
+                                            ? "This account currently uses Google as its primary sign-in method."
+                                            : "Google is linked to this account as an additional sign-in method."}
+                                    </Typography>
+                                </Box>
+
+                                <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    alignItems="center"
+                                >
+                                    <Chip
+                                        label="Connected"
+                                        color="success"
+                                        variant="filled"
+                                    />
+                                    <Button
+                                        variant="outlined"
+                                        color="warning"
+                                        onClick={startUnlinkGoogleFlow}
+                                        disabled={removingGoogle}
+                                    >
+                                        Remove Google link
+                                    </Button>
+                                </Stack>
+                            </Stack>
+
+                            {isGooglePrimaryAccount ? (
+                                <Alert severity="info">
+                                    To remove Google sign-in from a
+                                    Google-created account, you first need to
+                                    set a password from the password reset link
+                                    we send after verification. Once that is
+                                    done, you can remove Google and then manage
+                                    passwords normally.
+                                </Alert>
+                            ) : null}
+                        </Stack>
+                    </Paper>
+                ) : (
+                    <>
+                        <Paper sx={sectionCardSx}>
+                            <Stack spacing={2.5}>
+                                <Box>
+                                    <Typography variant="h6" fontWeight={700}>
+                                        Security
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Manage your password-based sign-in and
+                                        account protection.
+                                    </Typography>
+                                </Box>
+
+                                <Divider />
+
+                                <Stack
+                                    direction={{ xs: "column", sm: "row" }}
+                                    spacing={2}
+                                    alignItems={{
+                                        xs: "flex-start",
+                                        sm: "center",
+                                    }}
+                                    justifyContent="space-between"
+                                >
+                                    <Box>
+                                        <Typography fontWeight={600}>
+                                            Password
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                            sx={{ mt: 0.5 }}
+                                        >
+                                            Update your password after
+                                            confirming your identity.
+                                        </Typography>
+                                    </Box>
+
+                                    <Button
+                                        variant="outlined"
+                                        onClick={() => setChangePwOpen(true)}
+                                    >
+                                        Change password
+                                    </Button>
+                                </Stack>
+                            </Stack>
+                        </Paper>
+
+                        <Paper sx={sectionCardSx}>
+                            <Stack spacing={2.5}>
+                                <Box>
+                                    <Typography variant="h6" fontWeight={700}>
+                                        Connected accounts
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        You can link Google for faster sign-in
+                                        and provider-based verification flows.
+                                    </Typography>
+                                </Box>
+
+                                <Divider />
+
+                                <Stack
+                                    direction={{ xs: "column", sm: "row" }}
+                                    spacing={2}
+                                    alignItems={{
+                                        xs: "flex-start",
+                                        sm: "center",
+                                    }}
+                                    justifyContent="space-between"
+                                >
+                                    <Box>
+                                        <Typography fontWeight={600}>
+                                            Google
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                            sx={{ mt: 0.5 }}
+                                        >
+                                            Link Google to your existing
+                                            account.
+                                        </Typography>
+                                    </Box>
+
+                                    <Button
+                                        variant="outlined"
+                                        onClick={startLinkGoogleFlow}
+                                    >
+                                        Link Google
+                                    </Button>
+                                </Stack>
+                            </Stack>
+                        </Paper>
+                    </>
+                )}
+
+                <Paper
+                    sx={{
+                        ...sectionCardSx,
+                        border: (theme) =>
+                            `1px solid ${theme.palette.error.light}`,
+                    }}
+                >
+                    <Stack spacing={2.5}>
+                        <Box>
+                            <Typography
+                                variant="h6"
+                                fontWeight={700}
+                                color="error"
+                            >
+                                Danger zone
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Permanently delete your account and associated
+                                data. This action cannot be undone.
+                            </Typography>
+                        </Box>
+
+                        <Divider />
+
+                        <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={2}
+                            alignItems={{ xs: "flex-start", sm: "center" }}
+                            justifyContent="space-between"
                         >
-                            Delete account
-                        </Button>
+                            <Typography color="text.secondary">
+                                Delete your account permanently
+                            </Typography>
+
+                            <Button
+                                color="error"
+                                variant="contained"
+                                onClick={startDeleteFlow}
+                            >
+                                Delete account
+                            </Button>
+                        </Stack>
                     </Stack>
                 </Paper>
             </Stack>
 
-            {/* Reauth gates */}
             <ReauthDialog
-                open={reauthDeleteOpen}
-                onClose={() => setReauthDeleteOpen(false)}
-                onSuccess={handleReauthDeleteSuccess}
+                open={reauthOpen}
+                onClose={() => setReauthOpen(false)}
+                onSuccess={handlePasswordReauthSuccess}
+                mode={reauthMode}
+                title={reauthTitle}
+                description={reauthDescription}
+                googleIntent={reauthGoogleIntent}
             />
+
             <DeleteAccountConfirmDialog
                 open={deleteConfirmOpen}
                 loading={deleting}
@@ -468,11 +965,6 @@ const AccountPage = () => {
                 onConfirm={handleDelete}
             />
 
-            <ReauthDialog
-                open={reauthPwOpen}
-                onClose={() => setReauthPwOpen(false)}
-                onSuccess={handleReauthPwSuccess}
-            />
             <ChangePasswordDialog
                 open={changePwOpen}
                 loading={changingPw}
@@ -480,21 +972,11 @@ const AccountPage = () => {
                 onSubmit={handleChangePassword}
             />
 
-            <ReauthDialog
-                open={reauthEmailOpen}
-                onClose={() => setReauthEmailOpen(false)}
-                onSuccess={handleReauthEmailSuccess}
-            />
             <ChangeEmailDialog
                 open={changeEmailOpen}
                 onClose={() => setChangeEmailOpen(false)}
-            />
-
-            {/* reauth gate for link Google */}
-            <ReauthDialog
-                open={reauthLinkGoogleOpen}
-                onClose={() => setReauthLinkGoogleOpen(false)}
-                onSuccess={handleReauthLinkGoogleSuccess}
+                onInfo={(message) => openToast(message, "info")}
+                currentEmail={user.email}
             />
 
             <Snackbar

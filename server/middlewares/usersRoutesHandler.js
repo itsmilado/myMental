@@ -962,6 +962,7 @@ const serializeUserInfo = (user) => {
         first_name: user.first_name,
         last_name: user.last_name,
         email: user.email,
+        pending_email: user.pending_email,
         isconfirmed: user.isconfirmed,
         user_role: user.user_role,
         created_at: user.created_at,

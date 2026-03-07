@@ -1,3 +1,5 @@
+// src/features/account/components/ChangeEmailDialog.tsx
+
 import { useEffect, useMemo, useState } from "react";
 import {
     Dialog,
@@ -19,9 +21,10 @@ type Props = {
     open: boolean;
     onClose: () => void;
     onInfo?: (message: string) => void;
+    currentEmail?: string;
 };
 
-const ChangeEmailDialog = ({ open, onClose, onInfo }: Props) => {
+const ChangeEmailDialog = ({ open, onClose, onInfo, currentEmail }: Props) => {
     const [email, setEmail] = useState("");
     const [loading, setLoading] = useState(false);
     const [done, setDone] = useState(false);
@@ -36,11 +39,20 @@ const ChangeEmailDialog = ({ open, onClose, onInfo }: Props) => {
     }, [open]);
 
     const validation = useMemo(() => {
-        if (!email.trim()) return { ok: false, reason: "Email is required" };
+        if (!email.trim()) return { ok: false, reason: "Email is required." };
         if (!isValidEmail(email))
-            return { ok: false, reason: "Email is invalid" };
+            return { ok: false, reason: "Enter a valid email address." };
+        if (
+            currentEmail &&
+            email.trim().toLowerCase() === currentEmail.trim().toLowerCase()
+        ) {
+            return {
+                ok: false,
+                reason: "Enter a different email address.",
+            };
+        }
         return { ok: true, reason: "" };
-    }, [email]);
+    }, [email, currentEmail]);
 
     const handleSubmit = async () => {
         if (!validation.ok) {
@@ -53,9 +65,9 @@ const ChangeEmailDialog = ({ open, onClose, onInfo }: Props) => {
             setError("");
             const msg = await requestEmailChange(email.trim().toLowerCase());
             setDone(true);
-            onInfo?.(msg || "Confirmation email sent");
+            onInfo?.(msg || "Confirmation email sent.");
         } catch (e: any) {
-            setError(e?.message || "Failed to request email change");
+            setError(e?.message || "Failed to request email change.");
         } finally {
             setLoading(false);
         }
@@ -74,9 +86,20 @@ const ChangeEmailDialog = ({ open, onClose, onInfo }: Props) => {
                 <Stack spacing={2} sx={{ mt: 1 }}>
                     {!done ? (
                         <>
+                            {currentEmail ? (
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                >
+                                    Current email:{" "}
+                                    <strong>{currentEmail}</strong>
+                                </Typography>
+                            ) : null}
+
                             <Typography variant="body2" color="text.secondary">
-                                Enter your new email. We’ll send a confirmation
-                                link to that address.
+                                Enter your new email address. We’ll send a
+                                confirmation link there before the change
+                                becomes active.
                             </Typography>
 
                             <TextField
@@ -94,8 +117,9 @@ const ChangeEmailDialog = ({ open, onClose, onInfo }: Props) => {
                         </>
                     ) : (
                         <Alert severity="success">
-                            Confirmation email sent. Please check your inbox and
-                            click the link to finish.
+                            We sent a confirmation link to your new email
+                            address. Your account email will update after you
+                            click that link.
                         </Alert>
                     )}
                 </Stack>

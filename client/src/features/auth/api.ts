@@ -26,9 +26,29 @@ export type DeleteTranscriptionOptions = {
     deleteAudioFile?: boolean;
 };
 
-export const startGoogleOAuth = () => {
-    // server will redirect to Google and then back to APP_ORIGIN/oauth/callback
-    window.location.assign(`${API_BASE_URL}/auth/google`);
+export const startGoogleOAuth = (
+    intent:
+        | "signin"
+        | "link"
+        | "reauth_email"
+        | "reauth_delete"
+        | "reauth_unlink" = "signin",
+) => {
+    const url = new URL(`${API_BASE_URL}/auth/google`);
+    url.searchParams.set("intent", intent);
+    window.location.assign(url.toString());
+};
+
+export const unlinkGoogleAccount = async (): Promise<User> => {
+    const response = await apiClient.post(`${USER_BASE_PATH}/me/unlink-google`);
+
+    if (!response.data?.success) {
+        throw new Error(
+            response.data?.message || "Failed to remove Google sign-in.",
+        );
+    }
+
+    return response.data.userData as User;
 };
 
 export const getUser = async (id: string): Promise<User> => {
@@ -101,6 +121,20 @@ export const reauthCurrentUser = async (
         reauthenticatedAt: response.data.reauthenticatedAt as number,
         validForMs: response.data.validForMs as number,
     };
+};
+
+export const requestCurrentEmailConfirmation = async (): Promise<string> => {
+    const response = await apiClient.post(
+        `${USER_BASE_PATH}/me/confirm-email/request`,
+    );
+
+    if (!response.data?.success) {
+        throw new Error(
+            response.data?.message || "Failed to send confirmation email.",
+        );
+    }
+
+    return (response.data?.message as string) || "Confirmation email sent.";
 };
 
 export const requestEmailChange = async (newEmail: string): Promise<string> => {
