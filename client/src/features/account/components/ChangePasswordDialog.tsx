@@ -1,3 +1,5 @@
+// src/features/account/components/ChangePasswordDialog.tsx
+
 import {
     Dialog,
     DialogTitle,
@@ -8,30 +10,46 @@ import {
     Alert,
     Stack,
 } from "@mui/material";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+type ChangePasswordPayload = {
+    currentPassword?: string;
+    newPassword: string;
+};
 
 const ChangePasswordDialog = ({
     open,
     onClose,
     onSubmit,
     loading,
+    requireCurrentPassword = false,
 }: {
     open: boolean;
     onClose: () => void;
-    onSubmit: (newPassword: string) => Promise<void>;
+    onSubmit: (payload: ChangePasswordPayload) => Promise<void>;
     loading: boolean;
+    requireCurrentPassword?: boolean;
 }) => {
+    const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
 
     const reset = () => {
+        setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
         setError(null);
     };
 
+    useEffect(() => {
+        if (!open) {
+            reset();
+        }
+    }, [open]);
+
     const handleClose = () => {
+        if (loading) return;
         reset();
         onClose();
     };
@@ -39,7 +57,13 @@ const ChangePasswordDialog = ({
     const handleSave = async () => {
         setError(null);
 
+        const cp = currentPassword.trim();
         const np = newPassword.trim();
+
+        if (requireCurrentPassword && !cp) {
+            setError("Current password is required.");
+            return;
+        }
 
         if (np.length < 6) {
             setError("Password must be at least 6 characters.");
@@ -51,7 +75,11 @@ const ChangePasswordDialog = ({
             return;
         }
 
-        await onSubmit(np);
+        await onSubmit({
+            currentPassword: cp || undefined,
+            newPassword: np,
+        });
+
         reset();
     };
 
@@ -63,6 +91,19 @@ const ChangePasswordDialog = ({
                 <Stack spacing={2} sx={{ mt: 1 }}>
                     {error ? <Alert severity="error">{error}</Alert> : null}
 
+                    {requireCurrentPassword ? (
+                        <TextField
+                            label="Current password"
+                            type="password"
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            autoComplete="current-password"
+                            disabled={loading}
+                            fullWidth
+                            autoFocus
+                        />
+                    ) : null}
+
                     <TextField
                         label="New password"
                         type="password"
@@ -71,7 +112,7 @@ const ChangePasswordDialog = ({
                         autoComplete="new-password"
                         disabled={loading}
                         fullWidth
-                        autoFocus
+                        autoFocus={!requireCurrentPassword}
                     />
 
                     <TextField
