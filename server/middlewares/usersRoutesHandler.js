@@ -551,7 +551,7 @@ const unlinkMyGoogle = async (request, response, next) => {
             return response.status(400).json({
                 success: false,
                 message:
-                    "Set a password first from the password reset flow, then remove Google sign-in.",
+                    "A password must be set before removing Google sign-in.",
             });
         }
 
@@ -705,7 +705,8 @@ const changeMyPassword = async (request, response, next) => {
             });
         }
 
-        const { new_password } = request.body || {};
+        const { current_password, new_password } = request.body || {};
+
         if (
             !new_password ||
             typeof new_password !== "string" ||
@@ -725,13 +726,50 @@ const changeMyPassword = async (request, response, next) => {
             });
         }
 
-        // Prevent reusing the same password
-        const isSame = await compare(new_password, user.hashed_password);
-        if (isSame) {
-            return response.status(400).json({
-                success: false,
-                message: "New password must be different from the current one",
-            });
+        const isGooglePrimaryAccount = user.auth_provider === "google";
+
+        if (!isGooglePrimaryAccount) {
+            if (
+                !current_password ||
+                typeof current_password !== "string" ||
+                !current_password.trim()
+            ) {
+                return response.status(400).json({
+                    success: false,
+                    message: "Current password is required.",
+                });
+            }
+
+            if (!user.hashed_password) {
+                return response.status(400).json({
+                    success: false,
+                    message:
+                        "Current password is unavailable for this account.",
+                });
+            }
+
+            const matchesCurrent = await compare(
+                current_password,
+                user.hashed_password,
+            );
+
+            if (!matchesCurrent) {
+                return response.status(401).json({
+                    success: false,
+                    message: "Current password is incorrect.",
+                });
+            }
+        }
+
+        if (user.hashed_password) {
+            const isSame = await compare(new_password, user.hashed_password);
+            if (isSame) {
+                return response.status(400).json({
+                    success: false,
+                    message:
+                        "New password must be different from the current one",
+                });
+            }
         }
 
         const hashed_password = await hashPassword(new_password);
@@ -747,9 +785,6 @@ const changeMyPassword = async (request, response, next) => {
                 message: "User not found",
             });
         }
-
-        // Invalidate reauth so it can't be reused repeatedly
-        request.session.reauthenticatedAt = null;
 
         return response.status(200).json({
             success: true,
