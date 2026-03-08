@@ -21,12 +21,12 @@ import ReauthDialog from "../components/ReauthDialog";
 import DeleteAccountConfirmDialog from "../components/DeleteAccountConfirmDialog";
 import ChangePasswordDialog from "../components/ChangePasswordDialog";
 import ChangeEmailDialog from "../components/ChangeEmailDialog";
+import SetPasswordBeforeUnlinkDialog from "../components/SetPasswordBeforeUnlinkDialog";
 
 import {
     changeMyPassword,
     deleteMyAccount,
     requestCurrentEmailConfirmation,
-    requestPasswordReset,
     unlinkGoogleAccount,
     updateCurrentUser,
 } from "../../auth/api";
@@ -44,6 +44,11 @@ const sectionCardSx = {
 };
 
 type ReauthAction = "delete" | "email" | "link" | "unlink" | null;
+
+type ChangePasswordPayload = {
+    currentPassword?: string;
+    newPassword: string;
+};
 
 const AccountPage = () => {
     const user = useAuthStore((s) => s.user);
@@ -74,6 +79,8 @@ const AccountPage = () => {
 
     const [changePwOpen, setChangePwOpen] = useState(false);
     const [changingPw, setChangingPw] = useState(false);
+    const [setPasswordBeforeUnlinkOpen, setSetPasswordBeforeUnlinkOpen] =
+        useState(false);
 
     const [changeEmailOpen, setChangeEmailOpen] = useState(false);
 
@@ -127,25 +134,39 @@ const AccountPage = () => {
         navigate("/dashboard/account", { replace: true });
     };
 
-    const handlePostGoogleUnlinkFlow = async () => {
-        if (!user?.email) return;
-
-        if (isGooglePrimaryAccount) {
-            const response = await requestPasswordReset(user.email);
-            openToast(
-                response?.message ||
-                    "We sent a password setup link. Set your password first, then return here and remove Google sign-in.",
-                "info",
-            );
-            return;
-        }
-
+    const handleFinishGoogleUnlink = async () => {
         const updated = await unlinkGoogleAccount();
         setUser(updated);
         openToast(
             "Google sign-in has been removed from your account.",
             "success",
         );
+    };
+
+    const handleSetPasswordAndUnlinkGoogle = async (newPassword: string) => {
+        try {
+            setChangingPw(true);
+            setRemovingGoogle(true);
+
+            await changeMyPassword(newPassword);
+            const updated = await unlinkGoogleAccount();
+
+            setUser(updated);
+            setSetPasswordBeforeUnlinkOpen(false);
+            openToast(
+                "Password created and Google sign-in removed successfully.",
+                "success",
+            );
+        } catch (e: any) {
+            openToast(
+                e?.message || "Failed to remove Google sign-in.",
+                "error",
+            );
+            throw e;
+        } finally {
+            setChangingPw(false);
+            setRemovingGoogle(false);
+        }
     };
 
     useEffect(() => {
@@ -172,8 +193,12 @@ const AccountPage = () => {
                     } else if (intent === "delete") {
                         setDeleteConfirmOpen(true);
                     } else if (intent === "unlink") {
-                        setRemovingGoogle(true);
-                        await handlePostGoogleUnlinkFlow();
+                        if (isGooglePrimaryAccount) {
+                            setSetPasswordBeforeUnlinkOpen(true);
+                        } else {
+                            setRemovingGoogle(true);
+                            await handleFinishGoogleUnlink();
+                        }
                     }
 
                     if (intent !== "unlink") {
@@ -240,19 +265,22 @@ const AccountPage = () => {
         }
     };
 
-    const handleChangePassword = async (newPassword: string) => {
+    const handleChangePassword = async ({
+        currentPassword,
+        newPassword,
+    }: ChangePasswordPayload) => {
         try {
             setChangingPw(true);
-            const msg = await changeMyPassword(newPassword);
+            const msg = await changeMyPassword(newPassword, currentPassword);
             openToast(msg || "Password updated.", "success");
             setChangePwOpen(false);
         } catch (e: any) {
             openToast(e?.message || "Failed to update password.", "error");
+            throw e;
         } finally {
             setChangingPw(false);
         }
     };
-
     const handleSendCurrentEmailConfirmation = async () => {
         try {
             setSendingEmailConfirm(true);
@@ -347,7 +375,7 @@ const AccountPage = () => {
             "unlink",
             "Confirm Google removal",
             isGooglePrimaryAccount
-                ? "Continue with Google first. After verification, we’ll send a password setup link so you can safely remove Google sign-in."
+                ? "Continue with Google to verify your identity. After that, you'll set a password and remove Google sign-in."
                 : "Continue with Google to verify your identity before removing Google sign-in.",
             "reauth_unlink",
         );
@@ -481,55 +509,61 @@ const AccountPage = () => {
                     </Stack>
                 </Paper>
 
-                <Paper sx={sectionCardSx}>
-                    <Stack spacing={2}>
-                        <Box>
-                            <Typography variant="h6" fontWeight={700}>
-                                Email status
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Confirming your email helps secure account
-                                recovery and ensures you can receive password
-                                reset links, confirmation links, and other
-                                important account notices.
-                            </Typography>
-                        </Box>
-
-                        {pendingEmail ? (
-                            <Alert severity="info">
-                                Pending confirmation for{" "}
-                                <strong>{pendingEmail}</strong>. Check that
-                                inbox and click the confirmation link to finish
-                                the email change.
-                            </Alert>
-                        ) : null}
-
-                        {!isEmailConfirmed ? (
-                            <Stack
-                                direction={{ xs: "column", sm: "row" }}
-                                spacing={2}
-                                justifyContent="space-between"
-                                alignItems={{ xs: "flex-start", sm: "center" }}
-                            >
-                                <Alert severity="warning" sx={{ flex: 1 }}>
-                                    Your current email is not confirmed yet.
-                                </Alert>
-
-                                <Button
-                                    variant="contained"
-                                    onClick={handleSendCurrentEmailConfirmation}
-                                    disabled={sendingEmailConfirm}
+                {!isEmailConfirmed || pendingEmail ? (
+                    <Paper sx={sectionCardSx}>
+                        <Stack spacing={2}>
+                            <Box>
+                                <Typography variant="h6" fontWeight={700}>
+                                    Email status
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
                                 >
-                                    Confirm email
-                                </Button>
-                            </Stack>
-                        ) : (
-                            <Alert severity="success">
-                                Your current email is confirmed.
-                            </Alert>
-                        )}
-                    </Stack>
-                </Paper>
+                                    Confirming your email helps secure account
+                                    recovery and ensures you can receive
+                                    password reset links, confirmation links,
+                                    and other important account notices.
+                                </Typography>
+                            </Box>
+
+                            {pendingEmail ? (
+                                <Alert severity="info">
+                                    Pending confirmation for{" "}
+                                    <strong>{pendingEmail}</strong>. Check that
+                                    inbox and click the confirmation link to
+                                    finish the email change.
+                                </Alert>
+                            ) : null}
+
+                            {!isEmailConfirmed ? (
+                                <Stack
+                                    direction={{ xs: "column", sm: "row" }}
+                                    spacing={2}
+                                    justifyContent="space-between"
+                                    alignItems={{
+                                        xs: "flex-start",
+                                        sm: "center",
+                                    }}
+                                >
+                                    <Alert severity="warning" sx={{ flex: 1 }}>
+                                        Your current email is not confirmed yet.
+                                    </Alert>
+
+                                    <Button
+                                        variant="contained"
+                                        onClick={
+                                            handleSendCurrentEmailConfirmation
+                                        }
+                                        disabled={sendingEmailConfirm}
+                                    >
+                                        Confirm email
+                                    </Button>
+                                </Stack>
+                            ) : null}
+                        </Stack>
+                    </Paper>
+                ) : null}
 
                 <Paper sx={sectionCardSx}>
                     <Stack spacing={2.5}>
@@ -789,11 +823,9 @@ const AccountPage = () => {
                             {isGooglePrimaryAccount ? (
                                 <Alert severity="info">
                                     To remove Google sign-in from a
-                                    Google-created account, you first need to
-                                    set a password from the password reset link
-                                    we send after verification. Once that is
-                                    done, you can remove Google and then manage
-                                    passwords normally.
+                                    Google-created account, verify with Google
+                                    first. You'll then create a password and
+                                    remove Google sign-in in one step.
                                 </Alert>
                             ) : null}
                         </Stack>
@@ -970,6 +1002,14 @@ const AccountPage = () => {
                 loading={changingPw}
                 onClose={() => setChangePwOpen(false)}
                 onSubmit={handleChangePassword}
+                requireCurrentPassword={!hasGoogleConnection}
+            />
+
+            <SetPasswordBeforeUnlinkDialog
+                open={setPasswordBeforeUnlinkOpen}
+                loading={changingPw || removingGoogle}
+                onClose={() => setSetPasswordBeforeUnlinkOpen(false)}
+                onSubmit={handleSetPasswordAndUnlinkGoogle}
             />
 
             <ChangeEmailDialog
