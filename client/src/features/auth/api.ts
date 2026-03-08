@@ -10,7 +10,11 @@ import type {
     OnlineTranscription,
     RestorePayload,
 } from "../../types/types";
-import { apiClient, API_BASE_URL } from "../../api/apiClient";
+import {
+    apiClient,
+    getApiErrorMessage,
+    API_BASE_URL,
+} from "../../api/apiClient";
 
 const TRANSCRIPTION_BASE_PATH = "/transcription";
 const USER_BASE_PATH = "/users";
@@ -109,18 +113,21 @@ export const updateCurrentUser = async (payload: {
 export const reauthCurrentUser = async (
     password: string,
 ): Promise<{ reauthenticatedAt: number; validForMs: number }> => {
-    const response = await apiClient.post(`${USER_BASE_PATH}/me/reauth`, {
-        password,
-    });
+    try {
+        const response = await apiClient.post(`${USER_BASE_PATH}/me/reauth`, {
+            password,
+        });
+        if (!response.data?.success) {
+            throw new Error(response.data?.message || "Re-auth failed");
+        }
 
-    if (!response.data?.success) {
-        throw new Error(response.data?.message || "Re-auth failed");
+        return {
+            reauthenticatedAt: response.data.reauthenticatedAt as number,
+            validForMs: response.data.validForMs as number,
+        };
+    } catch (error) {
+        throw new Error(getApiErrorMessage(error, "Re-auth failed"));
     }
-
-    return {
-        reauthenticatedAt: response.data.reauthenticatedAt as number,
-        validForMs: response.data.validForMs as number,
-    };
 };
 
 export const requestCurrentEmailConfirmation = async (): Promise<string> => {

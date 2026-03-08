@@ -16,9 +16,13 @@ export const getApiErrorMessage = (
     fallback = "Request failed",
 ): string => {
     if (axios.isAxiosError(error)) {
-        const axErr = error as AxiosError<any>;
+        const axErr = error as AxiosError<{ message?: string }>;
         return axErr.response?.data?.message || axErr.message || fallback;
     }
-    if (error instanceof Error) return error.message || fallback;
+
+    if (error instanceof Error) {
+        return error.message || fallback;
+    }
+
     return fallback;
 };
