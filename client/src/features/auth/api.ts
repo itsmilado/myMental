@@ -12,8 +12,8 @@ import type {
 } from "../../types/types";
 import {
     apiClient,
-    getApiErrorMessage,
     API_BASE_URL,
+    getApiErrorMessage,
 } from "../../api/apiClient";
 
 const TRANSCRIPTION_BASE_PATH = "/transcription";
@@ -44,20 +44,32 @@ export const startGoogleOAuth = (
 };
 
 export const unlinkGoogleAccount = async (): Promise<User> => {
-    const response = await apiClient.post(`${USER_BASE_PATH}/me/unlink-google`);
+    try {
+        const response = await apiClient.post(
+            `${USER_BASE_PATH}/me/unlink-google`,
+        );
 
-    if (!response.data?.success) {
+        if (!response.data?.success) {
+            throw new Error(
+                response.data?.message || "Failed to remove Google sign-in.",
+            );
+        }
+
+        return response.data.userData as User;
+    } catch (error) {
         throw new Error(
-            response.data?.message || "Failed to remove Google sign-in.",
+            getApiErrorMessage(error, "Failed to remove Google sign-in."),
         );
     }
-
-    return response.data.userData as User;
 };
 
 export const getUser = async (id: string): Promise<User> => {
-    const response = await apiClient.get<User>(`${USER_BASE_PATH}/${id}`);
-    return response.data;
+    try {
+        const response = await apiClient.get<User>(`${USER_BASE_PATH}/${id}`);
+        return response.data;
+    } catch (error) {
+        throw new Error(getApiErrorMessage(error, "Failed to fetch user."));
+    }
 };
 
 export const loginUser = async (
@@ -65,21 +77,35 @@ export const loginUser = async (
     password: string,
     rememberMe: boolean,
 ): Promise<AuthResponse> => {
-    const response = await apiClient.post(`${USER_BASE_PATH}/login`, {
-        email,
-        password,
-        rememberMe,
-    });
-    return response.data as AuthResponse;
+    try {
+        const response = await apiClient.post(`${USER_BASE_PATH}/login`, {
+            email,
+            password,
+            rememberMe,
+        });
+        return response.data as AuthResponse;
+    } catch (error) {
+        throw new Error(getApiErrorMessage(error, "Login failed."));
+    }
 };
 
 export const fetchCurrentUser = async (): Promise<AuthResponse> => {
-    const response = await apiClient.get(`${USER_BASE_PATH}/me`);
-    return response.data as AuthResponse;
+    try {
+        const response = await apiClient.get(`${USER_BASE_PATH}/me`);
+        return response.data as AuthResponse;
+    } catch (error) {
+        throw new Error(
+            getApiErrorMessage(error, "Failed to fetch current user."),
+        );
+    }
 };
 
 export const logoutUser = async (): Promise<void> => {
-    await apiClient.post(`${USER_BASE_PATH}/logout`);
+    try {
+        await apiClient.post(`${USER_BASE_PATH}/logout`);
+    } catch (error) {
+        throw new Error(getApiErrorMessage(error, "Logout failed."));
+    }
 };
 
 export const signupUser = async (
@@ -89,14 +115,18 @@ export const signupUser = async (
     password: string,
     repeat_password: string,
 ): Promise<AuthResponse> => {
-    const response = await apiClient.post(`${USER_BASE_PATH}/signup`, {
-        first_name,
-        last_name,
-        email,
-        password,
-        repeat_password,
-    });
-    return response.data as AuthResponse;
+    try {
+        const response = await apiClient.post(`${USER_BASE_PATH}/signup`, {
+            first_name,
+            last_name,
+            email,
+            password,
+            repeat_password,
+        });
+        return response.data as AuthResponse;
+    } catch (error) {
+        throw new Error(getApiErrorMessage(error, "Signup failed."));
+    }
 };
 
 export const updateCurrentUser = async (payload: {
@@ -104,10 +134,17 @@ export const updateCurrentUser = async (payload: {
     last_name?: string;
     email?: string;
 }): Promise<User> => {
-    const response = await apiClient.patch(`${USER_BASE_PATH}/me`, payload);
-    if (!response.data?.success)
-        throw new Error(response.data?.message || "Update failed");
-    return response.data.userData as User;
+    try {
+        const response = await apiClient.patch(`${USER_BASE_PATH}/me`, payload);
+
+        if (!response.data?.success) {
+            throw new Error(response.data?.message || "Update failed");
+        }
+
+        return response.data.userData as User;
+    } catch (error) {
+        throw new Error(getApiErrorMessage(error, "Update failed"));
+    }
 };
 
 export const reauthCurrentUser = async (
@@ -117,6 +154,7 @@ export const reauthCurrentUser = async (
         const response = await apiClient.post(`${USER_BASE_PATH}/me/reauth`, {
             password,
         });
+
         if (!response.data?.success) {
             throw new Error(response.data?.message || "Re-auth failed");
         }
@@ -131,83 +169,149 @@ export const reauthCurrentUser = async (
 };
 
 export const requestCurrentEmailConfirmation = async (): Promise<string> => {
-    const response = await apiClient.post(
-        `${USER_BASE_PATH}/me/confirm-email/request`,
-    );
+    try {
+        const response = await apiClient.post(
+            `${USER_BASE_PATH}/me/confirm-email/request`,
+        );
 
-    if (!response.data?.success) {
+        if (!response.data?.success) {
+            throw new Error(
+                response.data?.message || "Failed to send confirmation email.",
+            );
+        }
+
+        return (response.data?.message as string) || "Confirmation email sent.";
+    } catch (error) {
         throw new Error(
-            response.data?.message || "Failed to send confirmation email.",
+            getApiErrorMessage(error, "Failed to send confirmation email."),
         );
     }
-
-    return (response.data?.message as string) || "Confirmation email sent.";
 };
 
 export const requestEmailChange = async (newEmail: string): Promise<string> => {
-    const response = await apiClient.post(`${USER_BASE_PATH}/me/change-email`, {
-        new_email: newEmail,
-    });
+    try {
+        const response = await apiClient.post(
+            `${USER_BASE_PATH}/me/change-email`,
+            {
+                new_email: newEmail,
+            },
+        );
 
-    if (!response.data?.success) {
+        if (!response.data?.success) {
+            throw new Error(
+                response.data?.message || "Email change request failed",
+            );
+        }
+
+        return (response.data?.message as string) || "Confirmation email sent";
+    } catch (error) {
         throw new Error(
-            response.data?.message || "Email change request failed",
+            getApiErrorMessage(error, "Email change request failed"),
         );
     }
-
-    return (response.data?.message as string) || "Confirmation email sent";
 };
 
 export const confirmEmail = async (token: string): Promise<User> => {
-    const response = await apiClient.get(`${USER_BASE_PATH}/confirm-email`, {
-        params: { token },
-    });
+    try {
+        const response = await apiClient.get(
+            `${USER_BASE_PATH}/confirm-email`,
+            {
+                params: { token },
+            },
+        );
 
-    if (!response.data?.success) {
-        throw new Error(response.data?.message || "Email confirmation failed");
+        if (!response.data?.success) {
+            throw new Error(
+                response.data?.message || "Email confirmation failed",
+            );
+        }
+
+        return response.data.userData as User;
+    } catch (error) {
+        throw new Error(getApiErrorMessage(error, "Email confirmation failed"));
     }
-
-    return response.data.userData as User;
 };
 
 export const deleteMyAccount = async (): Promise<string> => {
-    const response = await apiClient.delete(`${USER_BASE_PATH}/me`);
+    try {
+        const response = await apiClient.delete(`${USER_BASE_PATH}/me`);
 
-    if (!response.data?.success) {
-        throw new Error(response.data?.message || "Delete account failed");
+        if (!response.data?.success) {
+            throw new Error(response.data?.message || "Delete account failed");
+        }
+
+        return (response.data?.message as string) || "Account deleted";
+    } catch (error) {
+        throw new Error(getApiErrorMessage(error, "Delete account failed"));
     }
-
-    return (response.data?.message as string) || "Account deleted";
 };
 
-export async function changeMyPassword(newPassword: string): Promise<string> {
-    const res = await apiClient.post(`${USER_BASE_PATH}/me/change-password`, {
-        new_password: newPassword,
-    });
+export const changeMyPassword = async (
+    newPassword: string,
+    currentPassword?: string,
+): Promise<string> => {
+    try {
+        const response = await apiClient.post(
+            `${USER_BASE_PATH}/me/change-password`,
+            {
+                new_password: newPassword,
+                ...(currentPassword
+                    ? { current_password: currentPassword }
+                    : {}),
+            },
+        );
 
-    if (res.data?.success === false) {
-        throw new Error(res.data?.message || "Password update failed");
+        if (!response.data?.success) {
+            throw new Error(response.data?.message || "Password update failed");
+        }
+
+        return (response.data?.message as string) || "Password updated";
+    } catch (error) {
+        throw new Error(getApiErrorMessage(error, "Password update failed"));
     }
-
-    return (res.data?.message as string) || "Password updated";
-}
+};
 
 export const requestPasswordReset = async (
     email: string,
 ): Promise<{ success: boolean; message: string }> => {
-    const response = await apiClient.post(`/users/forgot-password`, { email });
-    return response.data as { success: boolean; message: string };
+    try {
+        const response = await apiClient.post(`/users/forgot-password`, {
+            email,
+        });
+
+        if (!response.data?.success) {
+            throw new Error(
+                response.data?.message ||
+                    "Failed to send password reset email.",
+            );
+        }
+
+        return response.data as { success: boolean; message: string };
+    } catch (error) {
+        throw new Error(
+            getApiErrorMessage(error, "Failed to send password reset email."),
+        );
+    }
 };
 
 export const resetPassword = async (
     token: string,
     newPassword: string,
 ): Promise<{ success: boolean; message: string }> => {
-    const response = await apiClient.post(`/users/reset-password`, {
-        token,
-        new_password: newPassword,
-    });
-    return response.data as { success: boolean; message: string };
+    try {
+        const response = await apiClient.post(`/users/reset-password`, {
+            token,
+            new_password: newPassword,
+        });
+
+        if (!response.data?.success) {
+            throw new Error(response.data?.message || "Password reset failed");
+        }
+
+        return response.data as { success: boolean; message: string };
+    } catch (error) {
+        throw new Error(getApiErrorMessage(error, "Password reset failed"));
+    }
 };
 
 // SSE-based background job starter
@@ -215,27 +319,33 @@ export const startTranscriptionJob = async (
     file: File,
     options: Partial<TranscriptionOptions>,
 ): Promise<StartTranscriptionResponse> => {
-    const formData = new FormData();
+    try {
+        const formData = new FormData();
 
-    const modified = new Date(file.lastModified);
-    const fileModifiedDate = modified.toISOString();
+        const modified = new Date(file.lastModified);
+        const fileModifiedDate = modified.toISOString();
 
-    formData.append("fileModifiedDate", fileModifiedDate);
-    formData.append("options", JSON.stringify(options));
-    Object.entries(options).forEach(([key, value]) => {
-        formData.append(key, value.toString());
-    });
-    formData.append("audioFile", file);
+        formData.append("fileModifiedDate", fileModifiedDate);
+        formData.append("options", JSON.stringify(options));
+        Object.entries(options).forEach(([key, value]) => {
+            formData.append(key, value.toString());
+        });
+        formData.append("audioFile", file);
 
-    const { data } = await apiClient.post<StartTranscriptionResponse>(
-        `${TRANSCRIPTION_BASE_PATH}/start`,
-        formData,
-        {
-            headers: { "Content-Type": "multipart/form-data" },
-        },
-    );
+        const { data } = await apiClient.post<StartTranscriptionResponse>(
+            `${TRANSCRIPTION_BASE_PATH}/start`,
+            formData,
+            {
+                headers: { "Content-Type": "multipart/form-data" },
+            },
+        );
 
-    return data;
+        return data;
+    } catch (error) {
+        throw new Error(
+            getApiErrorMessage(error, "Failed to start transcription job."),
+        );
+    }
 };
 
 export const getTranscriptionProgressUrl = (jobId: string): string => {
@@ -248,21 +358,32 @@ export const fetchUserTranscripts = async (
     filters: Filters = {},
     sort: SortState = { orderBy: "file_recorded_at", direction: "desc" },
 ): Promise<TranscriptData[]> => {
-    const params = {
-        ...filters,
-        order_by: sort.orderBy,
-        direction: sort.direction,
-    };
+    try {
+        const params = {
+            ...filters,
+            order_by: sort.orderBy,
+            direction: sort.direction,
+        };
 
-    const response = await apiClient.get(
-        `${TRANSCRIPTION_BASE_PATH}/filtered_transcriptions`,
-        {
-            params,
-        },
-    );
+        const response = await apiClient.get(
+            `${TRANSCRIPTION_BASE_PATH}/filtered_transcriptions`,
+            {
+                params,
+            },
+        );
 
-    if (response.data?.success) return response.data.data as TranscriptData[];
-    throw new Error(response.data?.message || "Failed to fetch transcriptions");
+        if (!response.data?.success) {
+            throw new Error(
+                response.data?.message || "Failed to fetch transcriptions",
+            );
+        }
+
+        return response.data.data as TranscriptData[];
+    } catch (error) {
+        throw new Error(
+            getApiErrorMessage(error, "Failed to fetch transcriptions"),
+        );
+    }
 };
 
 export const exportTranscription = async (
@@ -270,25 +391,31 @@ export const exportTranscription = async (
     format: "txt" | "pdf" | "docx",
     fallbackFileName?: string,
 ): Promise<{ blob: Blob; fileName: string }> => {
-    const res = await apiClient.get(
-        `${TRANSCRIPTION_BASE_PATH}/export/${transcriptId}`,
-        {
-            params: { format },
-            responseType: "blob",
-        },
-    );
+    try {
+        const res = await apiClient.get(
+            `${TRANSCRIPTION_BASE_PATH}/export/${transcriptId}`,
+            {
+                params: { format },
+                responseType: "blob",
+            },
+        );
 
-    const cd = (res.headers as any)["content-disposition"];
-    let fileName = fallbackFileName
-        ? `${fallbackFileName.replace(/\.[^/.]+$/, "")}-${transcriptId}.${format}`
-        : `${transcriptId}.${format}`;
+        const cd = (res.headers as any)["content-disposition"];
+        let fileName = fallbackFileName
+            ? `${fallbackFileName.replace(/\.[^/.]+$/, "")}-${transcriptId}.${format}`
+            : `${transcriptId}.${format}`;
 
-    if (cd) {
-        const match = cd.match(/filename="?([^"]+)"?/);
-        if (match) fileName = match[1];
+        if (cd) {
+            const match = cd.match(/filename="?([^"]+)"?/);
+            if (match) fileName = match[1];
+        }
+
+        return { blob: res.data as Blob, fileName };
+    } catch (error) {
+        throw new Error(
+            getApiErrorMessage(error, "Failed to export transcription"),
+        );
     }
-
-    return { blob: res.data as Blob, fileName };
 };
 
 export const deleteTranscription = async (
@@ -296,7 +423,6 @@ export const deleteTranscription = async (
     options?: DeleteTranscriptionOptions,
 ): Promise<string> => {
     try {
-        // axios.delete with a body must use `data` inside config
         const response = await apiClient.delete(
             `${TRANSCRIPTION_BASE_PATH}/delete/dbTranscription/${id}`,
             { data: options ?? {} },
@@ -307,52 +433,83 @@ export const deleteTranscription = async (
         }
 
         return response.data.message as string;
-    } catch (error: any) {
-        const message =
-            error?.response?.data?.message || error.message || "Delete failed";
-        throw new Error(message);
+    } catch (error) {
+        throw new Error(getApiErrorMessage(error, "Delete failed"));
     }
 };
 
 export const fetchAssemblyTranscriptions = async (
     transcriptId: string,
 ): Promise<OnlineTranscription[]> => {
-    const params = transcriptId ? { transcript_id: transcriptId } : {};
+    try {
+        const params = transcriptId ? { transcript_id: transcriptId } : {};
 
-    const response = await apiClient.get(
-        `${TRANSCRIPTION_BASE_PATH}/assemblyai/history`,
-        {
-            params,
-        },
-    );
+        const response = await apiClient.get(
+            `${TRANSCRIPTION_BASE_PATH}/assemblyai/history`,
+            {
+                params,
+            },
+        );
 
-    if (!response.data?.success) {
+        if (!response.data?.success) {
+            throw new Error(
+                response.data?.message ||
+                    "Failed to fetch AssemblyAI transcriptions",
+            );
+        }
+
+        return response.data.data as OnlineTranscription[];
+    } catch (error) {
         throw new Error(
-            response.data?.message ||
+            getApiErrorMessage(
+                error,
                 "Failed to fetch AssemblyAI transcriptions",
+            ),
         );
     }
-
-    return response.data.data as OnlineTranscription[];
 };
 
 export const fetchTranscriptionById = async (
     id: string,
 ): Promise<TranscriptData> => {
-    const res = await apiClient.get(`${TRANSCRIPTION_BASE_PATH}/by_id/${id}`);
+    try {
+        const response = await apiClient.get(
+            `${TRANSCRIPTION_BASE_PATH}/by_id/${id}`,
+        );
 
-    if (res.data?.success) return res.data.data as TranscriptData;
-    throw new Error(res.data?.message || "Failed to fetch transcription");
+        if (!response.data?.success) {
+            throw new Error(
+                response.data?.message || "Failed to fetch transcription",
+            );
+        }
+
+        return response.data.data as TranscriptData;
+    } catch (error) {
+        throw new Error(
+            getApiErrorMessage(error, "Failed to fetch transcription"),
+        );
+    }
 };
 
 export const restoreTranscription = async (
     payload: RestorePayload,
 ): Promise<TranscriptData> => {
-    const { data } = await apiClient.post(
-        `${TRANSCRIPTION_BASE_PATH}/restore`,
-        payload,
-    );
-    return data.data as TranscriptData;
+    try {
+        const { data } = await apiClient.post(
+            `${TRANSCRIPTION_BASE_PATH}/restore`,
+            payload,
+        );
+
+        if (!data?.success) {
+            throw new Error(data?.message || "Failed to restore transcription");
+        }
+
+        return data.data as TranscriptData;
+    } catch (error) {
+        throw new Error(
+            getApiErrorMessage(error, "Failed to restore transcription"),
+        );
+    }
 };
 
 export const deleteAssemblyTranscription = async (
@@ -368,10 +525,8 @@ export const deleteAssemblyTranscription = async (
         }
 
         return response.data.message as string;
-    } catch (error: any) {
-        const message =
-            error?.response?.data?.message || error.message || "Delete failed";
-        throw new Error(message);
+    } catch (error) {
+        throw new Error(getApiErrorMessage(error, "Delete failed"));
     }
 };
 
