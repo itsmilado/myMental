@@ -1,5 +1,3 @@
-// src/features/account/components/ChangePasswordDialog.tsx
-
 import {
     Dialog,
     DialogTitle,
@@ -75,12 +73,15 @@ const ChangePasswordDialog = ({
             return;
         }
 
-        await onSubmit({
-            currentPassword: cp || undefined,
-            newPassword: np,
-        });
-
-        reset();
+        try {
+            await onSubmit({
+                currentPassword: cp || undefined,
+                newPassword: np,
+            });
+            reset();
+        } catch (e: any) {
+            setError(e?.message || "Failed to update password.");
+        }
     };
 
     return (

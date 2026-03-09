@@ -29,8 +29,8 @@ import {
     requestCurrentEmailConfirmation,
     unlinkGoogleAccount,
     updateCurrentUser,
+    startGoogleOAuth,
 } from "../../auth/api";
-import { API_BASE_URL } from "../../../api/apiClient";
 
 const isValidName = (value: string) => {
     const v = value.trim();
@@ -43,12 +43,12 @@ const sectionCardSx = {
     borderRadius: 3,
 };
 
-type ReauthAction = "delete" | "email" | "link" | "unlink" | null;
+type ReauthAction = "delete" | "email" | "link" | "unlink" | "password" | null;
 
-type ChangePasswordPayload = {
-    currentPassword?: string;
-    newPassword: string;
-};
+// type ChangePasswordPayload = {
+//     currentPassword?: string;
+//     newPassword: string;
+// };
 
 const AccountPage = () => {
     const user = useAuthStore((s) => s.user);
@@ -268,7 +268,10 @@ const AccountPage = () => {
     const handleChangePassword = async ({
         currentPassword,
         newPassword,
-    }: ChangePasswordPayload) => {
+    }: {
+        currentPassword?: string;
+        newPassword: string;
+    }) => {
         try {
             setChangingPw(true);
             const msg = await changeMyPassword(newPassword, currentPassword);
@@ -276,11 +279,12 @@ const AccountPage = () => {
             setChangePwOpen(false);
         } catch (e: any) {
             openToast(e?.message || "Failed to update password.", "error");
-            throw e;
+            return;
         } finally {
             setChangingPw(false);
         }
     };
+
     const handleSendCurrentEmailConfirmation = async () => {
         try {
             setSendingEmailConfirm(true);
@@ -381,24 +385,50 @@ const AccountPage = () => {
         );
     };
 
+    const startChangePasswordFlow = () => {
+        setReauthAction("password");
+        setReauthMode("password");
+        setReauthTitle("Confirm password change");
+        setReauthDescription(
+            "Please confirm your current password before changing it.",
+        );
+        setReauthGoogleIntent("reauth_email");
+        setReauthOpen(true);
+    };
+
     const handlePasswordReauthSuccess = () => {
         setReauthOpen(false);
 
         if (reauthAction === "email") {
             setChangeEmailOpen(true);
+            setReauthAction(null);
+            openToast("Identity confirmed.", "success");
             return;
         }
 
         if (reauthAction === "delete") {
             setDeleteConfirmOpen(true);
+            setReauthAction(null);
+            openToast("Identity confirmed.", "success");
+            return;
+        }
+
+        if (reauthAction === "password") {
+            setChangePwOpen(true);
+            setReauthAction(null);
+            openToast("Identity confirmed.", "success");
             return;
         }
 
         if (reauthAction === "link") {
-            window.location.assign(`${API_BASE_URL}/auth/google?intent=link`);
+            setReauthAction(null);
+            startGoogleOAuth("link");
+            return;
         }
-    };
 
+        setReauthAction(null);
+        openToast("Identity confirmed.", "success");
+    };
     if (!user) {
         return (
             <Box>
@@ -874,7 +904,7 @@ const AccountPage = () => {
 
                                     <Button
                                         variant="outlined"
-                                        onClick={() => setChangePwOpen(true)}
+                                        onClick={startChangePasswordFlow}
                                     >
                                         Change password
                                     </Button>
