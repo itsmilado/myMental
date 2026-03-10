@@ -489,11 +489,15 @@ const reauthCurrentUser = async (request, response, next) => {
         const now = Date.now();
         request.session.reauthenticatedAt = now;
 
-        return response.status(200).json({
-            success: true,
-            message: "Re-authenticated.",
-            reauthenticatedAt: now,
-            validForMs: REAUTH_WINDOW_MS,
+        return request.session.save((err) => {
+            if (err) return next(err);
+
+            return response.status(200).json({
+                success: true,
+                message: "Re-authenticated.",
+                reauthenticatedAt: now,
+                validForMs: REAUTH_WINDOW_MS,
+            });
         });
     } catch (error) {
         logger.error(`[reauthCurrentUser] => Error: ${error.message}`);
