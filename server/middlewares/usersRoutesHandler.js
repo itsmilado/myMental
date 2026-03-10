@@ -7,6 +7,7 @@ const { hashPassword } = require("../utils/hashPass");
 const logger = require("../utils/logger");
 const pool = require("../db/db");
 const loginCheck = require("../utils/loginCheck");
+const { establishAuthenticatedSession } = require("../utils/sessionAuth");
 const {
     createUserQuery,
     getUserByIdQuery,
@@ -56,11 +57,7 @@ const createUsers = async (request, response, next) => {
             `New user created: user_id(${JSON.stringify(newUser.id)}) `,
         ); // Log the new user
 
-        request.session.user = {
-            id: newUser.id,
-            email: newUser.email,
-            role: newUser.user_role,
-        };
+        await establishAuthenticatedSession(request, newUser);
 
         response.status(201).json({
             success: true,
@@ -120,36 +117,22 @@ const userLogin = async (request, response, next) => {
                 matchUser.id,
             )} user_role ${JSON.stringify(matchUser.user_role)}`,
         );
-        request.session.user = {
-            id: matchUser.id,
-            email: matchUser.email,
-            role: matchUser.user_role,
-        };
 
         const rememberMe = Boolean(request.body?.rememberMe);
 
-        // - rememberMe=true  => persistent cookie ( 30 days)
-        // - rememberMe=false => session cookie (expires on browser close)
-        if (rememberMe) {
-            request.session.cookie.maxAge = 1000 * 60 * 60 * 24 * 30; // 30 days
-        } else {
-            request.session.cookie.expires = false;
-            request.session.cookie.maxAge = null;
-        }
+        await establishAuthenticatedSession(request, matchUser, { rememberMe });
 
-        request.session.save(() => {
-            response.status(201).json({
-                success: true,
-                message: "login success",
-                userData: {
-                    id: matchUser.id,
-                    first_name: matchUser.first_name,
-                    last_name: matchUser.last_name,
-                    email: matchUser.email,
-                    role: matchUser.user_role,
-                    created_at: matchUser.created_at,
-                },
-            });
+        return response.status(201).json({
+            success: true,
+            message: "login success",
+            userData: {
+                id: matchUser.id,
+                first_name: matchUser.first_name,
+                last_name: matchUser.last_name,
+                email: matchUser.email,
+                role: matchUser.user_role,
+                created_at: matchUser.created_at,
+            },
         });
     } catch (error) {
         logger.error(`[userHandlers > userLogin] Error: ${error.message}`);
