@@ -3,6 +3,7 @@
 const crypto = require("crypto");
 const { OAuth2Client } = require("google-auth-library");
 const logger = require("../utils/logger");
+const { establishAuthenticatedSession } = require("../utils/sessionAuth");
 const { hashPassword } = require("../utils/hashPass");
 const {
     getUserByEmailQuery,
@@ -116,15 +117,20 @@ const googleOAuthCallback = async (req, res) => {
         const payload = ticket.getPayload();
         if (!payload) return res.redirect(oauthErrorRedirect);
 
-        const google_sub = payload.sub;
+        const google_sub = String(payload.sub || "").trim();
         const email = String(payload.email || "")
             .trim()
             .toLowerCase();
+        const emailVerified = payload.email_verified === true;
         const first_name = String(payload.given_name || "User").trim();
         const last_name = String(payload.family_name || "").trim();
 
-        if (!google_sub || !email) {
-            return res.redirect(oauthErrorRedirect);
+        if (!google_sub || !email || !emailVerified) {
+            return res.redirect(
+                redirectWithParams(oauthSuccessRedirect, {
+                    error: "Google account email is missing or not verified.",
+                }),
+            );
         }
 
         const isReauthIntent =
@@ -255,12 +261,8 @@ const googleOAuthCallback = async (req, res) => {
 
         let user = await getUserByGoogleSubQuery({ google_sub });
         if (user) {
-            req.session.user = {
-                id: user.id,
-                email: user.email,
-                role: user.user_role,
-            };
-            return req.session.save(() => res.redirect(oauthSuccessRedirect));
+            await establishAuthenticatedSession(req, user);
+            return res.redirect(oauthSuccessRedirect);
         }
 
         const byEmail = await getUserByEmailQuery({ email });
@@ -289,13 +291,8 @@ const googleOAuthCallback = async (req, res) => {
             google_sub,
         });
 
-        req.session.user = {
-            id: user.id,
-            email: user.email,
-            role: user.user_role,
-        };
-
-        return req.session.save(() => res.redirect(oauthSuccessRedirect));
+        await establishAuthenticatedSession(req, user);
+        return res.redirect(oauthSuccessRedirect);
     } catch (err) {
         logger.error(`[googleOAuthCallback] => ${err.message}`);
         return res.redirect(oauthErrorRedirect);
