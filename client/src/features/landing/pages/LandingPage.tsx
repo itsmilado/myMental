@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import {
-    AppBar,
     Box,
     Button,
     Card,
@@ -13,17 +12,15 @@ import {
     Divider,
     Link,
     Stack,
-    Toolbar,
     Typography,
-    useScrollTrigger,
     Grid,
 } from "@mui/material";
-import { styled, keyframes } from "@mui/material/styles";
+import { styled } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 
 import AppTheme from "../../../components/shared-theme/AppTheme";
-import ColorModeSelect from "../../../components/shared-theme/ColorModeSelect";
 import { SitemarkIcon } from "../../../components/CustomIcons";
+import PublicTopBar from "../../public/components/PublicTopBar";
 
 type RevealProps = React.PropsWithChildren<{ delayMs?: number }>;
 
@@ -79,21 +76,6 @@ const PageRoot = styled(Box)(({ theme }) => ({
     }),
 }));
 
-const SubtleAppBar = styled(AppBar)(({ theme }) => ({
-    backgroundColor: "transparent",
-    boxShadow: "none",
-    borderBottom: "1px solid transparent",
-    transition: "background-color 200ms ease, border-color 200ms ease",
-    "&.scrolled": {
-        backgroundColor:
-            theme.palette.mode === "dark"
-                ? "rgba(2, 6, 23, 0.72)"
-                : "rgba(255, 255, 255, 0.72)",
-        backdropFilter: "blur(10px)",
-        borderBottom: `1px solid ${theme.palette.divider}`,
-    },
-}));
-
 const HeroMock = styled(Box)(({ theme }) => ({
     width: "100%",
     borderRadius: 20,
@@ -142,118 +124,6 @@ const SectionTitle = ({
                 </Typography>
             ) : null}
         </Stack>
-    );
-};
-
-const TopNav = () => {
-    const navigate = useNavigate();
-    const trigger = useScrollTrigger({
-        disableHysteresis: true,
-        threshold: 12,
-    });
-
-    return (
-        <SubtleAppBar position="sticky" className={trigger ? "scrolled" : ""}>
-            <Toolbar sx={{ py: 1 }}>
-                <Container
-                    maxWidth="lg"
-                    sx={{ display: "flex", alignItems: "center", gap: 2 }}
-                >
-                    <Box
-                        sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1,
-                            cursor: "pointer",
-                            userSelect: "none",
-                        }}
-                        onClick={() => scrollToId("top")}
-                        role="button"
-                        aria-label="Go to top"
-                    >
-                        <SitemarkIcon />
-                        <Typography
-                            variant="subtitle1"
-                            sx={{ fontWeight: 800 }}
-                        >
-                            myMental
-                        </Typography>
-                    </Box>
-
-                    <Box sx={{ flex: 1 }} />
-
-                    <Stack
-                        direction="row"
-                        spacing={1}
-                        sx={{
-                            display: { xs: "none", md: "flex" },
-                            alignItems: "center",
-                        }}
-                    >
-                        <Button
-                            variant="text"
-                            color="inherit"
-                            onClick={() => scrollToId("features")}
-                            sx={{ textTransform: "none" }}
-                        >
-                            Features
-                        </Button>
-                        <Button
-                            variant="text"
-                            color="inherit"
-                            onClick={() => scrollToId("privacy")}
-                            sx={{ textTransform: "none" }}
-                        >
-                            Privacy
-                        </Button>
-
-                        <Button
-                            variant="text"
-                            color="inherit"
-                            onClick={() => navigate("/sign-in")}
-                            sx={{ textTransform: "none" }}
-                        >
-                            Sign in
-                        </Button>
-
-                        <Button
-                            variant="contained"
-                            onClick={() => navigate("/sign-up")}
-                            sx={{ textTransform: "none", borderRadius: 999 }}
-                        >
-                            Create account
-                        </Button>
-
-                        <ColorModeSelect />
-                    </Stack>
-
-                    <Stack
-                        direction="row"
-                        spacing={1}
-                        sx={{
-                            display: { xs: "flex", md: "none" },
-                            alignItems: "center",
-                        }}
-                    >
-                        <Button
-                            variant="outlined"
-                            onClick={() => navigate("/")}
-                            sx={{ textTransform: "none", borderRadius: 999 }}
-                        >
-                            Sign in
-                        </Button>
-                        <Button
-                            variant="contained"
-                            onClick={() => navigate("/sign-up")}
-                            sx={{ textTransform: "none", borderRadius: 999 }}
-                        >
-                            Create
-                        </Button>
-                        <ColorModeSelect />
-                    </Stack>
-                </Container>
-            </Toolbar>
-        </SubtleAppBar>
     );
 };
 
@@ -1002,7 +872,26 @@ const LandingPage = (props: { disableCustomTheme?: boolean }) => {
         <AppTheme {...props}>
             <CssBaseline enableColorScheme />
             <PageRoot>
-                <TopNav />
+                <PublicTopBar
+                    brandOnClick={() => scrollToId("top")}
+                    brandAriaLabel="Go to top"
+                    links={[
+                        {
+                            label: "Features",
+                            onClick: () => scrollToId("features"),
+                        },
+                        {
+                            label: "Privacy",
+                            onClick: () => scrollToId("privacy"),
+                        },
+                        {
+                            label: "How it works",
+                            onClick: () => scrollToId("how-it-works"),
+                        },
+                    ]}
+                    secondaryAction={{ label: "Sign in", to: "/sign-in" }}
+                    primaryAction={{ label: "Create account", to: "/sign-up" }}
+                />
                 <Hero />
                 <TrustStrip />
                 <ValueProps />
