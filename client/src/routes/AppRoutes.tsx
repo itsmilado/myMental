@@ -20,17 +20,24 @@ import SettingsPage from "../features/settings/pages/SettingsPage";
 import ConfirmEmailPage from "../features/account/pages/ConfirmEmailPage";
 import ResetPassword from "../features/auth/pages/ResetPassword";
 import OAuthCallback from "../features/auth/pages/OAuthCallback";
+import PublicLayout from "../features/public/layout/PublicLayout";
 
 const AppRoutes = () => {
     return (
         <Routes>
-            {/* Public routes */}
+            {/* Public landing */}
             <Route path="/" element={<LandingPage />} />
-            <Route path="/sign-in" element={<SignIn />} />
-            <Route path="/sign-up" element={<SignUp />} />
+
+            {/* Shared public auth shell */}
+            <Route element={<PublicLayout />}>
+                <Route path="/sign-in" element={<SignIn />} />
+                <Route path="/sign-up" element={<SignUp />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/oauth/callback" element={<OAuthCallback />} />
+            </Route>
+
+            {/* Other public routes */}
             <Route path="/confirm-email" element={<ConfirmEmailPage />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/oauth/callback" element={<OAuthCallback />} />
 
             {/* Protected dashboard routes */}
             <Route
