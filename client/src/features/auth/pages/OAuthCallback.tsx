@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-    Box,
-    CircularProgress,
-    Typography,
     Alert,
+    Box,
     Button,
+    CircularProgress,
+    Stack,
+    Typography,
+    Card,
 } from "@mui/material";
 import { fetchCurrentUser } from "../api";
 import { useAuthStore } from "../../../store/useAuthStore";
@@ -58,28 +60,48 @@ const OAuthCallback = () => {
     }, [navigate, params, setUser]);
 
     return (
-        <Box sx={{ p: 4, maxWidth: 520, mx: "auto" }}>
-            <Typography variant="h5" fontWeight={800} gutterBottom>
-                Signing you in…
-            </Typography>
+        <Card
+            variant="outlined"
+            sx={{
+                width: "100%",
+                maxWidth: 520,
+                borderRadius: 24,
+                p: 4,
+            }}
+        >
+            <Stack spacing={2}>
+                <Box>
+                    <Typography variant="h5" fontWeight={800} gutterBottom>
+                        Signing you in…
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        We&apos;re finishing your secure Google sign-in.
+                    </Typography>
+                </Box>
 
-            {!error ? (
-                <CircularProgress />
-            ) : (
-                <>
-                    <Alert severity="error" sx={{ mt: 2 }}>
-                        {error}
-                    </Alert>
-                    <Button
-                        sx={{ mt: 2 }}
-                        variant="contained"
-                        onClick={() => navigate("/sign-in")}
+                {!error ? (
+                    <Box
+                        sx={{
+                            display: "flex",
+                            justifyContent: "center",
+                            py: 2,
+                        }}
                     >
-                        Back to sign in
-                    </Button>
-                </>
-            )}
-        </Box>
+                        <CircularProgress />
+                    </Box>
+                ) : (
+                    <>
+                        <Alert severity="error">{error}</Alert>
+                        <Button
+                            variant="contained"
+                            onClick={() => navigate("/sign-in")}
+                        >
+                            Back to sign in
+                        </Button>
+                    </>
+                )}
+            </Stack>
+        </Card>
     );
 };
 
