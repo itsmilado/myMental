@@ -1,7 +1,7 @@
 // src/store/usePreferencesStore.ts
 
 import { create } from "zustand";
-import type { UserPreferences } from "../types/types";
+import type { DeepPartial, UserPreferences } from "../types/types";
 import {
     fetchMyPreferences,
     patchMyPreferences,
@@ -13,7 +13,7 @@ type PreferencesState = {
     error: string | null;
 
     load: () => Promise<void>;
-    patch: (patch: Partial<UserPreferences>) => Promise<void>;
+    patch: (patch: DeepPartial<UserPreferences>) => Promise<void>;
 };
 
 export const usePreferencesStore = create<PreferencesState>((set, get) => ({
@@ -34,12 +34,11 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
         }
     },
 
-    patch: async (patch) => {
+    patch: async (patch: DeepPartial<UserPreferences>) => {
         const prev = get().preferences;
         if (!prev) return;
 
-        // optimistic merge (shallow at known keys)
-        const optimistic = {
+        const optimistic: UserPreferences = {
             ...prev,
             ...patch,
             appearance: patch.appearance
@@ -49,7 +48,7 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
                 ? { ...prev.transcription, ...patch.transcription }
                 : prev.transcription,
             ai: patch.ai ? { ...prev.ai, ...patch.ai } : prev.ai,
-        } as UserPreferences;
+        };
 
         set({ preferences: optimistic, error: null });
 

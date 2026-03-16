@@ -1,6 +1,6 @@
 // src/features/preferences/api/preferencesApi.ts
 
-import type { UserPreferences } from "../../../types/types";
+import type { DeepPartial, UserPreferences } from "../../../types/types";
 import { apiClient } from "../../../api/apiClient";
 
 export const fetchMyPreferences = async (): Promise<UserPreferences> => {
@@ -11,7 +11,7 @@ export const fetchMyPreferences = async (): Promise<UserPreferences> => {
 };
 
 export const patchMyPreferences = async (
-    patch: Partial<UserPreferences>,
+    patch: DeepPartial<UserPreferences>,
 ): Promise<UserPreferences> => {
     const res = await apiClient.patch(`/users/me/preferences`, patch);
     if (!res.data?.success)
