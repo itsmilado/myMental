@@ -130,20 +130,30 @@ export interface AuthResponse {
 }
 
 export type ThemePreference = "system" | "light" | "dark";
+export type SummaryStyle = "bullets" | "journal" | "action_items";
 
 export type UserPreferences = {
     schemaVersion: number;
-    appearance: { theme: ThemePreference };
+    appearance: {
+        theme: ThemePreference;
+    };
     transcription: {
-        defaultLanguageCode: string;
-        defaultModel: string;
-        defaultSpeakerLabels: boolean;
-        defaultShowSpeakers: boolean;
-        defaultShowTimestamps: boolean;
+        model: SpeechModel;
+        language: string;
+        autoDetectLanguage: boolean;
+        codeSwitching: boolean;
+        speakerLabels: boolean;
+        speakersExpected: number;
+        formatText: boolean;
+        punctuate: boolean;
+        entityDetection: boolean;
+        sentimentAnalysis: boolean;
+        showSpeakers: boolean;
+        showTimestamps: boolean;
     };
     ai: {
         autoSummarizeAfterTranscription: boolean;
-        summaryStyle: "bullets" | "journal" | "action_items";
+        summaryStyle: SummaryStyle;
     };
 };
 
