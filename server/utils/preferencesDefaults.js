@@ -1,4 +1,6 @@
-const PREFERENCES_SCHEMA_VERSION = 1;
+// utils/preferencesDefaults.js
+
+const PREFERENCES_SCHEMA_VERSION = 2;
 
 const DEFAULT_PREFERENCES = {
     schemaVersion: PREFERENCES_SCHEMA_VERSION,
@@ -8,11 +10,18 @@ const DEFAULT_PREFERENCES = {
     },
 
     transcription: {
-        defaultLanguageCode: "en_us",
-        defaultModel: "slam-1", // adjust to your actual supported models
-        defaultSpeakerLabels: false,
-        defaultShowSpeakers: true,
-        defaultShowTimestamps: false,
+        model: "slam-1",
+        language: "en_us",
+        autoDetectLanguage: false,
+        codeSwitching: false,
+        speakerLabels: false,
+        speakersExpected: 2,
+        formatText: true,
+        punctuate: true,
+        entityDetection: false,
+        sentimentAnalysis: false,
+        showSpeakers: true,
+        showTimestamps: false,
     },
 
     ai: {
@@ -22,7 +31,6 @@ const DEFAULT_PREFERENCES = {
 };
 
 const mergePreferences = (stored) => {
-    // stored can be null/undefined/{}; merge shallow+nested safely
     const s = stored && typeof stored === "object" ? stored : {};
 
     return {
