@@ -2,53 +2,155 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-    Box,
-    Paper,
-    Typography,
-    Stack,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    Switch,
-    FormControlLabel,
-    CircularProgress,
-    Snackbar,
     Alert,
+    Box,
+    Chip,
+    CircularProgress,
     Divider,
+    FormControl,
+    FormControlLabel,
+    InputLabel,
+    MenuItem,
+    Paper,
+    Select,
+    Snackbar,
+    Stack,
+    Switch,
+    TextField,
+    Typography,
 } from "@mui/material";
+
 import { usePreferencesStore } from "../../../store/usePreferencesStore";
-import type { ThemePreference } from "../../../types/types";
+import type {
+    SpeechModel,
+    SummaryStyle,
+    ThemePreference,
+    UserPreferences,
+    DeepPartial,
+} from "../../../types/types";
+
+const sectionCardSx = {
+    p: { xs: 2, md: 3 },
+    borderRadius: 3,
+};
+
+const modelOptions: SpeechModel[] = ["universal-2", "slam-1", "nano"];
+
+const modelLanguages: Record<SpeechModel, string[]> = {
+    "universal-2": [
+        "en",
+        "en_uk",
+        "en_us",
+        "de",
+        "fa",
+        "ar",
+        "es",
+        "fr",
+        "uk",
+        "ru",
+    ],
+    "slam-1": ["en", "en_uk", "en_us"],
+    nano: ["en", "en_uk", "en_us", "es", "de", "fr"],
+};
+
+const languageLabels: Record<string, string> = {
+    en: "English (Global)",
+    en_uk: "English (British)",
+    en_us: "English (US)",
+    de: "German",
+    fa: "Persian (Farsi)",
+    ar: "Arabic",
+    es: "Spanish",
+    fr: "French",
+    uk: "Ukrainian",
+    ru: "Russian",
+};
+
+const getLanguageLabel = (code: string): string => languageLabels[code] ?? code;
+
+const SettingsSection = ({
+    title,
+    description,
+    children,
+    chip,
+}: {
+    title: string;
+    description: string;
+    children: React.ReactNode;
+    chip?: string;
+}) => (
+    <Paper sx={sectionCardSx}>
+        <Stack spacing={2.5}>
+            <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={2}
+                alignItems={{ xs: "flex-start", sm: "center" }}
+                justifyContent="space-between"
+            >
+                <Box>
+                    <Typography variant="h6" fontWeight={700}>
+                        {title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        {description}
+                    </Typography>
+                </Box>
+
+                {chip ? (
+                    <Chip label={chip} size="small" variant="outlined" />
+                ) : null}
+            </Stack>
+
+            <Divider />
+
+            {children}
+        </Stack>
+    </Paper>
+);
 
 const PreferencesPage = () => {
     const { preferences, loading, error, load, patch } = usePreferencesStore();
 
     const [toast, setToast] = useState<{
         open: boolean;
-        msg: string;
+        message: string;
         severity: "success" | "error";
     }>({
         open: false,
-        msg: "",
+        message: "",
         severity: "success",
     });
 
     useEffect(() => {
-        load();
+        void load();
     }, [load]);
 
-    const themeValue = preferences?.appearance.theme ?? "system";
+    const openToast = (message: string, severity: "success" | "error") => {
+        setToast({ open: true, message, severity });
+    };
 
-    const modelOptions = useMemo(() => ["slam-1", "nano", "universal-2"], []);
-    const languageOptions = useMemo(
-        () => [
-            { code: "en_us", label: "English (US)" },
-            { code: "en_uk", label: "English (UK)" },
-            { code: "de", label: "German" },
-            { code: "fr", label: "French" },
-            { code: "es", label: "Spanish" },
-        ],
-        [],
+    const savePatch = async (
+        nextPatch: DeepPartial<UserPreferences>,
+        successMessage = "Preferences saved.",
+    ) => {
+        try {
+            await patch(nextPatch);
+            openToast(successMessage, "success");
+        } catch (e: any) {
+            openToast(e?.message || "Failed to save preferences.", "error");
+        }
+    };
+
+    const themeValue = preferences?.appearance.theme ?? "system";
+    const transcription = preferences?.transcription;
+    const ai = preferences?.ai;
+
+    const currentModel: SpeechModel = transcription?.model ?? "slam-1";
+    const isUniversal2 = currentModel === "universal-2";
+
+    const currentLanguages = useMemo(
+        () => modelLanguages[currentModel] ?? ["en_us"],
+        [currentModel],
     );
 
     if (loading && !preferences) {
@@ -64,59 +166,69 @@ const PreferencesPage = () => {
         );
     }
 
+    if (!preferences || !transcription || !ai) {
+        return (
+            <Box sx={{ maxWidth: 980, mx: "auto", pb: 4 }}>
+                <Alert severity="error">Unable to load preferences.</Alert>
+            </Box>
+        );
+    }
+
     return (
-        <Box>
-            <Typography variant="h4" fontWeight="bold" gutterBottom>
-                Preferences
-            </Typography>
-
-            <Stack spacing={2}>
-                {/* Appearance */}
-                <Paper sx={{ p: 3 }}>
-                    <Typography variant="h6" fontWeight={700} gutterBottom>
-                        Appearance
+        <Box sx={{ maxWidth: 980, mx: "auto", pb: 4 }}>
+            <Stack spacing={3}>
+                <Box>
+                    <Typography variant="h4" fontWeight={700} gutterBottom>
+                        Preferences
                     </Typography>
+                    <Typography color="text.secondary">
+                        Manage your workspace defaults, transcription behavior,
+                        and future feature settings in one place. Upload Audio
+                        uses the transcription defaults configured here.
+                    </Typography>
+                </Box>
 
+                <SettingsSection
+                    title="Appearance"
+                    description="Control how the app looks across your dashboard."
+                >
                     <FormControl fullWidth>
                         <InputLabel id="theme-label">Theme</InputLabel>
                         <Select
                             labelId="theme-label"
                             label="Theme"
                             value={themeValue}
-                            onChange={async (e) => {
-                                const value = e.target.value as ThemePreference;
-                                try {
-                                    await patch({
-                                        appearance: { theme: value },
-                                    } as any);
-                                    setToast({
-                                        open: true,
-                                        msg: "Theme preference saved",
-                                        severity: "success",
-                                    });
-                                } catch (err: any) {
-                                    setToast({
-                                        open: true,
-                                        msg: err?.message || "Failed to save",
-                                        severity: "error",
-                                    });
-                                }
-                            }}
+                            onChange={(e) =>
+                                void savePatch(
+                                    {
+                                        appearance: {
+                                            theme: e.target
+                                                .value as ThemePreference,
+                                        },
+                                    },
+                                    "Theme preference saved.",
+                                )
+                            }
                         >
                             <MenuItem value="system">System</MenuItem>
                             <MenuItem value="light">Light</MenuItem>
                             <MenuItem value="dark">Dark</MenuItem>
                         </Select>
                     </FormControl>
-                </Paper>
+                </SettingsSection>
 
-                {/* Transcription defaults */}
-                <Paper sx={{ p: 3 }}>
-                    <Typography variant="h6" fontWeight={700} gutterBottom>
-                        Transcription defaults
-                    </Typography>
-
-                    <Stack spacing={2}>
+                <SettingsSection
+                    title="Transcription defaults"
+                    description="These values initialize Upload Audio when you open the page."
+                    chip="Used by Upload Audio"
+                >
+                    <Box
+                        sx={{
+                            display: "grid",
+                            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                            gap: 2,
+                        }}
+                    >
                         <FormControl fullWidth>
                             <InputLabel id="model-label">
                                 Default model
@@ -124,212 +236,463 @@ const PreferencesPage = () => {
                             <Select
                                 labelId="model-label"
                                 label="Default model"
-                                value={
-                                    preferences?.transcription.defaultModel ??
-                                    "slam-1"
-                                }
-                                onChange={async (e) => {
-                                    try {
-                                        await patch({
+                                value={currentModel}
+                                onChange={(e) => {
+                                    const nextModel = e.target
+                                        .value as SpeechModel;
+                                    const nextLanguages = modelLanguages[
+                                        nextModel
+                                    ] ?? ["en_us"];
+                                    const nextIsUniversal2 =
+                                        nextModel === "universal-2";
+
+                                    const nextLanguage = nextLanguages.includes(
+                                        transcription.language,
+                                    )
+                                        ? transcription.language
+                                        : nextLanguages[0];
+
+                                    void savePatch(
+                                        {
                                             transcription: {
-                                                defaultModel: String(
-                                                    e.target.value,
-                                                ),
+                                                ...transcription,
+                                                model: nextModel,
+                                                language: nextLanguage,
+                                                autoDetectLanguage:
+                                                    nextIsUniversal2
+                                                        ? transcription.autoDetectLanguage
+                                                        : false,
+                                                codeSwitching:
+                                                    nextIsUniversal2 &&
+                                                    transcription.autoDetectLanguage
+                                                        ? transcription.codeSwitching
+                                                        : false,
                                             },
-                                        } as any);
-                                        setToast({
-                                            open: true,
-                                            msg: "Default model saved",
-                                            severity: "success",
-                                        });
-                                    } catch (err: any) {
-                                        setToast({
-                                            open: true,
-                                            msg:
-                                                err?.message ||
-                                                "Failed to save",
-                                            severity: "error",
-                                        });
-                                    }
+                                        },
+                                        "Default model saved.",
+                                    );
                                 }}
                             >
-                                {modelOptions.map((m) => (
-                                    <MenuItem key={m} value={m}>
-                                        {m}
+                                {modelOptions.map((model) => (
+                                    <MenuItem key={model} value={model}>
+                                        {model}
                                     </MenuItem>
                                 ))}
                             </Select>
                         </FormControl>
 
                         <FormControl fullWidth>
-                            <InputLabel id="lang-label">
+                            <InputLabel id="language-label">
                                 Default language
                             </InputLabel>
                             <Select
-                                labelId="lang-label"
+                                labelId="language-label"
                                 label="Default language"
-                                value={
-                                    preferences?.transcription
-                                        .defaultLanguageCode ?? "en_us"
+                                value={transcription.language}
+                                disabled={
+                                    isUniversal2 && transcription.codeSwitching
                                 }
-                                onChange={async (e) => {
-                                    try {
-                                        await patch({
+                                onChange={(e) =>
+                                    void savePatch(
+                                        {
                                             transcription: {
-                                                defaultLanguageCode: String(
+                                                ...transcription,
+                                                language: String(
                                                     e.target.value,
                                                 ),
                                             },
-                                        } as any);
-                                        setToast({
-                                            open: true,
-                                            msg: "Default language saved",
-                                            severity: "success",
-                                        });
-                                    } catch (err: any) {
-                                        setToast({
-                                            open: true,
-                                            msg:
-                                                err?.message ||
-                                                "Failed to save",
-                                            severity: "error",
-                                        });
-                                    }
-                                }}
+                                        },
+                                        "Default language saved.",
+                                    )
+                                }
                             >
-                                {languageOptions.map((l) => (
-                                    <MenuItem key={l.code} value={l.code}>
-                                        {l.label}
+                                {currentLanguages.map((lang) => (
+                                    <MenuItem key={lang} value={lang}>
+                                        {getLanguageLabel(lang)}
                                     </MenuItem>
                                 ))}
                             </Select>
                         </FormControl>
+                    </Box>
 
-                        <Divider />
-
+                    <Stack spacing={1}>
                         <FormControlLabel
                             control={
                                 <Switch
-                                    checked={
-                                        !!preferences?.transcription
-                                            .defaultSpeakerLabels
-                                    }
-                                    onChange={async (e) => {
-                                        try {
-                                            await patch({
+                                    checked={Boolean(
+                                        transcription.autoDetectLanguage,
+                                    )}
+                                    disabled={!isUniversal2}
+                                    onChange={(e) =>
+                                        void savePatch(
+                                            {
                                                 transcription: {
-                                                    defaultSpeakerLabels:
+                                                    ...transcription,
+                                                    autoDetectLanguage:
                                                         e.target.checked,
+                                                    codeSwitching: e.target
+                                                        .checked
+                                                        ? transcription.codeSwitching
+                                                        : false,
                                                 },
-                                            } as any);
-                                            setToast({
-                                                open: true,
-                                                msg: "Saved",
-                                                severity: "success",
-                                            });
-                                        } catch (err: any) {
-                                            setToast({
-                                                open: true,
-                                                msg:
-                                                    err?.message ||
-                                                    "Failed to save",
-                                                severity: "error",
-                                            });
-                                        }
-                                    }}
+                                            },
+                                            "Automatic language detection updated.",
+                                        )
+                                    }
                                 />
                             }
-                            label="Enable speaker labels by default"
+                            label="Enable automatic language detection"
                         />
 
                         <FormControlLabel
                             control={
                                 <Switch
-                                    checked={
-                                        !!preferences?.transcription
-                                            .defaultShowSpeakers
+                                    checked={Boolean(
+                                        transcription.codeSwitching,
+                                    )}
+                                    disabled={
+                                        !isUniversal2 ||
+                                        !transcription.autoDetectLanguage
                                     }
-                                    onChange={async (e) => {
-                                        try {
-                                            await patch({
+                                    onChange={(e) =>
+                                        void savePatch(
+                                            {
                                                 transcription: {
-                                                    defaultShowSpeakers:
+                                                    ...transcription,
+                                                    codeSwitching:
                                                         e.target.checked,
+                                                    autoDetectLanguage: e.target
+                                                        .checked
+                                                        ? true
+                                                        : transcription.autoDetectLanguage,
                                                 },
-                                            } as any);
-                                            setToast({
-                                                open: true,
-                                                msg: "Saved",
-                                                severity: "success",
-                                            });
-                                        } catch (err: any) {
-                                            setToast({
-                                                open: true,
-                                                msg:
-                                                    err?.message ||
-                                                    "Failed to save",
-                                                severity: "error",
-                                            });
-                                        }
-                                    }}
+                                            },
+                                            "Code switching updated.",
+                                        )
+                                    }
                                 />
                             }
-                            label="Show speakers in transcript view by default"
-                        />
-
-                        <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={
-                                        !!preferences?.transcription
-                                            .defaultShowTimestamps
-                                    }
-                                    onChange={async (e) => {
-                                        try {
-                                            await patch({
-                                                transcription: {
-                                                    defaultShowTimestamps:
-                                                        e.target.checked,
-                                                },
-                                            } as any);
-                                            setToast({
-                                                open: true,
-                                                msg: "Saved",
-                                                severity: "success",
-                                            });
-                                        } catch (err: any) {
-                                            setToast({
-                                                open: true,
-                                                msg:
-                                                    err?.message ||
-                                                    "Failed to save",
-                                                severity: "error",
-                                            });
-                                        }
-                                    }}
-                                />
-                            }
-                            label="Show timestamps in transcript view by default"
+                            label="Enable code switching"
                         />
                     </Stack>
-                </Paper>
 
-                {/* AI placeholder */}
-                <Paper sx={{ p: 3 }}>
-                    <Typography variant="h6" fontWeight={700} gutterBottom>
-                        AI (coming soon)
-                    </Typography>
-                    <Typography color="text.secondary">
-                        control auto-summaries, tone, and structured output.
-                    </Typography>
-                </Paper>
+                    <Divider />
 
-                {error && <Alert severity="error">{error}</Alert>}
+                    <Box
+                        sx={{
+                            display: "grid",
+                            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                            gap: 2,
+                        }}
+                    >
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={Boolean(
+                                        transcription.speakerLabels,
+                                    )}
+                                    onChange={(e) =>
+                                        void savePatch(
+                                            {
+                                                transcription: {
+                                                    ...transcription,
+                                                    speakerLabels:
+                                                        e.target.checked,
+                                                },
+                                            },
+                                            "Speaker label default saved.",
+                                        )
+                                    }
+                                />
+                            }
+                            label="Enable speaker labels"
+                        />
+
+                        <TextField
+                            label="Expected speakers"
+                            type="number"
+                            value={transcription.speakersExpected}
+                            disabled={!transcription.speakerLabels}
+                            inputProps={{ min: 1, max: 20 }}
+                            onChange={(e) =>
+                                void savePatch(
+                                    {
+                                        transcription: {
+                                            ...transcription,
+                                            speakersExpected: Math.max(
+                                                1,
+                                                Number.parseInt(
+                                                    e.target.value,
+                                                    10,
+                                                ) || 1,
+                                            ),
+                                        },
+                                    },
+                                    "Expected speakers saved.",
+                                )
+                            }
+                            helperText={
+                                transcription.speakerLabels
+                                    ? "Used when diarization is enabled."
+                                    : "Enable speaker labels to edit."
+                            }
+                        />
+                    </Box>
+
+                    <Box
+                        sx={{
+                            display: "grid",
+                            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                            gap: 1,
+                        }}
+                    >
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={Boolean(transcription.formatText)}
+                                    onChange={(e) =>
+                                        void savePatch(
+                                            {
+                                                transcription: {
+                                                    ...transcription,
+                                                    formatText:
+                                                        e.target.checked,
+                                                },
+                                            },
+                                            "Format text default saved.",
+                                        )
+                                    }
+                                />
+                            }
+                            label="Format text"
+                        />
+
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={Boolean(transcription.punctuate)}
+                                    onChange={(e) =>
+                                        void savePatch(
+                                            {
+                                                transcription: {
+                                                    ...transcription,
+                                                    punctuate: e.target.checked,
+                                                },
+                                            },
+                                            "Punctuation default saved.",
+                                        )
+                                    }
+                                />
+                            }
+                            label="Punctuate"
+                        />
+
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={Boolean(
+                                        transcription.entityDetection,
+                                    )}
+                                    onChange={(e) =>
+                                        void savePatch(
+                                            {
+                                                transcription: {
+                                                    ...transcription,
+                                                    entityDetection:
+                                                        e.target.checked,
+                                                },
+                                            },
+                                            "Entity detection default saved.",
+                                        )
+                                    }
+                                />
+                            }
+                            label="Entity detection"
+                        />
+
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={Boolean(
+                                        transcription.sentimentAnalysis,
+                                    )}
+                                    onChange={(e) =>
+                                        void savePatch(
+                                            {
+                                                transcription: {
+                                                    ...transcription,
+                                                    sentimentAnalysis:
+                                                        e.target.checked,
+                                                },
+                                            },
+                                            "Sentiment analysis default saved.",
+                                        )
+                                    }
+                                />
+                            }
+                            label="Sentiment analysis"
+                        />
+                    </Box>
+                </SettingsSection>
+
+                <SettingsSection
+                    title="Transcript display"
+                    description="Control transcript view defaults after transcription is complete."
+                >
+                    <Stack spacing={1}>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={Boolean(
+                                        transcription.showSpeakers,
+                                    )}
+                                    onChange={(e) =>
+                                        void savePatch(
+                                            {
+                                                transcription: {
+                                                    ...transcription,
+                                                    showSpeakers:
+                                                        e.target.checked,
+                                                },
+                                            },
+                                            "Transcript speaker display saved.",
+                                        )
+                                    }
+                                />
+                            }
+                            label="Show speakers by default"
+                        />
+
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={Boolean(
+                                        transcription.showTimestamps,
+                                    )}
+                                    onChange={(e) =>
+                                        void savePatch(
+                                            {
+                                                transcription: {
+                                                    ...transcription,
+                                                    showTimestamps:
+                                                        e.target.checked,
+                                                },
+                                            },
+                                            "Transcript timestamp display saved.",
+                                        )
+                                    }
+                                />
+                            }
+                            label="Show timestamps by default"
+                        />
+                    </Stack>
+                </SettingsSection>
+
+                <SettingsSection
+                    title="AI"
+                    description="Prepare future post-transcription AI workflows and output formatting."
+                    chip="Coming soon"
+                >
+                    <Box
+                        sx={{
+                            display: "grid",
+                            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                            gap: 2,
+                        }}
+                    >
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={Boolean(
+                                        ai.autoSummarizeAfterTranscription,
+                                    )}
+                                    onChange={(e) =>
+                                        void savePatch(
+                                            {
+                                                ai: {
+                                                    ...ai,
+                                                    autoSummarizeAfterTranscription:
+                                                        e.target.checked,
+                                                },
+                                            },
+                                            "AI summary preference saved.",
+                                        )
+                                    }
+                                />
+                            }
+                            label="Auto-summarize after transcription"
+                        />
+
+                        <FormControl fullWidth>
+                            <InputLabel id="summary-style-label">
+                                Summary style
+                            </InputLabel>
+                            <Select
+                                labelId="summary-style-label"
+                                label="Summary style"
+                                value={ai.summaryStyle}
+                                onChange={(e) =>
+                                    void savePatch(
+                                        {
+                                            ai: {
+                                                ...ai,
+                                                summaryStyle: e.target
+                                                    .value as SummaryStyle,
+                                            },
+                                        },
+                                        "Summary style saved.",
+                                    )
+                                }
+                            >
+                                <MenuItem value="bullets">Bullets</MenuItem>
+                                <MenuItem value="journal">Journal</MenuItem>
+                                <MenuItem value="action_items">
+                                    Action items
+                                </MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Box>
+                </SettingsSection>
+
+                <SettingsSection
+                    title="Documents"
+                    description="Document defaults will live here once document workflows are enabled."
+                    chip="Planned"
+                >
+                    <Alert severity="info">
+                        Reserve this section for document upload, sharing, and
+                        archive defaults.
+                    </Alert>
+                </SettingsSection>
+
+                <SettingsSection
+                    title="Tasks"
+                    description="Task-related defaults can be added here as task flows become available."
+                    chip="Planned"
+                >
+                    <Alert severity="info">
+                        Reserve this section for task list defaults, assignment
+                        views, and completion preferences.
+                    </Alert>
+                </SettingsSection>
+
+                <SettingsSection
+                    title="Calendar"
+                    description="Calendar display and scheduling defaults can be grouped here later."
+                    chip="Planned"
+                >
+                    <Alert severity="info">
+                        Reserve this section for calendar view defaults,
+                        reminders, and event settings.
+                    </Alert>
+                </SettingsSection>
+
+                {error ? <Alert severity="error">{error}</Alert> : null}
             </Stack>
 
             <Snackbar
                 open={toast.open}
-                autoHideDuration={2500}
+                autoHideDuration={2200}
                 onClose={() => setToast((t) => ({ ...t, open: false }))}
                 anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
             >
@@ -337,7 +700,7 @@ const PreferencesPage = () => {
                     severity={toast.severity}
                     onClose={() => setToast((t) => ({ ...t, open: false }))}
                 >
-                    {toast.msg}
+                    {toast.message}
                 </Alert>
             </Snackbar>
         </Box>
