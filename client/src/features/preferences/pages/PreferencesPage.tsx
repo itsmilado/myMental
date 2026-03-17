@@ -34,6 +34,8 @@ const sectionCardSx = {
     borderRadius: 3,
 };
 
+const AUTO_LANGUAGE_CODE = "auto";
+
 const modelOptions: SpeechModel[] = ["universal-2", "slam-1", "nano"];
 
 const modelLanguages: Record<SpeechModel, string[]> = {
@@ -54,6 +56,7 @@ const modelLanguages: Record<SpeechModel, string[]> = {
 };
 
 const languageLabels: Record<string, string> = {
+    [AUTO_LANGUAGE_CODE]: "Automatic Language Detection",
     en: "English (Global)",
     en_uk: "English (British)",
     en_us: "English (US)",
@@ -153,6 +156,11 @@ const PreferencesPage = () => {
         [currentModel],
     );
 
+    const currentLanguageValue =
+        isUniversal2 && transcription?.autoDetectLanguage
+            ? AUTO_LANGUAGE_CODE
+            : (transcription?.language ?? "en_us");
+
     if (loading && !preferences) {
         return (
             <Box
@@ -246,27 +254,32 @@ const PreferencesPage = () => {
                                     const nextIsUniversal2 =
                                         nextModel === "universal-2";
 
-                                    const nextLanguage = nextLanguages.includes(
-                                        transcription.language,
-                                    )
-                                        ? transcription.language
-                                        : nextLanguages[0];
+                                    const fallbackLanguage =
+                                        nextLanguages.includes(
+                                            transcription.language,
+                                        )
+                                            ? transcription.language
+                                            : nextLanguages[0];
+
+                                    const shouldKeepAuto =
+                                        nextIsUniversal2 &&
+                                        transcription.autoDetectLanguage;
 
                                     void savePatch(
                                         {
                                             transcription: {
                                                 ...transcription,
                                                 model: nextModel,
-                                                language: nextLanguage,
+                                                language: shouldKeepAuto
+                                                    ? AUTO_LANGUAGE_CODE
+                                                    : fallbackLanguage,
                                                 autoDetectLanguage:
                                                     nextIsUniversal2
                                                         ? transcription.autoDetectLanguage
                                                         : false,
-                                                codeSwitching:
-                                                    nextIsUniversal2 &&
-                                                    transcription.autoDetectLanguage
-                                                        ? transcription.codeSwitching
-                                                        : false,
+                                                codeSwitching: nextIsUniversal2
+                                                    ? transcription.codeSwitching
+                                                    : false,
                                             },
                                         },
                                         "Default model saved.",
@@ -288,24 +301,42 @@ const PreferencesPage = () => {
                             <Select
                                 labelId="language-label"
                                 label="Default language"
-                                value={transcription.language}
+                                value={currentLanguageValue}
                                 disabled={
                                     isUniversal2 && transcription.codeSwitching
                                 }
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                    const nextValue = String(e.target.value);
+                                    const selectingAuto =
+                                        nextValue === AUTO_LANGUAGE_CODE;
+
                                     void savePatch(
                                         {
                                             transcription: {
                                                 ...transcription,
-                                                language: String(
-                                                    e.target.value,
-                                                ),
+                                                language: nextValue,
+                                                autoDetectLanguage:
+                                                    selectingAuto
+                                                        ? true
+                                                        : transcription.autoDetectLanguage &&
+                                                            isUniversal2
+                                                          ? false
+                                                          : false,
+                                                codeSwitching: selectingAuto
+                                                    ? transcription.codeSwitching
+                                                    : false,
                                             },
                                         },
                                         "Default language saved.",
-                                    )
-                                }
+                                    );
+                                }}
                             >
+                                {isUniversal2 && (
+                                    <MenuItem value={AUTO_LANGUAGE_CODE}>
+                                        {getLanguageLabel(AUTO_LANGUAGE_CODE)}
+                                    </MenuItem>
+                                )}
+
                                 {currentLanguages.map((lang) => (
                                     <MenuItem key={lang} value={lang}>
                                         {getLanguageLabel(lang)}
@@ -323,22 +354,33 @@ const PreferencesPage = () => {
                                         transcription.autoDetectLanguage,
                                     )}
                                     disabled={!isUniversal2}
-                                    onChange={(e) =>
+                                    onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        const fallbackLanguage =
+                                            currentLanguages.find(
+                                                (lang) =>
+                                                    lang !== AUTO_LANGUAGE_CODE,
+                                            ) ?? "en_us";
+
                                         void savePatch(
                                             {
                                                 transcription: {
                                                     ...transcription,
-                                                    autoDetectLanguage:
-                                                        e.target.checked,
-                                                    codeSwitching: e.target
-                                                        .checked
+                                                    autoDetectLanguage: checked,
+                                                    language: checked
+                                                        ? AUTO_LANGUAGE_CODE
+                                                        : transcription.language ===
+                                                            AUTO_LANGUAGE_CODE
+                                                          ? fallbackLanguage
+                                                          : transcription.language,
+                                                    codeSwitching: checked
                                                         ? transcription.codeSwitching
                                                         : false,
                                                 },
                                             },
                                             "Automatic language detection updated.",
-                                        )
-                                    }
+                                        );
+                                    }}
                                 />
                             }
                             label="Enable automatic language detection"
@@ -354,22 +396,25 @@ const PreferencesPage = () => {
                                         !isUniversal2 ||
                                         !transcription.autoDetectLanguage
                                     }
-                                    onChange={(e) =>
+                                    onChange={(e) => {
+                                        const checked = e.target.checked;
+
                                         void savePatch(
                                             {
                                                 transcription: {
                                                     ...transcription,
-                                                    codeSwitching:
-                                                        e.target.checked,
-                                                    autoDetectLanguage: e.target
-                                                        .checked
+                                                    codeSwitching: checked,
+                                                    autoDetectLanguage: checked
                                                         ? true
                                                         : transcription.autoDetectLanguage,
+                                                    language: checked
+                                                        ? AUTO_LANGUAGE_CODE
+                                                        : transcription.language,
                                                 },
                                             },
                                             "Code switching updated.",
-                                        )
-                                    }
+                                        );
+                                    }}
                                 />
                             }
                             label="Enable code switching"

@@ -177,9 +177,8 @@ export const UploadAudioPage = () => {
         loading: preferencesLoading,
     } = usePreferencesStore();
 
-    const [preferencesApplied, setPreferencesApplied] = useState(false);
-
     const [file, setFile] = useState<File | null>(null);
+    const [hasLocalOptionEdits, setHasLocalOptionEdits] = useState(false);
     const [options, setOptions] = useState<TranscriptionOptions>(
         defaultTranscriptionOptions,
     );
@@ -203,11 +202,10 @@ export const UploadAudioPage = () => {
     }, [preferences, preferencesLoading, loadPreferences]);
 
     useEffect(() => {
-        if (!preferences || preferencesApplied) return;
+        if (!preferences || hasLocalOptionEdits) return;
 
         setOptions(mapPreferencesToUploadOptions(preferences));
-        setPreferencesApplied(true);
-    }, [preferences, preferencesApplied]);
+    }, [preferences, hasLocalOptionEdits]);
 
     useEffect(() => {
         return () => {
@@ -250,12 +248,13 @@ export const UploadAudioPage = () => {
 
     useEffect(() => {
         // Hide/reset auto language detection + code switching when not using Universal-2.
-        if (isUniversal2) return;
-
         setOptions((o) => {
-            const model = o.speech_models?.[0] ?? "slam-1";
-            const langs = modelLanguages[model] ?? ["en"];
+            const liveModel = o.speech_models?.[0] ?? "slam-1";
+            const liveIsUniversal2 = liveModel === "universal-2";
 
+            if (liveIsUniversal2) return o;
+
+            const langs = modelLanguages[liveModel] ?? ["en"];
             const nextLanguageCode =
                 o.language_code === AUTO_LANGUAGE_CODE
                     ? (langs[0] ?? "en")
@@ -276,7 +275,7 @@ export const UploadAudioPage = () => {
             };
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentSpeechModel, isUniversal2]);
+    }, [currentSpeechModel]);
 
     useEffect(() => {
         // Enforce Code Switching contract for Universal-2.
@@ -299,18 +298,24 @@ export const UploadAudioPage = () => {
 
     useEffect(() => {
         // Keep language_code valid when switching models (but do not override auto detection).
-        if (options.language_code === AUTO_LANGUAGE_CODE) return;
+        setOptions((o) => {
+            if (o.language_code === AUTO_LANGUAGE_CODE) return o;
 
-        if (!currentModelLanguages.includes(options.language_code)) {
-            setOptions((o) => ({
+            const liveModel = o.speech_models?.[0] ?? "slam-1";
+            const langs = modelLanguages[liveModel] ?? ["en"];
+
+            if (langs.includes(o.language_code)) return o;
+
+            return {
                 ...o,
-                language_code: currentModelLanguages[0],
-            }));
-        }
+                language_code: langs[0] ?? "en",
+            };
+        });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentSpeechModel, currentModelLanguages, options.language_code]);
+    }, [currentSpeechModel]);
 
     const handleSelectModel = (model: SpeechModel): void => {
+        setHasLocalOptionEdits(true);
         if (model === currentSpeechModel) return;
         const langs = modelLanguages[model] ?? ["en"];
 
@@ -772,7 +777,8 @@ export const UploadAudioPage = () => {
                             <Select
                                 value={options.language_code}
                                 disabled={isUniversal2 && codeSwitchingEnabled}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                    setHasLocalOptionEdits(true);
                                     setOptions((o) => {
                                         const next = String(e.target.value);
 
@@ -798,8 +804,8 @@ export const UploadAudioPage = () => {
                                                     ? o.language_detection_options
                                                     : undefined,
                                         };
-                                    })
-                                }
+                                    });
+                                }}
                             >
                                 {isUniversal2 && (
                                     <MenuItem value={AUTO_LANGUAGE_CODE}>
@@ -821,6 +827,7 @@ export const UploadAudioPage = () => {
                                         <Switch
                                             checked={codeSwitchingEnabled}
                                             onChange={(e) => {
+                                                setHasLocalOptionEdits(true);
                                                 const checked =
                                                     e.target.checked;
                                                 setOptions((o) => ({
@@ -882,12 +889,13 @@ export const UploadAudioPage = () => {
                             control={
                                 <Switch
                                     checked={options.speaker_labels}
-                                    onChange={(e) =>
+                                    onChange={(e) => {
+                                        setHasLocalOptionEdits(true);
                                         setOptions((o) => ({
                                             ...o,
                                             speaker_labels: e.target.checked,
-                                        }))
-                                    }
+                                        }));
+                                    }}
                                     sx={{
                                         "& .MuiSwitch-switchBase.Mui-checked": {
                                             color: colors.greenAccent[500],
@@ -908,13 +916,14 @@ export const UploadAudioPage = () => {
                             type="number"
                             value={options.speakers_expected}
                             disabled={!options.speaker_labels}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                                setHasLocalOptionEdits(true);
                                 setOptions((o) => ({
                                     ...o,
                                     speakers_expected:
                                         parseInt(e.target.value) || 1,
-                                }))
-                            }
+                                }));
+                            }}
                             size="small"
                             helperText={
                                 options.speaker_labels
@@ -995,13 +1004,14 @@ export const UploadAudioPage = () => {
                                     control={
                                         <Switch
                                             checked={options.format_text}
-                                            onChange={(e) =>
+                                            onChange={(e) => {
+                                                setHasLocalOptionEdits(true);
                                                 setOptions((o) => ({
                                                     ...o,
                                                     format_text:
                                                         e.target.checked,
-                                                }))
-                                            }
+                                                }));
+                                            }}
                                             sx={{
                                                 "& .MuiSwitch-switchBase.Mui-checked":
                                                     {
@@ -1024,12 +1034,13 @@ export const UploadAudioPage = () => {
                                     control={
                                         <Switch
                                             checked={options.punctuate}
-                                            onChange={(e) =>
+                                            onChange={(e) => {
+                                                setHasLocalOptionEdits(true);
                                                 setOptions((o) => ({
                                                     ...o,
                                                     punctuate: e.target.checked,
-                                                }))
-                                            }
+                                                }));
+                                            }}
                                             sx={{
                                                 "& .MuiSwitch-switchBase.Mui-checked":
                                                     {
@@ -1052,13 +1063,14 @@ export const UploadAudioPage = () => {
                                     control={
                                         <Switch
                                             checked={options.entity_detection}
-                                            onChange={(e) =>
+                                            onChange={(e) => {
+                                                setHasLocalOptionEdits(true);
                                                 setOptions((o) => ({
                                                     ...o,
                                                     entity_detection:
                                                         e.target.checked,
-                                                }))
-                                            }
+                                                }));
+                                            }}
                                             sx={{
                                                 "& .MuiSwitch-switchBase.Mui-checked":
                                                     {
@@ -1081,13 +1093,14 @@ export const UploadAudioPage = () => {
                                     control={
                                         <Switch
                                             checked={options.sentiment_analysis}
-                                            onChange={(e) =>
+                                            onChange={(e) => {
+                                                setHasLocalOptionEdits(true);
                                                 setOptions((o) => ({
                                                     ...o,
                                                     sentiment_analysis:
                                                         e.target.checked,
-                                                }))
-                                            }
+                                                }));
+                                            }}
                                             sx={{
                                                 "& .MuiSwitch-switchBase.Mui-checked":
                                                     {
