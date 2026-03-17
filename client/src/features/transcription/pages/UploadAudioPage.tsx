@@ -1,3 +1,6 @@
+// src/features/transcription/pages/UploadAudioPage.tsx
+
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
     Box,
     Button,
@@ -26,12 +29,17 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useTheme } from "@mui/material/styles";
+import { tokens } from "../../../theme/theme";
+
 import {
     startTranscriptionJob,
     getTranscriptionProgressUrl,
     deleteTranscription,
 } from "../../auth/api";
+
+import { usePreferencesStore } from "../../../store/usePreferencesStore";
+import { mapPreferencesToUploadOptions } from "../../preferences/utils/mapPreferencesToUploadOptions";
 
 import { ExportButton } from "../components/ExportButton";
 import { DeleteButton } from "../components/DeleteButton";
@@ -46,9 +54,8 @@ import type {
     ErrorEventPayload,
     SpeechModel,
 } from "../../../types/types";
+
 import { formatDateTime } from "../../../utils/formatDate";
-import { useTheme } from "@mui/material/styles";
-import { tokens } from "../../../theme/theme";
 import { TranscriptText } from "../components/TranscriptText";
 
 const TRANSCRIPTION_STEP_ORDER: TranscriptionStepKey[] = [
@@ -164,6 +171,13 @@ const getLanguageLabel = (code: string): string => {
 export const UploadAudioPage = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
+    const {
+        preferences,
+        load: loadPreferences,
+        loading: preferencesLoading,
+    } = usePreferencesStore();
+
+    const [preferencesApplied, setPreferencesApplied] = useState(false);
 
     const [file, setFile] = useState<File | null>(null);
     const [options, setOptions] = useState<TranscriptionOptions>(
@@ -181,6 +195,19 @@ export const UploadAudioPage = () => {
     const [advancedOpen, setAdvancedOpen] = useState(false);
 
     const eventSourceRef = useRef<EventSource | null>(null);
+
+    useEffect(() => {
+        if (!preferences && !preferencesLoading) {
+            void loadPreferences();
+        }
+    }, [preferences, preferencesLoading, loadPreferences]);
+
+    useEffect(() => {
+        if (!preferences || preferencesApplied) return;
+
+        setOptions(mapPreferencesToUploadOptions(preferences));
+        setPreferencesApplied(true);
+    }, [preferences, preferencesApplied]);
 
     useEffect(() => {
         return () => {
