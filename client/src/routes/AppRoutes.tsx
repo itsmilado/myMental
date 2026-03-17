@@ -1,6 +1,6 @@
 // src/routes/AppRoutes.tsx
 
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import LandingPage from "../features/landing/pages/LandingPage";
 import SignIn from "../features/auth/pages/Sign-In";
@@ -16,7 +16,6 @@ import OnlineHistoryPage from "../features/transcription/pages/OnlineHistoryPage
 
 import AccountPage from "../features/account/pages/AccountPage";
 import PreferencesPage from "../features/preferences/pages/PreferencesPage";
-import SettingsPage from "../features/settings/pages/SettingsPage";
 import ConfirmEmailPage from "../features/account/pages/ConfirmEmailPage";
 import ResetPassword from "../features/auth/pages/ResetPassword";
 import OAuthCallback from "../features/auth/pages/OAuthCallback";
@@ -51,7 +50,10 @@ const AppRoutes = () => {
                 {/* Account */}
                 <Route path="account" element={<AccountPage />} />
                 <Route path="preferences" element={<PreferencesPage />} />
-                <Route path="settings" element={<SettingsPage />} />
+                <Route
+                    path="settings"
+                    element={<Navigate to="/dashboard/preferences" replace />}
+                />
 
                 {/* Transcriptions */}
                 <Route

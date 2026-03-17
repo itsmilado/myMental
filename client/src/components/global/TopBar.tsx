@@ -113,11 +113,6 @@ const TopBar = () => {
                         </MenuItem>
 
                         <MenuItem
-                            onClick={() => navigate("/dashboard/settings")}
-                        >
-                            Settings
-                        </MenuItem>
-                        <MenuItem
                             onClick={() => {
                                 handleLogout();
                                 handleMenuClose();

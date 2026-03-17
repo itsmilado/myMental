@@ -65,11 +65,6 @@ const Sidebar = () => {
                     path: "/dashboard/reports",
                     icon: <AssessmentIcon />,
                 },
-                {
-                    text: "Settings",
-                    path: "/dashboard/settings",
-                    icon: <SettingsIcon />,
-                },
             ],
         },
         {
@@ -105,9 +100,9 @@ const Sidebar = () => {
                     icon: <HistoryIcon />,
                 },
                 {
-                    text: "Settings",
-                    path: "/dashboard/transcriptions/settings",
-                    icon: <SettingsIcon />,
+                    text: "Defaults",
+                    path: "/dashboard/preferences",
+                    icon: <TuneIcon />,
                 },
             ],
         },
