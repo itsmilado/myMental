@@ -7,3 +7,12 @@ logs/
 issues.txt
 issues.json
 session-logs.md
+# SSH keys
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+ssh-agent
+ssh-agent.pub
