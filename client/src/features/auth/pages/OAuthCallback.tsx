@@ -2,15 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import {
-    Alert,
-    Box,
-    Button,
-    CircularProgress,
-    Stack,
-    Typography,
-    Card,
-} from "@mui/material";
+
+import GlobalLoader from "../../../components/global/GlobalLoader";
+import DocumentTitle from "../../../components/global/DocumentTitle";
+
+import { Alert, Button, Stack, Typography, Card } from "@mui/material";
 import { fetchCurrentUser } from "../api";
 import { useAuthStore } from "../../../store/useAuthStore";
 
@@ -59,49 +55,50 @@ const OAuthCallback = () => {
         run();
     }, [navigate, params, setUser]);
 
-    return (
-        <Card
-            variant="outlined"
-            sx={{
-                width: "100%",
-                maxWidth: 520,
-                borderRadius: 24,
-                p: 4,
-            }}
-        >
-            <Stack spacing={2}>
-                <Box>
-                    <Typography variant="h5" fontWeight={800} gutterBottom>
-                        Signing you in…
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        We&apos;re finishing your secure Google sign-in.
-                    </Typography>
-                </Box>
+    if (!error) {
+        return (
+            <>
+                <DocumentTitle title="Signing in" />
+                <GlobalLoader
+                    label="We're finishing your secure Google sign-in."
+                    minHeight="240px"
+                />
+            </>
+        );
+    }
 
-                {!error ? (
-                    <Box
-                        sx={{
-                            display: "flex",
-                            justifyContent: "center",
-                            py: 2,
-                        }}
+    return (
+        <>
+            <DocumentTitle title="Sign in" />
+            <Card
+                variant="outlined"
+                sx={{
+                    width: "100%",
+                    maxWidth: 520,
+                    borderRadius: 24,
+                    p: 4,
+                }}
+            >
+                <Stack spacing={2}>
+                    <div>
+                        <Typography variant="h5" fontWeight={800} gutterBottom>
+                            Signing you in…
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            We're finishing your secure Google sign-in.
+                        </Typography>
+                    </div>
+
+                    <Alert severity="error">{error}</Alert>
+                    <Button
+                        variant="contained"
+                        onClick={() => navigate("/sign-in")}
                     >
-                        <CircularProgress />
-                    </Box>
-                ) : (
-                    <>
-                        <Alert severity="error">{error}</Alert>
-                        <Button
-                            variant="contained"
-                            onClick={() => navigate("/sign-in")}
-                        >
-                            Back to sign in
-                        </Button>
-                    </>
-                )}
-            </Stack>
-        </Card>
+                        Back to sign in
+                    </Button>
+                </Stack>
+            </Card>
+        </>
     );
 };
 

@@ -2,6 +2,8 @@
 
 import React, { useEffect } from "react";
 import { Navigate } from "react-router-dom";
+
+import GlobalLoader from "../components/global/GlobalLoader";
 import { useAuthStore } from "../store/useAuthStore";
 
 type ProtectedRouteProps = {
@@ -20,7 +22,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
     // Block rendering until auth state is known
     if (!authReady) {
-        return <div style={{ padding: 24 }}>Loading…</div>;
+        return (
+            <GlobalLoader
+                label="Loading your workspace..."
+                minHeight="100dvh"
+            />
+        );
     }
 
     // Redirect only after hydration completes

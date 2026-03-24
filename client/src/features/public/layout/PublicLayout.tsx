@@ -3,6 +3,8 @@ import { Outlet, useLocation } from "react-router-dom";
 import { Box, Container } from "@mui/material";
 import { styled } from "@mui/material/styles";
 
+import DocumentTitle from "../../../components/global/DocumentTitle";
+
 import AppTheme from "../../../components/shared-theme/AppTheme";
 import PublicTopBar from "../components/PublicTopBar";
 
@@ -23,7 +25,6 @@ type Props = {
 const PublicLayout: React.FC<Props> = (props) => {
     const location = useLocation();
 
-    const isSignUp = location.pathname === "/sign-up";
     const isSignIn = location.pathname === "/sign-in";
 
     const primaryAction = isSignIn
@@ -32,8 +33,20 @@ const PublicLayout: React.FC<Props> = (props) => {
 
     const secondaryAction = { label: "Back to home", to: "/" };
 
+    const routeTitle =
+        location.pathname === "/sign-in"
+            ? "Sign in"
+            : location.pathname === "/sign-up"
+              ? "Create account"
+              : location.pathname === "/reset-password"
+                ? "Reset password"
+                : location.pathname === "/oauth/callback"
+                  ? "Signing in"
+                  : undefined;
+
     return (
         <AppTheme {...props}>
+            <DocumentTitle title={routeTitle} />
             <LayoutRoot>
                 <PublicTopBar
                     secondaryAction={secondaryAction}

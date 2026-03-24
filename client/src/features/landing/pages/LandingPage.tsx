@@ -18,6 +18,8 @@ import {
 import { styled } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 
+import DocumentTitle from "../../../components/global/DocumentTitle";
+
 import AppTheme from "../../../components/shared-theme/AppTheme";
 import { SitemarkIcon } from "../../../components/CustomIcons";
 import PublicTopBar from "../../public/components/PublicTopBar";
@@ -869,39 +871,45 @@ const Footer = () => {
 
 const LandingPage = (props: { disableCustomTheme?: boolean }) => {
     return (
-        <AppTheme {...props}>
-            <CssBaseline enableColorScheme />
-            <PageRoot>
-                <PublicTopBar
-                    brandOnClick={() => scrollToId("top")}
-                    brandAriaLabel="Go to top"
-                    links={[
-                        {
-                            label: "Features",
-                            onClick: () => scrollToId("features"),
-                        },
-                        {
-                            label: "Privacy",
-                            onClick: () => scrollToId("privacy"),
-                        },
-                        {
-                            label: "How it works",
-                            onClick: () => scrollToId("how-it-works"),
-                        },
-                    ]}
-                    secondaryAction={{ label: "Sign in", to: "/sign-in" }}
-                    primaryAction={{ label: "Create account", to: "/sign-up" }}
-                />
-                <Hero />
-                <TrustStrip />
-                <ValueProps />
-                <FeatureGrid />
-                <PrivacyBlock />
-                <HowItWorks />
-                <FinalCTA />
-                <Footer />
-            </PageRoot>
-        </AppTheme>
+        <>
+            <DocumentTitle />
+            <AppTheme {...props}>
+                <CssBaseline enableColorScheme />
+                <PageRoot>
+                    <PublicTopBar
+                        brandOnClick={() => scrollToId("top")}
+                        brandAriaLabel="Go to top"
+                        links={[
+                            {
+                                label: "Features",
+                                onClick: () => scrollToId("features"),
+                            },
+                            {
+                                label: "Privacy",
+                                onClick: () => scrollToId("privacy"),
+                            },
+                            {
+                                label: "How it works",
+                                onClick: () => scrollToId("how-it-works"),
+                            },
+                        ]}
+                        secondaryAction={{ label: "Sign in", to: "/sign-in" }}
+                        primaryAction={{
+                            label: "Create account",
+                            to: "/sign-up",
+                        }}
+                    />
+                    <Hero />
+                    <TrustStrip />
+                    <ValueProps />
+                    <FeatureGrid />
+                    <PrivacyBlock />
+                    <HowItWorks />
+                    <FinalCTA />
+                    <Footer />
+                </PageRoot>
+            </AppTheme>
+        </>
     );
 };
 

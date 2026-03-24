@@ -16,6 +16,8 @@ import {
 } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import DocumentTitle from "../../../components/global/DocumentTitle";
+
 import { useAuthStore } from "../../../store/useAuthStore";
 import ReauthDialog from "../components/ReauthDialog";
 import DeleteAccountConfirmDialog from "../components/DeleteAccountConfirmDialog";
@@ -443,368 +445,328 @@ const AccountPage = () => {
     }
 
     return (
-        <Box sx={{ maxWidth: 980, mx: "auto", pb: 4 }}>
-            <Stack spacing={3}>
-                <Box>
-                    <Typography variant="h4" fontWeight={700} gutterBottom>
-                        Account
-                    </Typography>
-                    <Typography color="text.secondary">
-                        Manage your profile, email status, connected sign-in
-                        methods, and account security.
-                    </Typography>
-                </Box>
+        <>
+            <DocumentTitle title="Account" />
+            <Box sx={{ maxWidth: 980, mx: "auto", pb: 4 }}>
+                <Stack spacing={3}>
+                    <Box>
+                        <Typography variant="h4" fontWeight={700} gutterBottom>
+                            Account
+                        </Typography>
+                        <Typography color="text.secondary">
+                            Manage your profile, email status, connected sign-in
+                            methods, and account security.
+                        </Typography>
+                    </Box>
 
-                <Paper sx={sectionCardSx}>
-                    <Stack
-                        direction={{ xs: "column", md: "row" }}
-                        spacing={3}
-                        alignItems={{ xs: "flex-start", md: "center" }}
-                        justifyContent="space-between"
-                    >
-                        <Stack direction="row" spacing={2} alignItems="center">
-                            <Avatar
-                                sx={{
-                                    width: 64,
-                                    height: 64,
-                                    fontSize: 24,
-                                    fontWeight: 700,
-                                }}
-                            >
-                                {initials}
-                            </Avatar>
-
-                            <Box>
-                                <Typography variant="h5" fontWeight={700}>
-                                    {user.first_name} {user.last_name}
-                                </Typography>
-
-                                <Typography color="text.secondary">
-                                    {user.email}
-                                </Typography>
-
-                                <Stack
-                                    direction="row"
-                                    spacing={1}
-                                    useFlexGap
-                                    flexWrap="wrap"
-                                    sx={{ mt: 1.5 }}
-                                >
-                                    <Chip
-                                        size="small"
-                                        label={
-                                            isEmailConfirmed
-                                                ? "Email confirmed"
-                                                : "Email not confirmed"
-                                        }
-                                        color={
-                                            isEmailConfirmed
-                                                ? "success"
-                                                : "warning"
-                                        }
-                                        variant={
-                                            isEmailConfirmed
-                                                ? "filled"
-                                                : "outlined"
-                                        }
-                                    />
-                                    <Chip
-                                        size="small"
-                                        label={`Provider: ${authProvider}`}
-                                        variant="outlined"
-                                    />
-                                    <Chip
-                                        size="small"
-                                        label={
-                                            hasGoogleConnection
-                                                ? "Google connected"
-                                                : "Google not connected"
-                                        }
-                                        variant={
-                                            hasGoogleConnection
-                                                ? "filled"
-                                                : "outlined"
-                                        }
-                                    />
-                                    {role ? (
-                                        <Chip
-                                            size="small"
-                                            label={`Role: ${role}`}
-                                            variant="outlined"
-                                        />
-                                    ) : null}
-                                </Stack>
-                            </Box>
-                        </Stack>
-                    </Stack>
-                </Paper>
-
-                {!isEmailConfirmed || pendingEmail ? (
                     <Paper sx={sectionCardSx}>
-                        <Stack spacing={2}>
-                            <Box>
-                                <Typography variant="h6" fontWeight={700}>
-                                    Email status
-                                </Typography>
-                                <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                >
-                                    Confirming your email helps secure account
-                                    recovery and ensures you can receive
-                                    password reset links, confirmation links,
-                                    and other important account notices.
-                                </Typography>
-                            </Box>
-
-                            {pendingEmail ? (
-                                <Alert severity="info">
-                                    Pending confirmation for{" "}
-                                    <strong>{pendingEmail}</strong>. Check that
-                                    inbox and click the confirmation link to
-                                    finish the email change.
-                                </Alert>
-                            ) : null}
-
-                            {!isEmailConfirmed ? (
-                                <Stack
-                                    direction={{ xs: "column", sm: "row" }}
-                                    spacing={2}
-                                    justifyContent="space-between"
-                                    alignItems={{
-                                        xs: "flex-start",
-                                        sm: "center",
+                        <Stack
+                            direction={{ xs: "column", md: "row" }}
+                            spacing={3}
+                            alignItems={{ xs: "flex-start", md: "center" }}
+                            justifyContent="space-between"
+                        >
+                            <Stack
+                                direction="row"
+                                spacing={2}
+                                alignItems="center"
+                            >
+                                <Avatar
+                                    sx={{
+                                        width: 64,
+                                        height: 64,
+                                        fontSize: 24,
+                                        fontWeight: 700,
                                     }}
                                 >
-                                    <Alert severity="warning" sx={{ flex: 1 }}>
-                                        Your current email is not confirmed yet.
-                                    </Alert>
+                                    {initials}
+                                </Avatar>
 
-                                    <Button
-                                        variant="contained"
-                                        onClick={
-                                            handleSendCurrentEmailConfirmation
-                                        }
-                                        disabled={sendingEmailConfirm}
+                                <Box>
+                                    <Typography variant="h5" fontWeight={700}>
+                                        {user.first_name} {user.last_name}
+                                    </Typography>
+
+                                    <Typography color="text.secondary">
+                                        {user.email}
+                                    </Typography>
+
+                                    <Stack
+                                        direction="row"
+                                        spacing={1}
+                                        useFlexGap
+                                        flexWrap="wrap"
+                                        sx={{ mt: 1.5 }}
                                     >
-                                        Confirm email
-                                    </Button>
-                                </Stack>
-                            ) : null}
+                                        <Chip
+                                            size="small"
+                                            label={
+                                                isEmailConfirmed
+                                                    ? "Email confirmed"
+                                                    : "Email not confirmed"
+                                            }
+                                            color={
+                                                isEmailConfirmed
+                                                    ? "success"
+                                                    : "warning"
+                                            }
+                                            variant={
+                                                isEmailConfirmed
+                                                    ? "filled"
+                                                    : "outlined"
+                                            }
+                                        />
+                                        <Chip
+                                            size="small"
+                                            label={`Provider: ${authProvider}`}
+                                            variant="outlined"
+                                        />
+                                        <Chip
+                                            size="small"
+                                            label={
+                                                hasGoogleConnection
+                                                    ? "Google connected"
+                                                    : "Google not connected"
+                                            }
+                                            variant={
+                                                hasGoogleConnection
+                                                    ? "filled"
+                                                    : "outlined"
+                                            }
+                                        />
+                                        {role ? (
+                                            <Chip
+                                                size="small"
+                                                label={`Role: ${role}`}
+                                                variant="outlined"
+                                            />
+                                        ) : null}
+                                    </Stack>
+                                </Box>
+                            </Stack>
                         </Stack>
                     </Paper>
-                ) : null}
 
-                <Paper sx={sectionCardSx}>
-                    <Stack spacing={2.5}>
-                        <Stack
-                            direction={{ xs: "column", sm: "row" }}
-                            alignItems={{ xs: "flex-start", sm: "center" }}
-                            justifyContent="space-between"
-                            spacing={1.5}
-                        >
-                            <Box>
-                                <Typography variant="h6" fontWeight={700}>
-                                    Profile
-                                </Typography>
-                                <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                >
-                                    Keep your account identity accurate and easy
-                                    to recognize.
-                                </Typography>
-                            </Box>
-
-                            {!editingProfile ? (
-                                <Button
-                                    variant="contained"
-                                    onClick={() => setEditingProfile(true)}
-                                >
-                                    Edit profile
-                                </Button>
-                            ) : (
-                                <Stack direction="row" spacing={1}>
-                                    <Button
-                                        onClick={handleCancelProfileEdit}
-                                        disabled={savingProfile}
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        variant="contained"
-                                        onClick={handleSaveProfile}
-                                        disabled={
-                                            savingProfile ||
-                                            !profileValidation.ok
-                                        }
-                                    >
-                                        Save changes
-                                    </Button>
-                                </Stack>
-                            )}
-                        </Stack>
-
-                        <Divider />
-
-                        {!editingProfile ? (
-                            <Box
-                                sx={{
-                                    display: "grid",
-                                    gridTemplateColumns: {
-                                        xs: "1fr",
-                                        sm: "1fr 1fr",
-                                    },
-                                    gap: 2,
-                                }}
-                            >
+                    {!isEmailConfirmed || pendingEmail ? (
+                        <Paper sx={sectionCardSx}>
+                            <Stack spacing={2}>
                                 <Box>
-                                    <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                    >
-                                        First name
+                                    <Typography variant="h6" fontWeight={700}>
+                                        Email status
                                     </Typography>
                                     <Typography
-                                        variant="body1"
-                                        fontWeight={600}
+                                        variant="body2"
+                                        color="text.secondary"
                                     >
-                                        {user.first_name}
+                                        Confirming your email helps secure
+                                        account recovery and ensures you can
+                                        receive password reset links,
+                                        confirmation links, and other important
+                                        account notices.
                                     </Typography>
                                 </Box>
 
-                                <Box>
-                                    <Typography
-                                        variant="caption"
-                                        color="text.secondary"
+                                {pendingEmail ? (
+                                    <Alert severity="info">
+                                        Pending confirmation for{" "}
+                                        <strong>{pendingEmail}</strong>. Check
+                                        that inbox and click the confirmation
+                                        link to finish the email change.
+                                    </Alert>
+                                ) : null}
+
+                                {!isEmailConfirmed ? (
+                                    <Stack
+                                        direction={{ xs: "column", sm: "row" }}
+                                        spacing={2}
+                                        justifyContent="space-between"
+                                        alignItems={{
+                                            xs: "flex-start",
+                                            sm: "center",
+                                        }}
                                     >
-                                        Last name
-                                    </Typography>
-                                    <Typography
-                                        variant="body1"
-                                        fontWeight={600}
-                                    >
-                                        {user.last_name}
-                                    </Typography>
-                                </Box>
-                            </Box>
-                        ) : (
-                            <Box
-                                sx={{
-                                    display: "grid",
-                                    gridTemplateColumns: {
-                                        xs: "1fr",
-                                        sm: "1fr 1fr",
-                                    },
-                                    gap: 2,
-                                }}
-                            >
-                                <TextField
-                                    label="First name"
-                                    value={firstName}
-                                    onChange={(e) =>
-                                        setFirstName(e.target.value)
-                                    }
-                                    disabled={savingProfile}
-                                    fullWidth
-                                    helperText="Use your preferred first name."
-                                />
+                                        <Alert
+                                            severity="warning"
+                                            sx={{ flex: 1 }}
+                                        >
+                                            Your current email is not confirmed
+                                            yet.
+                                        </Alert>
 
-                                <TextField
-                                    label="Last name"
-                                    value={lastName}
-                                    onChange={(e) =>
-                                        setLastName(e.target.value)
-                                    }
-                                    disabled={savingProfile}
-                                    fullWidth
-                                    helperText="Use your preferred last name."
-                                />
-                            </Box>
-                        )}
-                    </Stack>
-                </Paper>
+                                        <Button
+                                            variant="contained"
+                                            onClick={
+                                                handleSendCurrentEmailConfirmation
+                                            }
+                                            disabled={sendingEmailConfirm}
+                                        >
+                                            Confirm email
+                                        </Button>
+                                    </Stack>
+                                ) : null}
+                            </Stack>
+                        </Paper>
+                    ) : null}
 
-                <Paper sx={sectionCardSx}>
-                    <Stack spacing={2.5}>
-                        <Stack
-                            direction={{ xs: "column", sm: "row" }}
-                            spacing={2}
-                            alignItems={{ xs: "flex-start", sm: "center" }}
-                            justifyContent="space-between"
-                        >
-                            <Box>
-                                <Typography variant="h6" fontWeight={700}>
-                                    Email
-                                </Typography>
-                                <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                >
-                                    Changing your email requires identity
-                                    verification and inbox confirmation to
-                                    prevent unauthorized account changes.
-                                </Typography>
-                            </Box>
-
-                            <Button
-                                variant="outlined"
-                                onClick={startChangeEmailFlow}
-                            >
-                                Change email
-                            </Button>
-                        </Stack>
-
-                        <Divider />
-
-                        <Stack
-                            direction={{ xs: "column", sm: "row" }}
-                            spacing={2}
-                            alignItems={{ xs: "flex-start", sm: "center" }}
-                            justifyContent="space-between"
-                        >
-                            <Box>
-                                <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                >
-                                    Current email
-                                </Typography>
-                                <Typography variant="body1" fontWeight={600}>
-                                    {user.email}
-                                </Typography>
-                            </Box>
-
-                            <Chip
-                                label={
-                                    isEmailConfirmed
-                                        ? "Confirmed"
-                                        : "Not confirmed"
-                                }
-                                color={isEmailConfirmed ? "success" : "warning"}
-                                variant={
-                                    isEmailConfirmed ? "filled" : "outlined"
-                                }
-                            />
-                        </Stack>
-                    </Stack>
-                </Paper>
-
-                {hasGoogleConnection ? (
                     <Paper sx={sectionCardSx}>
                         <Stack spacing={2.5}>
-                            <Box>
-                                <Typography variant="h6" fontWeight={700}>
-                                    Connected accounts
-                                </Typography>
-                                <Typography
-                                    variant="body2"
-                                    color="text.secondary"
+                            <Stack
+                                direction={{ xs: "column", sm: "row" }}
+                                alignItems={{ xs: "flex-start", sm: "center" }}
+                                justifyContent="space-between"
+                                spacing={1.5}
+                            >
+                                <Box>
+                                    <Typography variant="h6" fontWeight={700}>
+                                        Profile
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Keep your account identity accurate and
+                                        easy to recognize.
+                                    </Typography>
+                                </Box>
+
+                                {!editingProfile ? (
+                                    <Button
+                                        variant="contained"
+                                        onClick={() => setEditingProfile(true)}
+                                    >
+                                        Edit profile
+                                    </Button>
+                                ) : (
+                                    <Stack direction="row" spacing={1}>
+                                        <Button
+                                            onClick={handleCancelProfileEdit}
+                                            disabled={savingProfile}
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            variant="contained"
+                                            onClick={handleSaveProfile}
+                                            disabled={
+                                                savingProfile ||
+                                                !profileValidation.ok
+                                            }
+                                        >
+                                            Save changes
+                                        </Button>
+                                    </Stack>
+                                )}
+                            </Stack>
+
+                            <Divider />
+
+                            {!editingProfile ? (
+                                <Box
+                                    sx={{
+                                        display: "grid",
+                                        gridTemplateColumns: {
+                                            xs: "1fr",
+                                            sm: "1fr 1fr",
+                                        },
+                                        gap: 2,
+                                    }}
                                 >
-                                    Manage third-party sign-in methods linked to
-                                    this account.
-                                </Typography>
-                            </Box>
+                                    <Box>
+                                        <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                        >
+                                            First name
+                                        </Typography>
+                                        <Typography
+                                            variant="body1"
+                                            fontWeight={600}
+                                        >
+                                            {user.first_name}
+                                        </Typography>
+                                    </Box>
+
+                                    <Box>
+                                        <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                        >
+                                            Last name
+                                        </Typography>
+                                        <Typography
+                                            variant="body1"
+                                            fontWeight={600}
+                                        >
+                                            {user.last_name}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            ) : (
+                                <Box
+                                    sx={{
+                                        display: "grid",
+                                        gridTemplateColumns: {
+                                            xs: "1fr",
+                                            sm: "1fr 1fr",
+                                        },
+                                        gap: 2,
+                                    }}
+                                >
+                                    <TextField
+                                        label="First name"
+                                        value={firstName}
+                                        onChange={(e) =>
+                                            setFirstName(e.target.value)
+                                        }
+                                        disabled={savingProfile}
+                                        fullWidth
+                                        helperText="Use your preferred first name."
+                                    />
+
+                                    <TextField
+                                        label="Last name"
+                                        value={lastName}
+                                        onChange={(e) =>
+                                            setLastName(e.target.value)
+                                        }
+                                        disabled={savingProfile}
+                                        fullWidth
+                                        helperText="Use your preferred last name."
+                                    />
+                                </Box>
+                            )}
+                        </Stack>
+                    </Paper>
+
+                    <Paper sx={sectionCardSx}>
+                        <Stack spacing={2.5}>
+                            <Stack
+                                direction={{ xs: "column", sm: "row" }}
+                                spacing={2}
+                                alignItems={{ xs: "flex-start", sm: "center" }}
+                                justifyContent="space-between"
+                            >
+                                <Box>
+                                    <Typography variant="h6" fontWeight={700}>
+                                        Email
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Changing your email requires identity
+                                        verification and inbox confirmation to
+                                        prevent unauthorized account changes.
+                                    </Typography>
+                                </Box>
+
+                                <Button
+                                    variant="outlined"
+                                    onClick={startChangeEmailFlow}
+                                >
+                                    Change email
+                                </Button>
+                            </Stack>
 
                             <Divider />
 
@@ -815,103 +777,38 @@ const AccountPage = () => {
                                 justifyContent="space-between"
                             >
                                 <Box>
-                                    <Typography fontWeight={600}>
-                                        Google
+                                    <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                    >
+                                        Current email
                                     </Typography>
                                     <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                        sx={{ mt: 0.5 }}
+                                        variant="body1"
+                                        fontWeight={600}
                                     >
-                                        {isGooglePrimaryAccount
-                                            ? "This account currently uses Google as its primary sign-in method."
-                                            : "Google is linked to this account as an additional sign-in method."}
+                                        {user.email}
                                     </Typography>
                                 </Box>
 
-                                <Stack
-                                    direction="row"
-                                    spacing={1}
-                                    alignItems="center"
-                                >
-                                    <Chip
-                                        label="Connected"
-                                        color="success"
-                                        variant="filled"
-                                    />
-                                    <Button
-                                        variant="outlined"
-                                        color="warning"
-                                        onClick={startUnlinkGoogleFlow}
-                                        disabled={removingGoogle}
-                                    >
-                                        Remove Google link
-                                    </Button>
-                                </Stack>
+                                <Chip
+                                    label={
+                                        isEmailConfirmed
+                                            ? "Confirmed"
+                                            : "Not confirmed"
+                                    }
+                                    color={
+                                        isEmailConfirmed ? "success" : "warning"
+                                    }
+                                    variant={
+                                        isEmailConfirmed ? "filled" : "outlined"
+                                    }
+                                />
                             </Stack>
-
-                            {isGooglePrimaryAccount ? (
-                                <Alert severity="info">
-                                    To remove Google sign-in from a
-                                    Google-created account, verify with Google
-                                    first. You'll then create a password and
-                                    remove Google sign-in in one step.
-                                </Alert>
-                            ) : null}
                         </Stack>
                     </Paper>
-                ) : (
-                    <>
-                        <Paper sx={sectionCardSx}>
-                            <Stack spacing={2.5}>
-                                <Box>
-                                    <Typography variant="h6" fontWeight={700}>
-                                        Security
-                                    </Typography>
-                                    <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                    >
-                                        Manage your password-based sign-in and
-                                        account protection.
-                                    </Typography>
-                                </Box>
 
-                                <Divider />
-
-                                <Stack
-                                    direction={{ xs: "column", sm: "row" }}
-                                    spacing={2}
-                                    alignItems={{
-                                        xs: "flex-start",
-                                        sm: "center",
-                                    }}
-                                    justifyContent="space-between"
-                                >
-                                    <Box>
-                                        <Typography fontWeight={600}>
-                                            Password
-                                        </Typography>
-                                        <Typography
-                                            variant="body2"
-                                            color="text.secondary"
-                                            sx={{ mt: 0.5 }}
-                                        >
-                                            Update your password after
-                                            confirming your identity.
-                                        </Typography>
-                                    </Box>
-
-                                    <Button
-                                        variant="outlined"
-                                        onClick={startChangePasswordFlow}
-                                    >
-                                        Change password
-                                    </Button>
-                                </Stack>
-                            </Stack>
-                        </Paper>
-
+                    {hasGoogleConnection ? (
                         <Paper sx={sectionCardSx}>
                             <Stack spacing={2.5}>
                                 <Box>
@@ -922,8 +819,8 @@ const AccountPage = () => {
                                         variant="body2"
                                         color="text.secondary"
                                     >
-                                        You can link Google for faster sign-in
-                                        and provider-based verification flows.
+                                        Manage third-party sign-in methods
+                                        linked to this account.
                                     </Typography>
                                 </Box>
 
@@ -947,124 +844,261 @@ const AccountPage = () => {
                                             color="text.secondary"
                                             sx={{ mt: 0.5 }}
                                         >
-                                            Link Google to your existing
-                                            account.
+                                            {isGooglePrimaryAccount
+                                                ? "This account currently uses Google as its primary sign-in method."
+                                                : "Google is linked to this account as an additional sign-in method."}
                                         </Typography>
                                     </Box>
 
-                                    <Button
-                                        variant="outlined"
-                                        onClick={startLinkGoogleFlow}
+                                    <Stack
+                                        direction="row"
+                                        spacing={1}
+                                        alignItems="center"
                                     >
-                                        Link Google
-                                    </Button>
+                                        <Chip
+                                            label="Connected"
+                                            color="success"
+                                            variant="filled"
+                                        />
+                                        <Button
+                                            variant="outlined"
+                                            color="warning"
+                                            onClick={startUnlinkGoogleFlow}
+                                            disabled={removingGoogle}
+                                        >
+                                            Remove Google link
+                                        </Button>
+                                    </Stack>
                                 </Stack>
+
+                                {isGooglePrimaryAccount ? (
+                                    <Alert severity="info">
+                                        To remove Google sign-in from a
+                                        Google-created account, verify with
+                                        Google first. You'll then create a
+                                        password and remove Google sign-in in
+                                        one step.
+                                    </Alert>
+                                ) : null}
                             </Stack>
                         </Paper>
-                    </>
-                )}
+                    ) : (
+                        <>
+                            <Paper sx={sectionCardSx}>
+                                <Stack spacing={2.5}>
+                                    <Box>
+                                        <Typography
+                                            variant="h6"
+                                            fontWeight={700}
+                                        >
+                                            Security
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Manage your password-based sign-in
+                                            and account protection.
+                                        </Typography>
+                                    </Box>
 
-                <Paper
-                    sx={{
-                        ...sectionCardSx,
-                        border: (theme) =>
-                            `1px solid ${theme.palette.error.light}`,
-                    }}
-                >
-                    <Stack spacing={2.5}>
-                        <Box>
-                            <Typography
-                                variant="h6"
-                                fontWeight={700}
-                                color="error"
+                                    <Divider />
+
+                                    <Stack
+                                        direction={{ xs: "column", sm: "row" }}
+                                        spacing={2}
+                                        alignItems={{
+                                            xs: "flex-start",
+                                            sm: "center",
+                                        }}
+                                        justifyContent="space-between"
+                                    >
+                                        <Box>
+                                            <Typography fontWeight={600}>
+                                                Password
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                                sx={{ mt: 0.5 }}
+                                            >
+                                                Update your password after
+                                                confirming your identity.
+                                            </Typography>
+                                        </Box>
+
+                                        <Button
+                                            variant="outlined"
+                                            onClick={startChangePasswordFlow}
+                                        >
+                                            Change password
+                                        </Button>
+                                    </Stack>
+                                </Stack>
+                            </Paper>
+
+                            <Paper sx={sectionCardSx}>
+                                <Stack spacing={2.5}>
+                                    <Box>
+                                        <Typography
+                                            variant="h6"
+                                            fontWeight={700}
+                                        >
+                                            Connected accounts
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            You can link Google for faster
+                                            sign-in and provider-based
+                                            verification flows.
+                                        </Typography>
+                                    </Box>
+
+                                    <Divider />
+
+                                    <Stack
+                                        direction={{ xs: "column", sm: "row" }}
+                                        spacing={2}
+                                        alignItems={{
+                                            xs: "flex-start",
+                                            sm: "center",
+                                        }}
+                                        justifyContent="space-between"
+                                    >
+                                        <Box>
+                                            <Typography fontWeight={600}>
+                                                Google
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                                sx={{ mt: 0.5 }}
+                                            >
+                                                Link Google to your existing
+                                                account.
+                                            </Typography>
+                                        </Box>
+
+                                        <Button
+                                            variant="outlined"
+                                            onClick={startLinkGoogleFlow}
+                                        >
+                                            Link Google
+                                        </Button>
+                                    </Stack>
+                                </Stack>
+                            </Paper>
+                        </>
+                    )}
+
+                    <Paper
+                        sx={{
+                            ...sectionCardSx,
+                            border: (theme) =>
+                                `1px solid ${theme.palette.error.light}`,
+                        }}
+                    >
+                        <Stack spacing={2.5}>
+                            <Box>
+                                <Typography
+                                    variant="h6"
+                                    fontWeight={700}
+                                    color="error"
+                                >
+                                    Danger zone
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                >
+                                    Permanently delete your account and
+                                    associated data. This action cannot be
+                                    undone.
+                                </Typography>
+                            </Box>
+
+                            <Divider />
+
+                            <Stack
+                                direction={{ xs: "column", sm: "row" }}
+                                spacing={2}
+                                alignItems={{ xs: "flex-start", sm: "center" }}
+                                justifyContent="space-between"
                             >
-                                Danger zone
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Permanently delete your account and associated
-                                data. This action cannot be undone.
-                            </Typography>
-                        </Box>
+                                <Typography color="text.secondary">
+                                    Delete your account permanently
+                                </Typography>
 
-                        <Divider />
-
-                        <Stack
-                            direction={{ xs: "column", sm: "row" }}
-                            spacing={2}
-                            alignItems={{ xs: "flex-start", sm: "center" }}
-                            justifyContent="space-between"
-                        >
-                            <Typography color="text.secondary">
-                                Delete your account permanently
-                            </Typography>
-
-                            <Button
-                                color="error"
-                                variant="contained"
-                                onClick={startDeleteFlow}
-                            >
-                                Delete account
-                            </Button>
+                                <Button
+                                    color="error"
+                                    variant="contained"
+                                    onClick={startDeleteFlow}
+                                >
+                                    Delete account
+                                </Button>
+                            </Stack>
                         </Stack>
-                    </Stack>
-                </Paper>
-            </Stack>
+                    </Paper>
+                </Stack>
 
-            <ReauthDialog
-                open={reauthOpen}
-                onClose={() => setReauthOpen(false)}
-                onSuccess={handlePasswordReauthSuccess}
-                mode={reauthMode}
-                title={reauthTitle}
-                description={reauthDescription}
-                googleIntent={reauthGoogleIntent}
-            />
+                <ReauthDialog
+                    open={reauthOpen}
+                    onClose={() => setReauthOpen(false)}
+                    onSuccess={handlePasswordReauthSuccess}
+                    mode={reauthMode}
+                    title={reauthTitle}
+                    description={reauthDescription}
+                    googleIntent={reauthGoogleIntent}
+                />
 
-            <DeleteAccountConfirmDialog
-                open={deleteConfirmOpen}
-                loading={deleting}
-                onClose={() => setDeleteConfirmOpen(false)}
-                onConfirm={handleDelete}
-            />
+                <DeleteAccountConfirmDialog
+                    open={deleteConfirmOpen}
+                    loading={deleting}
+                    onClose={() => setDeleteConfirmOpen(false)}
+                    onConfirm={handleDelete}
+                />
 
-            <ChangePasswordDialog
-                open={changePwOpen}
-                loading={changingPw}
-                onClose={() => setChangePwOpen(false)}
-                onSubmit={handleChangePassword}
-                requireCurrentPassword={!hasGoogleConnection}
-            />
+                <ChangePasswordDialog
+                    open={changePwOpen}
+                    loading={changingPw}
+                    onClose={() => setChangePwOpen(false)}
+                    onSubmit={handleChangePassword}
+                    requireCurrentPassword={!hasGoogleConnection}
+                />
 
-            <SetPasswordBeforeUnlinkDialog
-                open={setPasswordBeforeUnlinkOpen}
-                loading={changingPw || removingGoogle}
-                onClose={() => setSetPasswordBeforeUnlinkOpen(false)}
-                onSubmit={handleSetPasswordAndUnlinkGoogle}
-            />
+                <SetPasswordBeforeUnlinkDialog
+                    open={setPasswordBeforeUnlinkOpen}
+                    loading={changingPw || removingGoogle}
+                    onClose={() => setSetPasswordBeforeUnlinkOpen(false)}
+                    onSubmit={handleSetPasswordAndUnlinkGoogle}
+                />
 
-            <ChangeEmailDialog
-                open={changeEmailOpen}
-                onClose={() => setChangeEmailOpen(false)}
-                onInfo={(message) => openToast(message, "info")}
-                currentEmail={user.email}
-            />
+                <ChangeEmailDialog
+                    open={changeEmailOpen}
+                    onClose={() => setChangeEmailOpen(false)}
+                    onInfo={(message) => openToast(message, "info")}
+                    currentEmail={user.email}
+                />
 
-            <Snackbar
-                open={toast.open}
-                autoHideDuration={4500}
-                onClose={() => setToast((t) => ({ ...t, open: false }))}
-                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-            >
-                <Alert
-                    severity={toast.severity}
+                <Snackbar
+                    open={toast.open}
+                    autoHideDuration={4500}
                     onClose={() => setToast((t) => ({ ...t, open: false }))}
-                    variant="filled"
-                    sx={{ width: "100%" }}
+                    anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
                 >
-                    {toast.message}
-                </Alert>
-            </Snackbar>
-        </Box>
+                    <Alert
+                        severity={toast.severity}
+                        onClose={() => setToast((t) => ({ ...t, open: false }))}
+                        variant="filled"
+                        sx={{ width: "100%" }}
+                    >
+                        {toast.message}
+                    </Alert>
+                </Snackbar>
+            </Box>
+        </>
     );
 };
 

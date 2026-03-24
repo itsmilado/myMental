@@ -2,6 +2,8 @@
 
 import { Routes, Route, Navigate } from "react-router-dom";
 
+import DocumentTitle from "../components/global/DocumentTitle";
+
 import LandingPage from "../features/landing/pages/LandingPage";
 import SignIn from "../features/auth/pages/Sign-In";
 import SignUp from "../features/auth/pages/SignUp";
@@ -43,13 +45,30 @@ const AppRoutes = () => {
                 path="/dashboard"
                 element={
                     <ProtectedRoute>
+                        <DocumentTitle title="Dashboard" />
                         <Dashboard />
                     </ProtectedRoute>
                 }
             >
                 {/* Account */}
-                <Route path="account" element={<AccountPage />} />
-                <Route path="preferences" element={<PreferencesPage />} />
+                <Route
+                    path="account"
+                    element={
+                        <>
+                            <DocumentTitle title="Account" />
+                            <AccountPage />
+                        </>
+                    }
+                />
+                <Route
+                    path="preferences"
+                    element={
+                        <>
+                            <DocumentTitle title="Preferences" />
+                            <PreferencesPage />
+                        </>
+                    }
+                />
                 <Route
                     path="settings"
                     element={<Navigate to="/dashboard/preferences" replace />}
@@ -58,11 +77,21 @@ const AppRoutes = () => {
                 {/* Transcriptions */}
                 <Route
                     path="transcriptions/upload"
-                    element={<UploadAudioPage />}
+                    element={
+                        <>
+                            <DocumentTitle title="Upload" />
+                            <UploadAudioPage />
+                        </>
+                    }
                 />
                 <Route
                     path="transcriptions/history"
-                    element={<TranscriptionHistoryPage />}
+                    element={
+                        <>
+                            <DocumentTitle title="History" />
+                            <TranscriptionHistoryPage />
+                        </>
+                    }
                 >
                     <Route path="offline" element={<OfflineHistoryPage />} />
                     <Route path="online" element={<OnlineHistoryPage />} />
@@ -70,7 +99,12 @@ const AppRoutes = () => {
                 </Route>
                 <Route
                     path="transcriptions/:id"
-                    element={<TranscriptionDetailPage />}
+                    element={
+                        <>
+                            <DocumentTitle title="Transcription" />
+                            <TranscriptionDetailPage />
+                        </>
+                    }
                 />
             </Route>
         </Routes>
