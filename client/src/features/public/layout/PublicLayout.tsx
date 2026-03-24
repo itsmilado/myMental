@@ -10,11 +10,15 @@ import PublicTopBar from "../components/PublicTopBar";
 
 const LayoutRoot = styled(Box)(({ theme }) => ({
     minHeight: "100dvh",
-    background:
-        "radial-gradient(ellipse at 35% 10%, rgba(99, 102, 241, 0.10), transparent 55%), radial-gradient(ellipse at 80% 0%, rgba(2, 132, 199, 0.08), transparent 45%)",
+    backgroundColor: "#f4f6fb",
+    backgroundImage:
+        "radial-gradient(ellipse at 35% 10%, rgba(99, 102, 241, 0.05), transparent 55%), radial-gradient(ellipse at 80% 0%, rgba(2, 132, 199, 0.04), transparent 45%)",
+    backgroundRepeat: "no-repeat",
+    color: theme.palette.text.primary,
     ...theme.applyStyles("dark", {
-        background:
-            "radial-gradient(ellipse at 35% 10%, rgba(99, 102, 241, 0.18), transparent 55%), radial-gradient(ellipse at 80% 0%, rgba(2, 132, 199, 0.12), transparent 45%)",
+        backgroundColor: "#0b1120",
+        backgroundImage:
+            "radial-gradient(ellipse at 35% 10%, rgba(99, 102, 241, 0.16), transparent 55%), radial-gradient(ellipse at 80% 0%, rgba(2, 132, 199, 0.10), transparent 45%)",
     }),
 }));
 

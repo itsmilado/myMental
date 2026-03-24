@@ -40,15 +40,19 @@ const FrostedAppBar = styled(AppBar)(({ theme }) => ({
     backgroundColor: "transparent",
     boxShadow: "none",
     borderBottom: "1px solid transparent",
+    color: theme.palette.text.primary,
     transition: "background-color 200ms ease, border-color 200ms ease",
     "&.scrolled": {
-        backgroundColor:
-            theme.palette.mode === "dark"
-                ? "rgba(2, 6, 23, 0.72)"
-                : "rgba(255, 255, 255, 0.72)",
+        backgroundColor: "rgba(255, 255, 255, 0.72)",
         backdropFilter: "blur(10px)",
         borderBottom: `1px solid ${theme.palette.divider}`,
     },
+    ...theme.applyStyles("dark", {
+        "&.scrolled": {
+            backgroundColor: "rgba(11, 17, 32, 0.72)",
+            borderBottom: `1px solid ${theme.palette.divider}`,
+        },
+    }),
 }));
 
 const PublicTopBar: React.FC<PublicTopBarProps> = ({
