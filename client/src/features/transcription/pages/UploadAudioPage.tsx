@@ -2,57 +2,62 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
+    Alert,
     Box,
     Button,
-    Typography,
-    TextField,
-    Switch,
-    FormControlLabel,
-    Paper,
-    Select,
-    MenuItem,
+    Chip,
+    Divider,
     FormControl,
-    Stepper,
+    FormControlLabel,
+    IconButton,
+    InputLabel,
+    LinearProgress,
+    MenuItem,
+    Paper,
+    Radio,
+    RadioGroup,
+    Select,
     Step,
     StepLabel,
-    LinearProgress,
-    Alert,
-    Divider,
-    Accordion,
-    AccordionSummary,
-    AccordionDetails,
-    Chip,
+    Stepper,
+    Switch,
+    TextField,
     Tooltip,
-    IconButton,
+    Typography,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import { useTheme } from "@mui/material/styles";
 import { tokens } from "../../../theme/theme";
 
 import {
-    startTranscriptionJob,
-    getTranscriptionProgressUrl,
     deleteTranscription,
+    getTranscriptionProgressUrl,
+    startTranscriptionJob,
 } from "../../auth/api";
 
 import { usePreferencesStore } from "../../../store/usePreferencesStore";
 import { mapPreferencesToUploadOptions } from "../../preferences/utils/mapPreferencesToUploadOptions";
 
-import { ExportButton } from "../components/ExportButton";
 import { DeleteButton } from "../components/DeleteButton";
+import { ExportButton } from "../components/ExportButton";
 
 import type {
-    TranscriptionOptions,
-    TranscriptData,
-    TranscriptionStepKey,
-    TranscriptionStepsState,
-    StepEventPayload,
     CompletedEventPayload,
     ErrorEventPayload,
+    SpeakerType,
     SpeechModel,
+    StepEventPayload,
+    TranscriptData,
+    TranscriptionOptions,
+    TranscriptionStepKey,
+    TranscriptionStepsState,
 } from "../../../types/types";
 
 import { formatDateTime } from "../../../utils/formatDate";
@@ -66,6 +71,10 @@ const TRANSCRIPTION_STEP_ORDER: TranscriptionStepKey[] = [
     "save_file",
     "complete",
 ];
+
+const AUTO_LANGUAGE_CODE = "auto";
+const DISABLED_U3_FORMATTING_TEXT =
+    "This feature is not configurable for universal-3-pro.";
 
 const createInitialStepsState = (): TranscriptionStepsState => ({
     init: { status: "pending", error: null },
@@ -113,64 +122,202 @@ const labelForStepKey = (key: TranscriptionStepKey): string => {
 const defaultTranscriptionOptions: TranscriptionOptions = {
     speaker_labels: false,
     speakers_expected: 2,
-
     format_text: true,
     punctuate: true,
-    entity_detection: false,
-    sentiment_analysis: false,
-
-    speech_models: ["slam-1"],
-    language_code: "en_us",
+    disfluencies: false,
+    speech_models: ["universal-3-pro", "universal-2"],
+    language_code: "en",
+    language_detection: true,
 };
 
-const modelLanguages: Record<string, string[]> = {
+const modelLanguages: Record<SpeechModel, string[]> = {
+    "universal-3-pro": ["en", "es", "de", "fr", "pt", "it"],
     "universal-2": [
         "en",
         "en_uk",
         "en_us",
+        "en_au",
         "de",
         "fa",
-        "ar",
         "es",
         "fr",
-        "uk",
+        "it",
+        "pt",
+        "nl",
+        "hi",
+        "ja",
+        "zh",
+        "ko",
         "ru",
+        "tr",
+        "uk",
+        "vi",
+        "ar",
     ],
-    "slam-1": ["en", "en_uk", "en_us"],
-    nano: ["en", "en_uk", "en_us", "es", "de", "fr"],
 };
 
-const speechModelHelp: Record<string, string> = {
+const speechModelHelp: Record<SpeechModel, string> = {
+    "universal-3-pro":
+        "Highest-accuracy option for supported languages. Supports prompts, automatic language detection, and internal fallback to universal-2.",
     "universal-2":
-        "Advanced general-purpose model for pre-recorded audio with multi-lingual support, improved accuracy and low latency.",
-    "slam-1":
-        "Highest accuracy for transcribing English pre-recorded audio with fine-tuning support and customization.",
-    nano: "Fast and lightweight for general transcription with multi-lingual support.",
+        "Broad language-coverage option. Best when you need wide language support, lower cost, or a fallback for languages outside universal-3-pro.",
 };
-
-const AUTO_LANGUAGE_CODE = "auto";
 
 const languageLabels: Record<string, string> = {
-    [AUTO_LANGUAGE_CODE]: "Automatic Language Detection",
-    en: "English ( Global )",
-    en_uk: "English ( British )",
-    en_us: "English ( US )",
+    [AUTO_LANGUAGE_CODE]: "Automatic language detection",
+    en: "English (Global)",
+    en_au: "English (Australian)",
+    en_uk: "English (British)",
+    en_us: "English (US)",
     de: "German",
-    fa: "Persian ( Farsi )",
-    ar: "Arabic",
+    fa: "Persian (Farsi)",
     es: "Spanish",
     fr: "French",
-    uk: "Ukrainian",
+    it: "Italian",
+    pt: "Portuguese",
+    nl: "Dutch",
+    hi: "Hindi",
+    ja: "Japanese",
+    zh: "Chinese",
+    ko: "Korean",
     ru: "Russian",
+    tr: "Turkish",
+    uk: "Ukrainian",
+    vi: "Vietnamese",
+    ar: "Arabic",
 };
 
-const getLanguageLabel = (code: string): string => {
-    return languageLabels[code] ?? code;
+type PromptPresetKey =
+    | "default"
+    | "verbatim_multilingual"
+    | "unclear_audio"
+    | "custom";
+
+const PROMPT_PRESETS: Record<
+    Exclude<PromptPresetKey, "custom">,
+    {
+        label: string;
+        helper: string;
+        value: string;
+    }
+> = {
+    default: {
+        label: "Use AssemblyAI default (recommended)",
+        helper: "Start here, then only add a prompt if you need extra control.",
+        value: "",
+    },
+    verbatim_multilingual: {
+        label: "Verbatim + multilingual",
+        helper: "Keeps mixed-language speech, filler words, hesitations, and false starts.",
+        value: "Preserve the original language mix as spoken. Keep filler words, hesitations, repetitions, stutters, and false starts.",
+    },
+    unclear_audio: {
+        label: "Reduce hallucinations on unclear audio",
+        helper: "Prefer marking uncertain audio instead of guessing.",
+        value: "Transcribe exactly as heard. If audio is unclear, mark it as [unclear]. Review for hallucinations, spelling mistakes, and unnatural wording.",
+    },
 };
+
+const getLanguageLabel = (code: string): string => languageLabels[code] ?? code;
+
+const getVisibleSpeechModel = (speechModels?: SpeechModel[]): SpeechModel => {
+    if (speechModels?.[0] === "universal-3-pro") {
+        return "universal-3-pro";
+    }
+
+    return "universal-2";
+};
+
+const buildSpeechModels = (model: SpeechModel): SpeechModel[] => {
+    if (model === "universal-3-pro") {
+        return ["universal-3-pro", "universal-2"];
+    }
+
+    return ["universal-2"];
+};
+
+const normalizeKnownSpeakerInputs = (
+    values: string[] | undefined,
+    count: number,
+): string[] => {
+    const safeCount = Math.max(1, count);
+    const current = Array.isArray(values) ? [...values] : [];
+
+    if (current.length > safeCount) {
+        return current.slice(0, safeCount);
+    }
+
+    while (current.length < safeCount) {
+        current.push("");
+    }
+
+    return current;
+};
+
+const sanitizeKnownSpeakers = (
+    values: string[] | undefined,
+): string[] | undefined => {
+    const cleaned = (values ?? []).map((value) => value.trim()).filter(Boolean);
+
+    return cleaned.length > 0 ? cleaned : undefined;
+};
+
+const getPromptPresetKey = (prompt?: string): PromptPresetKey => {
+    const trimmed = (prompt ?? "").trim();
+
+    if (!trimmed) return "default";
+
+    if (trimmed === PROMPT_PRESETS.verbatim_multilingual.value) {
+        return "verbatim_multilingual";
+    }
+
+    if (trimmed === PROMPT_PRESETS.unclear_audio.value) {
+        return "unclear_audio";
+    }
+
+    return "custom";
+};
+
+const TOOLTIP_SX = {
+    fontSize: "0.95rem",
+    lineHeight: 1.5,
+    maxWidth: 360,
+    px: 1.5,
+    py: 1.25,
+} as const;
+
+const InfoLabel = ({ label, tooltip }: { label: string; tooltip?: string }) => (
+    <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+        <Typography variant="body2">{label}</Typography>
+
+        {tooltip ? (
+            <Tooltip
+                title={tooltip}
+                arrow
+                slotProps={{
+                    tooltip: {
+                        sx: TOOLTIP_SX,
+                    },
+                }}
+            >
+                <IconButton
+                    size="small"
+                    sx={{
+                        p: 0.25,
+                        color: "text.secondary",
+                    }}
+                >
+                    <InfoOutlinedIcon fontSize="inherit" />
+                </IconButton>
+            </Tooltip>
+        ) : null}
+    </Box>
+);
 
 export const UploadAudioPage = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
+
     const {
         preferences,
         load: loadPreferences,
@@ -191,7 +338,11 @@ export const UploadAudioPage = () => {
     );
     const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const [advancedOpen, setAdvancedOpen] = useState(false);
+
+    const [speakerSectionOpen, setSpeakerSectionOpen] = useState(true);
+    const [formatSectionOpen, setFormatSectionOpen] = useState(false);
+    const [selectedPromptPreset, setSelectedPromptPreset] =
+        useState<PromptPresetKey>("default");
 
     const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -204,7 +355,28 @@ export const UploadAudioPage = () => {
     useEffect(() => {
         if (!preferences || hasLocalOptionEdits) return;
 
-        setOptions(mapPreferencesToUploadOptions(preferences));
+        setOptions((current) => {
+            const mapped = mapPreferencesToUploadOptions(preferences);
+
+            return {
+                ...current,
+                ...mapped,
+                speakers_expected: Math.max(1, mapped.speakers_expected ?? 2),
+                prompt: mapped.prompt ?? "",
+                format_text:
+                    mapped.format_text === undefined
+                        ? current.format_text
+                        : mapped.format_text,
+                punctuate:
+                    mapped.punctuate === undefined
+                        ? current.punctuate
+                        : mapped.punctuate,
+                disfluencies:
+                    mapped.disfluencies === undefined
+                        ? current.disfluencies
+                        : mapped.disfluencies,
+            };
+        });
     }, [preferences, hasLocalOptionEdits]);
 
     useEffect(() => {
@@ -215,9 +387,10 @@ export const UploadAudioPage = () => {
         };
     }, []);
 
-    const transcriptMaxHeight = useMemo(() => {
-        return "min(820px, calc(100vh - 360px))";
-    }, []);
+    const transcriptMaxHeight = useMemo(
+        () => "min(820px, calc(100vh - 360px))",
+        [],
+    );
 
     const currentStepLabel = useMemo(() => {
         const safeIndex = Math.min(
@@ -233,120 +406,350 @@ export const UploadAudioPage = () => {
           ? "Processing… this panel updates automatically."
           : "Select a file and start transcription to see results here.";
 
-    const currentSpeechModel: SpeechModel =
-        options.speech_models?.[0] ?? "slam-1";
+    const currentSpeechModel: SpeechModel = getVisibleSpeechModel(
+        options.speech_models,
+    );
 
     const currentModelLanguages = useMemo(() => {
         const langs = modelLanguages[currentSpeechModel] ?? [];
         return langs.length ? langs : ["en"];
     }, [currentSpeechModel]);
 
-    const isUniversal2 = currentSpeechModel === "universal-2";
+    const isUniversal3Pro = currentSpeechModel === "universal-3-pro";
+
+    const autoLanguageEnabled =
+        options.language_code === AUTO_LANGUAGE_CODE ||
+        Boolean(options.language_detection);
+
     const codeSwitchingEnabled = Boolean(
         options.language_detection_options?.code_switching,
     );
 
+    const speakerIdEnabled = Boolean(options.speaker_options?.speaker_id);
+
+    const currentSpeakerType: SpeakerType =
+        options.speaker_options?.speaker_id_config?.speaker_type ?? "name";
+
+    const knownSpeakerInputs = normalizeKnownSpeakerInputs(
+        options.speaker_options?.speaker_id_config?.speakers,
+        options.speakers_expected ?? 1,
+    );
+
+    const knownValuePlaceholder =
+        currentSpeakerType === "role" ? "e.g. Host" : "e.g. Maya";
+
     useEffect(() => {
-        // Hide/reset auto language detection + code switching when not using Universal-2.
-        setOptions((o) => {
-            const liveModel = o.speech_models?.[0] ?? "slam-1";
-            const liveIsUniversal2 = liveModel === "universal-2";
+        setSelectedPromptPreset(
+            isUniversal3Pro ? getPromptPresetKey(options.prompt) : "default",
+        );
+    }, [isUniversal3Pro, options.prompt]);
 
-            if (liveIsUniversal2) return o;
+    useEffect(() => {
+        if (!speakerIdEnabled) return;
 
-            const langs = modelLanguages[liveModel] ?? ["en"];
-            const nextLanguageCode =
-                o.language_code === AUTO_LANGUAGE_CODE
-                    ? (langs[0] ?? "en")
-                    : o.language_code;
+        setOptions((prev) => {
+            const nextValues = normalizeKnownSpeakerInputs(
+                prev.speaker_options?.speaker_id_config?.speakers,
+                prev.speakers_expected ?? 1,
+            );
 
-            const hadDetection =
-                o.language_code === AUTO_LANGUAGE_CODE ||
-                o.language_detection ||
-                o.language_detection_options?.code_switching;
+            const currentValues =
+                prev.speaker_options?.speaker_id_config?.speakers ?? [];
 
-            if (!hadDetection) return o;
+            if (
+                currentValues.length === nextValues.length &&
+                currentValues.every(
+                    (value, index) => value === nextValues[index],
+                )
+            ) {
+                return prev;
+            }
 
             return {
-                ...o,
-                language_code: nextLanguageCode,
-                language_detection: false,
-                language_detection_options: undefined,
+                ...prev,
+                speaker_options: {
+                    speaker_id: true,
+                    speaker_id_config: {
+                        speaker_type:
+                            prev.speaker_options?.speaker_id_config
+                                ?.speaker_type ?? "name",
+                        speakers: nextValues,
+                    },
+                },
             };
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentSpeechModel]);
+    }, [speakerIdEnabled, options.speakers_expected]);
 
     useEffect(() => {
-        // Enforce Code Switching contract for Universal-2.
-        if (!isUniversal2) return;
-        if (!codeSwitchingEnabled) return;
+        setOptions((prev) => {
+            const selectedModel = getVisibleSpeechModel(prev.speech_models);
 
-        if (
-            options.language_code !== AUTO_LANGUAGE_CODE ||
-            !options.language_detection
-        ) {
-            setOptions((o) => ({
-                ...o,
+            if (selectedModel !== "universal-3-pro") {
+                return prev;
+            }
+
+            if (
+                prev.language_code === AUTO_LANGUAGE_CODE ||
+                prev.language_detection
+            ) {
+                return prev;
+            }
+
+            return {
+                ...prev,
                 language_code: AUTO_LANGUAGE_CODE,
                 language_detection: true,
-                language_detection_options: { code_switching: true },
-            }));
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isUniversal2, codeSwitchingEnabled]);
-
-    useEffect(() => {
-        // Keep language_code valid when switching models (but do not override auto detection).
-        setOptions((o) => {
-            if (o.language_code === AUTO_LANGUAGE_CODE) return o;
-
-            const liveModel = o.speech_models?.[0] ?? "slam-1";
-            const langs = modelLanguages[liveModel] ?? ["en"];
-
-            if (langs.includes(o.language_code)) return o;
-
-            return {
-                ...o,
-                language_code: langs[0] ?? "en",
             };
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentSpeechModel]);
+
+    useEffect(() => {
+        setOptions((prev) => {
+            if (!autoLanguageEnabled && prev.language_detection_options) {
+                return {
+                    ...prev,
+                    language_detection_options: undefined,
+                };
+            }
+
+            return prev;
+        });
+    }, [autoLanguageEnabled]);
+
+    useEffect(() => {
+        setOptions((prev) => {
+            if (autoLanguageEnabled) return prev;
+
+            if (currentModelLanguages.includes(prev.language_code)) return prev;
+
+            return {
+                ...prev,
+                language_code: currentModelLanguages[0] ?? "en",
+            };
+        });
+    }, [autoLanguageEnabled, currentModelLanguages]);
 
     const handleSelectModel = (model: SpeechModel): void => {
         setHasLocalOptionEdits(true);
-        if (model === currentSpeechModel) return;
-        const langs = modelLanguages[model] ?? ["en"];
 
-        setOptions((o) => {
-            const nextIsUniversal2 = model === "universal-2";
-            const prevWasAuto = o.language_code === AUTO_LANGUAGE_CODE;
+        setOptions((prev) => {
+            const nextLanguages = modelLanguages[model] ?? ["en"];
+            const prevKnownValues =
+                prev.speaker_options?.speaker_id_config?.speakers;
 
-            const nextLanguageCode = nextIsUniversal2
-                ? prevWasAuto
+            const nextLanguageCode =
+                prev.language_code === AUTO_LANGUAGE_CODE ||
+                prev.language_detection
                     ? AUTO_LANGUAGE_CODE
-                    : langs.includes(o.language_code)
-                      ? o.language_code
-                      : (langs[0] ?? "en")
-                : prevWasAuto
-                  ? (langs[0] ?? "en")
-                  : langs.includes(o.language_code)
-                    ? o.language_code
-                    : (langs[0] ?? "en");
+                    : nextLanguages.includes(prev.language_code)
+                      ? prev.language_code
+                      : (nextLanguages[0] ?? "en");
 
             return {
-                ...o,
-                speech_models: [model],
+                ...prev,
+                speech_models: buildSpeechModels(model),
                 language_code: nextLanguageCode,
-                language_detection: nextIsUniversal2
-                    ? o.language_detection
-                    : false,
-                language_detection_options: nextIsUniversal2
-                    ? o.language_detection_options
+                language_detection:
+                    nextLanguageCode === AUTO_LANGUAGE_CODE ? true : undefined,
+                language_detection_options: autoLanguageEnabled
+                    ? prev.language_detection_options
+                    : undefined,
+                prompt: model === "universal-2" ? "" : (prev.prompt ?? ""),
+                speaker_options: prev.speaker_options?.speaker_id
+                    ? {
+                          speaker_id: true,
+                          speaker_id_config: {
+                              speaker_type:
+                                  prev.speaker_options.speaker_id_config
+                                      ?.speaker_type ?? "name",
+                              speakers: normalizeKnownSpeakerInputs(
+                                  prevKnownValues,
+                                  prev.speakers_expected ?? 1,
+                              ),
+                          },
+                      }
                     : undefined,
             };
         });
+    };
+
+    const handleLanguageChange = (nextValue: string): void => {
+        setHasLocalOptionEdits(true);
+
+        setOptions((prev) => {
+            const selectingAuto = nextValue === AUTO_LANGUAGE_CODE;
+
+            return {
+                ...prev,
+                language_code: selectingAuto ? AUTO_LANGUAGE_CODE : nextValue,
+                language_detection: selectingAuto ? true : undefined,
+                language_detection_options: selectingAuto
+                    ? prev.language_detection_options
+                    : undefined,
+            };
+        });
+    };
+
+    const handleCodeSwitchingToggle = (enabled: boolean): void => {
+        setHasLocalOptionEdits(true);
+
+        setOptions((prev) => ({
+            ...prev,
+            language_code: enabled ? AUTO_LANGUAGE_CODE : prev.language_code,
+            language_detection:
+                enabled || prev.language_code === AUTO_LANGUAGE_CODE
+                    ? true
+                    : undefined,
+            language_detection_options: enabled
+                ? { code_switching: true }
+                : undefined,
+        }));
+    };
+
+    const handleSpeakerLabelsToggle = (enabled: boolean): void => {
+        setHasLocalOptionEdits(true);
+
+        setOptions((prev) => ({
+            ...prev,
+            speaker_labels: enabled,
+            speakers_expected: Math.max(1, prev.speakers_expected ?? 1),
+        }));
+    };
+
+    const handleSpeakersExpectedChange = (rawValue: string): void => {
+        const nextCount = Math.max(1, Number.parseInt(rawValue, 10) || 1);
+
+        setHasLocalOptionEdits(true);
+
+        setOptions((prev) => ({
+            ...prev,
+            speakers_expected: nextCount,
+            speaker_options: prev.speaker_options?.speaker_id
+                ? {
+                      speaker_id: true,
+                      speaker_id_config: {
+                          speaker_type:
+                              prev.speaker_options.speaker_id_config
+                                  ?.speaker_type ?? "name",
+                          speakers: normalizeKnownSpeakerInputs(
+                              prev.speaker_options.speaker_id_config?.speakers,
+                              nextCount,
+                          ),
+                      },
+                  }
+                : prev.speaker_options,
+        }));
+    };
+
+    const handleSpeakerIdToggle = (enabled: boolean): void => {
+        setHasLocalOptionEdits(true);
+
+        setOptions((prev) => ({
+            ...prev,
+            speaker_options: enabled
+                ? {
+                      speaker_id: true,
+                      speaker_id_config: {
+                          speaker_type:
+                              prev.speaker_options?.speaker_id_config
+                                  ?.speaker_type ?? "name",
+                          speakers: normalizeKnownSpeakerInputs(
+                              prev.speaker_options?.speaker_id_config?.speakers,
+                              prev.speakers_expected ?? 1,
+                          ),
+                      },
+                  }
+                : undefined,
+        }));
+    };
+
+    const handleSpeakerTypeChange = (speakerType: SpeakerType): void => {
+        setHasLocalOptionEdits(true);
+
+        setOptions((prev) => ({
+            ...prev,
+            speaker_options: {
+                speaker_id: true,
+                speaker_id_config: {
+                    speaker_type: speakerType,
+                    speakers: normalizeKnownSpeakerInputs(
+                        prev.speaker_options?.speaker_id_config?.speakers,
+                        prev.speakers_expected ?? 1,
+                    ),
+                },
+            },
+        }));
+    };
+
+    const handleKnownSpeakerChange = (index: number, value: string): void => {
+        setHasLocalOptionEdits(true);
+
+        setOptions((prev) => {
+            const nextValues = normalizeKnownSpeakerInputs(
+                prev.speaker_options?.speaker_id_config?.speakers,
+                prev.speakers_expected ?? 1,
+            );
+
+            nextValues[index] = value;
+
+            return {
+                ...prev,
+                speaker_options: {
+                    speaker_id: true,
+                    speaker_id_config: {
+                        speaker_type:
+                            prev.speaker_options?.speaker_id_config
+                                ?.speaker_type ?? "name",
+                        speakers: nextValues,
+                    },
+                },
+            };
+        });
+    };
+
+    const handleAddKnownValueField = (): void => {
+        setHasLocalOptionEdits(true);
+
+        setOptions((prev) => {
+            const nextCount = Math.max(1, (prev.speakers_expected ?? 1) + 1);
+
+            return {
+                ...prev,
+                speakers_expected: nextCount,
+                speaker_options: {
+                    speaker_id: true,
+                    speaker_id_config: {
+                        speaker_type:
+                            prev.speaker_options?.speaker_id_config
+                                ?.speaker_type ?? "name",
+                        speakers: normalizeKnownSpeakerInputs(
+                            prev.speaker_options?.speaker_id_config?.speakers,
+                            nextCount,
+                        ),
+                    },
+                },
+            };
+        });
+    };
+
+    const handlePromptPresetChange = (presetKey: PromptPresetKey): void => {
+        setHasLocalOptionEdits(true);
+        setSelectedPromptPreset(presetKey);
+
+        if (presetKey === "custom") return;
+
+        setOptions((prev) => ({
+            ...prev,
+            prompt: PROMPT_PRESETS[presetKey].value,
+        }));
+    };
+
+    const handlePromptInputChange = (value: string): void => {
+        setHasLocalOptionEdits(true);
+        setOptions((prev) => ({
+            ...prev,
+            prompt: value,
+        }));
     };
 
     const handleUpload = async (): Promise<void> => {
@@ -364,23 +767,13 @@ export const UploadAudioPage = () => {
         setActiveStepIndex(0);
         setJobId(null);
 
-        const userOptions: Partial<TranscriptionOptions> = {};
+        const userOptions: Partial<TranscriptionOptions> = {
+            speech_models: buildSpeechModels(currentSpeechModel),
+        };
 
-        // Keep payload logic consistent with existing behavior.
-        if (options.speaker_labels) userOptions.speaker_labels = true;
-        if (options.speaker_labels) {
-            userOptions.speakers_expected = options.speakers_expected;
-        }
-
-        if (options.punctuate) userOptions.punctuate = true;
-        if (options.format_text) userOptions.format_text = true;
-        if (options.entity_detection) userOptions.entity_detection = true;
-        if (options.sentiment_analysis) userOptions.sentiment_analysis = true;
-
-        userOptions.speech_models = [currentSpeechModel];
-        const isAutoLanguage = options.language_code === AUTO_LANGUAGE_CODE;
-        if (isAutoLanguage || options.language_detection) {
+        if (autoLanguageEnabled) {
             userOptions.language_detection = true;
+
             if (codeSwitchingEnabled) {
                 userOptions.language_detection_options = {
                     code_switching: true,
@@ -388,6 +781,39 @@ export const UploadAudioPage = () => {
             }
         } else {
             userOptions.language_code = options.language_code;
+        }
+
+        if (currentSpeechModel === "universal-3-pro") {
+            const trimmedPrompt = options.prompt?.trim();
+            if (trimmedPrompt) {
+                userOptions.prompt = trimmedPrompt;
+            }
+        }
+
+        if (options.speaker_labels) {
+            userOptions.speaker_labels = true;
+            userOptions.speakers_expected = Math.max(
+                1,
+                options.speakers_expected ?? 1,
+            );
+        }
+
+        if (speakerIdEnabled) {
+            userOptions.speaker_options = {
+                speaker_id: true,
+                speaker_id_config: {
+                    speaker_type: currentSpeakerType,
+                    speakers: sanitizeKnownSpeakers(
+                        options.speaker_options?.speaker_id_config?.speakers,
+                    ),
+                },
+            };
+        }
+
+        if (currentSpeechModel === "universal-2") {
+            if (options.punctuate) userOptions.punctuate = true;
+            if (options.format_text) userOptions.format_text = true;
+            if (options.disfluencies) userOptions.disfluencies = true;
         }
 
         try {
@@ -518,18 +944,7 @@ export const UploadAudioPage = () => {
                         arrow
                         slotProps={{
                             tooltip: {
-                                sx: {
-                                    fontSize: "0.95rem",
-                                    lineHeight: 1.5,
-                                    maxWidth: 360,
-                                    px: 1.5,
-                                    py: 1.25,
-                                },
-                            },
-                            arrow: {
-                                sx: {
-                                    color: "grey.900",
-                                },
+                                sx: TOOLTIP_SX,
                             },
                         }}
                     >
@@ -543,9 +958,6 @@ export const UploadAudioPage = () => {
                                 p: 0.25,
                                 ml: 0.25,
                                 color: "text.secondary",
-                                "&:hover": {
-                                    backgroundColor: theme.palette.action.hover,
-                                },
                             }}
                         >
                             <InfoOutlinedIcon fontSize="inherit" />
@@ -553,6 +965,59 @@ export const UploadAudioPage = () => {
                     </Tooltip>
                 </Box>
             </Button>
+        );
+    };
+
+    const renderFormattingSwitch = ({
+        checked,
+        label,
+        tooltip,
+        onChange,
+    }: {
+        checked: boolean;
+        label: string;
+        tooltip: string;
+        onChange: (checked: boolean) => void;
+    }) => {
+        const disabled = isUniversal3Pro;
+        const effectiveTooltip = disabled
+            ? DISABLED_U3_FORMATTING_TEXT
+            : tooltip;
+
+        return (
+            <FormControlLabel
+                sx={{
+                    ml: 0,
+                    mr: 0,
+                    py: 0.25,
+                    alignItems: "center",
+                    "& .MuiFormControlLabel-label": {
+                        display: "flex",
+                        alignItems: "center",
+                    },
+                }}
+                control={
+                    <Switch
+                        checked={checked}
+                        disabled={disabled}
+                        onChange={(e) => {
+                            setHasLocalOptionEdits(true);
+                            onChange(e.target.checked);
+                        }}
+                        sx={{
+                            mr: 1,
+                            "& .MuiSwitch-switchBase.Mui-checked": {
+                                color: colors.greenAccent[500],
+                            },
+                            "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
+                                {
+                                    backgroundColor: colors.greenAccent[500],
+                                },
+                        }}
+                    />
+                }
+                label={<InfoLabel label={label} tooltip={effectiveTooltip} />}
+            />
         );
     };
 
@@ -573,7 +1038,6 @@ export const UploadAudioPage = () => {
                     alignItems: "flex-start",
                 }}
             >
-                {/* Left panel */}
                 <Paper
                     sx={{
                         p: 3,
@@ -678,11 +1142,11 @@ export const UploadAudioPage = () => {
 
                     <Divider sx={{ borderColor: theme.palette.divider }} />
 
-                    {/* File selection */}
                     <Button
                         variant="outlined"
                         component="label"
                         startIcon={<UploadFileOutlinedIcon />}
+                        fullWidth
                         sx={{
                             color: colors.grey[100],
                             borderColor: colors.grey[300],
@@ -691,7 +1155,6 @@ export const UploadAudioPage = () => {
                                 backgroundColor: theme.palette.action.hover,
                             },
                         }}
-                        fullWidth
                     >
                         {file ? "Change Audio File" : "Choose Audio File"}
                         <input
@@ -721,7 +1184,6 @@ export const UploadAudioPage = () => {
                         </Typography>
                     )}
 
-                    {/* Speech model (buttons with info icon tooltips) */}
                     <Box
                         sx={{
                             display: "flex",
@@ -733,30 +1195,28 @@ export const UploadAudioPage = () => {
                             variant="subtitle2"
                             sx={{ color: "text.secondary" }}
                         >
-                            Select a model
+                            Speech model
                         </Typography>
 
                         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                            {renderModelButton("universal-3-pro")}
                             {renderModelButton("universal-2")}
-                            {renderModelButton("slam-1")}
-                            {renderModelButton("nano")}
                         </Box>
                     </Box>
 
-                    {/* Language */}
+                    <Divider sx={{ borderColor: theme.palette.divider }} />
+
                     <Box
                         sx={{
                             display: "flex",
                             flexDirection: "column",
-                            gap: 1,
+                            gap: 1.25,
                         }}
                     >
-                        <Typography
-                            variant="subtitle2"
-                            sx={{ color: "text.secondary" }}
-                        >
-                            Language
-                        </Typography>
+                        <InfoLabel
+                            label="Language"
+                            tooltip="Choose a language manually, or use automatic language detection to let AssemblyAI choose the best supported model for the audio."
+                        />
 
                         <FormControl
                             size="small"
@@ -774,44 +1234,24 @@ export const UploadAudioPage = () => {
                                     },
                             }}
                         >
+                            <InputLabel id="language-label">
+                                Language
+                            </InputLabel>
                             <Select
-                                value={options.language_code}
-                                disabled={isUniversal2 && codeSwitchingEnabled}
-                                onChange={(e) => {
-                                    setHasLocalOptionEdits(true);
-                                    setOptions((o) => {
-                                        const next = String(e.target.value);
-
-                                        // Prevent selecting auto for non-Universal-2 models.
-                                        if (
-                                            !isUniversal2 &&
-                                            next === AUTO_LANGUAGE_CODE
-                                        ) {
-                                            return o;
-                                        }
-
-                                        const selectingAuto =
-                                            next === AUTO_LANGUAGE_CODE;
-
-                                        return {
-                                            ...o,
-                                            language_code: next,
-                                            language_detection: selectingAuto
-                                                ? true
-                                                : false,
-                                            language_detection_options:
-                                                selectingAuto
-                                                    ? o.language_detection_options
-                                                    : undefined,
-                                        };
-                                    });
-                                }}
+                                labelId="language-label"
+                                label="Language"
+                                value={
+                                    autoLanguageEnabled
+                                        ? AUTO_LANGUAGE_CODE
+                                        : options.language_code
+                                }
+                                onChange={(e) =>
+                                    handleLanguageChange(String(e.target.value))
+                                }
                             >
-                                {isUniversal2 && (
-                                    <MenuItem value={AUTO_LANGUAGE_CODE}>
-                                        {getLanguageLabel(AUTO_LANGUAGE_CODE)}
-                                    </MenuItem>
-                                )}
+                                <MenuItem value={AUTO_LANGUAGE_CODE}>
+                                    {getLanguageLabel(AUTO_LANGUAGE_CODE)}
+                                </MenuItem>
 
                                 {currentModelLanguages.map((lang) => (
                                     <MenuItem key={lang} value={lang}>
@@ -819,83 +1259,19 @@ export const UploadAudioPage = () => {
                                     </MenuItem>
                                 ))}
                             </Select>
-
-                            {isUniversal2 && (
-                                <FormControlLabel
-                                    sx={{ mt: 0.5, ml: 0 }}
-                                    control={
-                                        <Switch
-                                            checked={codeSwitchingEnabled}
-                                            onChange={(e) => {
-                                                setHasLocalOptionEdits(true);
-                                                const checked =
-                                                    e.target.checked;
-                                                setOptions((o) => ({
-                                                    ...o,
-                                                    language_detection: checked
-                                                        ? true
-                                                        : o.language_code ===
-                                                            AUTO_LANGUAGE_CODE
-                                                          ? true
-                                                          : false,
-                                                    language_code: checked
-                                                        ? AUTO_LANGUAGE_CODE
-                                                        : o.language_code,
-                                                    language_detection_options:
-                                                        checked
-                                                            ? {
-                                                                  code_switching: true,
-                                                              }
-                                                            : undefined,
-                                                }));
-                                            }}
-                                            sx={{
-                                                "& .MuiSwitch-switchBase.Mui-checked":
-                                                    {
-                                                        color: colors
-                                                            .greenAccent[500],
-                                                    },
-                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
-                                                    {
-                                                        backgroundColor:
-                                                            colors
-                                                                .greenAccent[500],
-                                                    },
-                                            }}
-                                        />
-                                    }
-                                    label="Code switching"
-                                />
-                            )}
                         </FormControl>
-                    </Box>
-
-                    {/* Speaker labels */}
-                    <Box
-                        sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 1,
-                        }}
-                    >
-                        <Typography
-                            variant="subtitle2"
-                            sx={{ color: "text.secondary", mt: 0.5 }}
-                        >
-                            Speakers
-                        </Typography>
 
                         <FormControlLabel
+                            sx={{ ml: 0 }}
                             control={
                                 <Switch
-                                    checked={options.speaker_labels}
-                                    onChange={(e) => {
-                                        setHasLocalOptionEdits(true);
-                                        setOptions((o) => ({
-                                            ...o,
-                                            speaker_labels: e.target.checked,
-                                        }));
-                                    }}
+                                    checked={codeSwitchingEnabled}
+                                    disabled={!autoLanguageEnabled}
+                                    onChange={(e) =>
+                                        handleCodeSwitchingToggle(
+                                            e.target.checked,
+                                        )
+                                    }
                                     sx={{
                                         "& .MuiSwitch-switchBase.Mui-checked": {
                                             color: colors.greenAccent[500],
@@ -908,221 +1284,368 @@ export const UploadAudioPage = () => {
                                     }}
                                 />
                             }
-                            label="Speaker labels"
-                        />
-
-                        <TextField
-                            label="Speakers expected"
-                            type="number"
-                            value={options.speakers_expected}
-                            disabled={!options.speaker_labels}
-                            onChange={(e) => {
-                                setHasLocalOptionEdits(true);
-                                setOptions((o) => ({
-                                    ...o,
-                                    speakers_expected:
-                                        parseInt(e.target.value) || 1,
-                                }));
-                            }}
-                            size="small"
-                            helperText={
-                                options.speaker_labels
-                                    ? "Used to improve diarization."
-                                    : "Enable speaker labels to configure."
+                            label={
+                                <InfoLabel
+                                    label="Code switching"
+                                    tooltip="Use this when speakers switch between languages in the same recording. It works with automatic language detection and helps preserve mixed-language speech."
+                                />
                             }
-                            sx={{
-                                "& .MuiInputLabel-root.Mui-focused": {
-                                    color: colors.greenAccent[500],
-                                },
-                                "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
-                                    {
-                                        borderColor: colors.greenAccent[500],
-                                    },
-                            }}
                         />
                     </Box>
 
-                    {/* Advanced options */}
-                    <Box
-                        sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 1,
-                        }}
-                    >
-                        <Typography
-                            variant="subtitle2"
-                            sx={{ color: "text.secondary" }}
-                        >
-                            Advanced options
-                        </Typography>
+                    {isUniversal3Pro && (
+                        <>
+                            <Divider
+                                sx={{ borderColor: theme.palette.divider }}
+                            />
 
-                        <Accordion
-                            disableGutters
-                            elevation={0}
-                            expanded={advancedOpen}
-                            onChange={() => setAdvancedOpen((v) => !v)}
-                            sx={{
-                                borderRadius: 2,
-                                border: `1px solid ${theme.palette.divider}`,
-                                backgroundColor: "transparent",
-                                "&:before": { display: "none" },
-                                "&.Mui-expanded": {
-                                    margin: 0,
-                                },
-                            }}
-                        >
-                            <AccordionSummary
-                                expandIcon={<ExpandMoreIcon />}
+                            <Box
                                 sx={{
-                                    px: 1.5,
-                                    minHeight: 44,
-                                    "& .MuiAccordionSummary-content": {
-                                        margin: 0,
-                                    },
-                                }}
-                            >
-                                <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: 600 }}
-                                >
-                                    Show advanced options
-                                </Typography>
-                            </AccordionSummary>
-
-                            <AccordionDetails
-                                sx={{
-                                    px: 1.5,
-                                    pt: 1,
-                                    pb: 1.5,
                                     display: "flex",
                                     flexDirection: "column",
                                     gap: 1.25,
                                 }}
                             >
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={options.format_text}
-                                            onChange={(e) => {
-                                                setHasLocalOptionEdits(true);
-                                                setOptions((o) => ({
-                                                    ...o,
-                                                    format_text:
-                                                        e.target.checked,
-                                                }));
-                                            }}
-                                            sx={{
-                                                "& .MuiSwitch-switchBase.Mui-checked":
-                                                    {
-                                                        color: colors
-                                                            .greenAccent[500],
-                                                    },
-                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
-                                                    {
-                                                        backgroundColor:
-                                                            colors
-                                                                .greenAccent[500],
-                                                    },
-                                            }}
-                                        />
-                                    }
-                                    label="Format text"
+                                <InfoLabel
+                                    label="Prompt"
+                                    tooltip="For best results, start without a prompt first. When you need more control, pick a recommended prompt and then edit it to fit your audio."
                                 />
 
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={options.punctuate}
-                                            onChange={(e) => {
-                                                setHasLocalOptionEdits(true);
-                                                setOptions((o) => ({
-                                                    ...o,
-                                                    punctuate: e.target.checked,
-                                                }));
-                                            }}
-                                            sx={{
-                                                "& .MuiSwitch-switchBase.Mui-checked":
-                                                    {
-                                                        color: colors
-                                                            .greenAccent[500],
-                                                    },
-                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
-                                                    {
-                                                        backgroundColor:
-                                                            colors
-                                                                .greenAccent[500],
-                                                    },
-                                            }}
-                                        />
-                                    }
-                                    label="Punctuate"
-                                />
+                                <FormControl component="fieldset">
+                                    <RadioGroup
+                                        value={selectedPromptPreset}
+                                        onChange={(e) =>
+                                            handlePromptPresetChange(
+                                                e.target
+                                                    .value as PromptPresetKey,
+                                            )
+                                        }
+                                    >
+                                        {(
+                                            Object.entries(
+                                                PROMPT_PRESETS,
+                                            ) as Array<
+                                                [
+                                                    Exclude<
+                                                        PromptPresetKey,
+                                                        "custom"
+                                                    >,
+                                                    (typeof PROMPT_PRESETS)[Exclude<
+                                                        PromptPresetKey,
+                                                        "custom"
+                                                    >],
+                                                ]
+                                            >
+                                        ).map(([key, preset]) => (
+                                            <Box
+                                                key={key}
+                                                sx={{
+                                                    border: `1px solid ${theme.palette.divider}`,
+                                                    borderRadius: 2,
+                                                    px: 1.25,
+                                                    py: 0.9,
+                                                    mb: 1,
+                                                }}
+                                            >
+                                                <FormControlLabel
+                                                    value={key}
+                                                    control={<Radio />}
+                                                    label={
+                                                        <Box>
+                                                            <Typography
+                                                                variant="body2"
+                                                                sx={{
+                                                                    fontWeight: 600,
+                                                                }}
+                                                            >
+                                                                {preset.label}
+                                                            </Typography>
+                                                            <Typography
+                                                                variant="caption"
+                                                                color="text.secondary"
+                                                            >
+                                                                {preset.helper}
+                                                            </Typography>
+                                                        </Box>
+                                                    }
+                                                />
+                                            </Box>
+                                        ))}
 
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={options.entity_detection}
-                                            onChange={(e) => {
-                                                setHasLocalOptionEdits(true);
-                                                setOptions((o) => ({
-                                                    ...o,
-                                                    entity_detection:
-                                                        e.target.checked,
-                                                }));
-                                            }}
-                                            sx={{
-                                                "& .MuiSwitch-switchBase.Mui-checked":
-                                                    {
-                                                        color: colors
-                                                            .greenAccent[500],
-                                                    },
-                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
-                                                    {
-                                                        backgroundColor:
-                                                            colors
-                                                                .greenAccent[500],
-                                                    },
-                                            }}
+                                        <FormControlLabel
+                                            value="custom"
+                                            control={<Radio />}
+                                            label="Custom prompt"
                                         />
-                                    }
-                                    label="Entity detection"
-                                />
+                                    </RadioGroup>
+                                </FormControl>
 
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={options.sentiment_analysis}
-                                            onChange={(e) => {
-                                                setHasLocalOptionEdits(true);
-                                                setOptions((o) => ({
-                                                    ...o,
-                                                    sentiment_analysis:
-                                                        e.target.checked,
-                                                }));
-                                            }}
-                                            sx={{
-                                                "& .MuiSwitch-switchBase.Mui-checked":
-                                                    {
-                                                        color: colors
-                                                            .greenAccent[500],
-                                                    },
-                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
-                                                    {
-                                                        backgroundColor:
-                                                            colors
-                                                                .greenAccent[500],
-                                                    },
-                                            }}
+                                <TextField
+                                    label="Prompt input"
+                                    value={options.prompt ?? ""}
+                                    onChange={(e) =>
+                                        handlePromptInputChange(e.target.value)
+                                    }
+                                    size="small"
+                                    multiline
+                                    minRows={4}
+                                    placeholder="e.g. Preserve mixed-language speech, keep filler words, and do not normalize false starts."
+                                    helperText="You can pick a recommended prompt, then edit it here."
+                                />
+                            </Box>
+                        </>
+                    )}
+
+                    <Divider sx={{ borderColor: theme.palette.divider }} />
+
+                    <Accordion
+                        disableGutters
+                        elevation={0}
+                        expanded={speakerSectionOpen}
+                        onChange={() => setSpeakerSectionOpen((prev) => !prev)}
+                        sx={{
+                            borderRadius: 2,
+                            border: `1px solid ${theme.palette.divider}`,
+                            backgroundColor: "transparent",
+                            "&:before": { display: "none" },
+                            "&.Mui-expanded": { margin: 0 },
+                        }}
+                    >
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography variant="subtitle2">
+                                Speaker Diarization
+                            </Typography>
+                        </AccordionSummary>
+
+                        <AccordionDetails
+                            sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 1.25,
+                            }}
+                        >
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={Boolean(
+                                            options.speaker_labels,
+                                        )}
+                                        onChange={(e) =>
+                                            handleSpeakerLabelsToggle(
+                                                e.target.checked,
+                                            )
+                                        }
+                                        sx={{
+                                            "& .MuiSwitch-switchBase.Mui-checked":
+                                                {
+                                                    color: colors
+                                                        .greenAccent[500],
+                                                },
+                                            "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
+                                                {
+                                                    backgroundColor:
+                                                        colors.greenAccent[500],
+                                                },
+                                        }}
+                                    />
+                                }
+                                label={
+                                    <InfoLabel
+                                        label="Speaker labels"
+                                        tooltip="Separates the transcript by speaker turns."
+                                    />
+                                }
+                            />
+
+                            <TextField
+                                label="Speakers expected"
+                                type="number"
+                                value={options.speakers_expected ?? 1}
+                                disabled={!options.speaker_labels}
+                                onChange={(e) =>
+                                    handleSpeakersExpectedChange(e.target.value)
+                                }
+                                inputProps={{ min: 1, max: 20 }}
+                                size="small"
+                                helperText={
+                                    options.speaker_labels
+                                        ? "Used to improve diarization. This also controls the number of known-value inputs when speaker ID is enabled."
+                                        : "Enable speaker labels to edit."
+                                }
+                            />
+
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={speakerIdEnabled}
+                                        onChange={(e) =>
+                                            handleSpeakerIdToggle(
+                                                e.target.checked,
+                                            )
+                                        }
+                                        sx={{
+                                            "& .MuiSwitch-switchBase.Mui-checked":
+                                                {
+                                                    color: colors
+                                                        .greenAccent[500],
+                                                },
+                                            "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
+                                                {
+                                                    backgroundColor:
+                                                        colors.greenAccent[500],
+                                                },
+                                        }}
+                                    />
+                                }
+                                label={
+                                    <InfoLabel
+                                        label="Speaker ID"
+                                        tooltip="Lets you guide speaker labeling with names or roles you already know."
+                                    />
+                                }
+                            />
+
+                            {speakerIdEnabled && (
+                                <>
+                                    <FormControl size="small" fullWidth>
+                                        <InputLabel id="speaker-type-label">
+                                            Speaker type
+                                        </InputLabel>
+                                        <Select
+                                            labelId="speaker-type-label"
+                                            label="Speaker type"
+                                            value={currentSpeakerType}
+                                            onChange={(e) =>
+                                                handleSpeakerTypeChange(
+                                                    e.target
+                                                        .value as SpeakerType,
+                                                )
+                                            }
+                                        >
+                                            <MenuItem value="name">
+                                                Name
+                                            </MenuItem>
+                                            <MenuItem value="role">
+                                                Role
+                                            </MenuItem>
+                                        </Select>
+                                    </FormControl>
+
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: 1,
+                                        }}
+                                    >
+                                        <InfoLabel
+                                            label="Known values (optional)"
+                                            tooltip="Add names or roles you expect in the recording. The number of inputs stays aligned with Speakers expected."
                                         />
-                                    }
-                                    label="Sentiment analysis"
-                                />
-                            </AccordionDetails>
-                        </Accordion>
-                    </Box>
 
-                    {/* Sticky-ish primary action */}
+                                        {knownSpeakerInputs.map(
+                                            (value, index) => (
+                                                <TextField
+                                                    key={index}
+                                                    size="small"
+                                                    label={`Known value ${index + 1}`}
+                                                    value={value}
+                                                    placeholder={
+                                                        knownValuePlaceholder
+                                                    }
+                                                    onChange={(e) =>
+                                                        handleKnownSpeakerChange(
+                                                            index,
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            ),
+                                        )}
+
+                                        <Button
+                                            variant="text"
+                                            startIcon={<AddCircleOutlineIcon />}
+                                            onClick={handleAddKnownValueField}
+                                            sx={{
+                                                justifyContent: "flex-start",
+                                                width: "fit-content",
+                                                textTransform: "none",
+                                                px: 0,
+                                            }}
+                                        >
+                                            Add another known value
+                                        </Button>
+                                    </Box>
+                                </>
+                            )}
+                        </AccordionDetails>
+                    </Accordion>
+
+                    <Accordion
+                        disableGutters
+                        elevation={0}
+                        expanded={formatSectionOpen}
+                        onChange={() => setFormatSectionOpen((prev) => !prev)}
+                        sx={{
+                            borderRadius: 2,
+                            border: `1px solid ${theme.palette.divider}`,
+                            backgroundColor: "transparent",
+                            "&:before": { display: "none" },
+                            "&.Mui-expanded": { margin: 0 },
+                        }}
+                    >
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography variant="subtitle2">
+                                Format Transcript
+                            </Typography>
+                        </AccordionSummary>
+
+                        <AccordionDetails
+                            sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 0.25,
+                            }}
+                        >
+                            {renderFormattingSwitch({
+                                checked: Boolean(options.punctuate),
+                                label: "Auto Punctuation",
+                                tooltip:
+                                    "Adds punctuation automatically to improve readability.",
+                                onChange: (checked) =>
+                                    setOptions((prev) => ({
+                                        ...prev,
+                                        punctuate: checked,
+                                    })),
+                            })}
+
+                            {renderFormattingSwitch({
+                                checked: Boolean(options.format_text),
+                                label: "Text Formatting",
+                                tooltip:
+                                    "Applies transcript formatting for cleaner readable output.",
+                                onChange: (checked) =>
+                                    setOptions((prev) => ({
+                                        ...prev,
+                                        format_text: checked,
+                                    })),
+                            })}
+
+                            {renderFormattingSwitch({
+                                checked: Boolean(options.disfluencies),
+                                label: "Filler Words",
+                                tooltip:
+                                    "Keeps words like um, uh, hesitations, and false starts.",
+                                onChange: (checked) =>
+                                    setOptions((prev) => ({
+                                        ...prev,
+                                        disfluencies: checked,
+                                    })),
+                            })}
+                        </AccordionDetails>
+                    </Accordion>
+
                     <Box sx={{ mt: "auto", pt: 1 }}>
                         <Button
                             variant="contained"
@@ -1136,7 +1659,6 @@ export const UploadAudioPage = () => {
                     </Box>
                 </Paper>
 
-                {/* Right panel */}
                 <Paper
                     sx={{
                         p: 3,
@@ -1232,12 +1754,18 @@ export const UploadAudioPage = () => {
                         >
                             <Chip
                                 size="small"
-                                label={`Model: ${results.options?.speech_models?.[0]}`}
+                                label={`Model: ${results.options?.speech_models?.[0] ?? currentSpeechModel}`}
                                 variant="outlined"
                             />
                             <Chip
                                 size="small"
-                                label={`Language: ${getLanguageLabel(options.language_code)}`}
+                                label={`Language: ${
+                                    autoLanguageEnabled
+                                        ? "Automatic detection"
+                                        : getLanguageLabel(
+                                              options.language_code,
+                                          )
+                                }`}
                                 variant="outlined"
                             />
                             {options.speaker_labels && (
@@ -1247,20 +1775,21 @@ export const UploadAudioPage = () => {
                                     variant="outlined"
                                 />
                             )}
-                            {options.sentiment_analysis && (
+                            {speakerIdEnabled && (
                                 <Chip
                                     size="small"
-                                    label="Sentiment"
+                                    label={`Speaker ID: ${currentSpeakerType}`}
                                     variant="outlined"
                                 />
                             )}
-                            {options.entity_detection && (
-                                <Chip
-                                    size="small"
-                                    label="Entities"
-                                    variant="outlined"
-                                />
-                            )}
+                            {currentSpeechModel === "universal-2" &&
+                                options.disfluencies && (
+                                    <Chip
+                                        size="small"
+                                        label="Filler Words"
+                                        variant="outlined"
+                                    />
+                                )}
                         </Box>
                     )}
 
