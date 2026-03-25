@@ -24,11 +24,11 @@ import DocumentTitle from "../../../components/global/DocumentTitle";
 
 import { usePreferencesStore } from "../../../store/usePreferencesStore";
 import type {
+    DeepPartial,
     SpeechModel,
     SummaryStyle,
     ThemePreference,
     UserPreferences,
-    DeepPartial,
 } from "../../../types/types";
 
 const sectionCardSx = {
@@ -38,9 +38,21 @@ const sectionCardSx = {
 
 const AUTO_LANGUAGE_CODE = "auto";
 
-const modelOptions: SpeechModel[] = ["universal-2", "slam-1", "nano"];
+const modelOptions: SpeechModel[] = ["universal-3-pro", "universal-2"];
 
 const modelLanguages: Record<SpeechModel, string[]> = {
+    "universal-3-pro": [
+        "en",
+        "en_uk",
+        "en_us",
+        "de",
+        "fa",
+        "ar",
+        "es",
+        "fr",
+        "uk",
+        "ru",
+    ],
     "universal-2": [
         "en",
         "en_uk",
@@ -53,8 +65,6 @@ const modelLanguages: Record<SpeechModel, string[]> = {
         "uk",
         "ru",
     ],
-    "slam-1": ["en", "en_uk", "en_us"],
-    nano: ["en", "en_uk", "en_us", "es", "de", "fr"],
 };
 
 const languageLabels: Record<string, string> = {
@@ -150,7 +160,7 @@ const PreferencesPage = () => {
     const transcription = preferences?.transcription;
     const ai = preferences?.ai;
 
-    const currentModel: SpeechModel = transcription?.model ?? "slam-1";
+    const currentModel: SpeechModel = transcription?.model ?? "universal-3-pro";
     const isUniversal2 = currentModel === "universal-2";
 
     const currentLanguages = useMemo(
@@ -183,6 +193,7 @@ const PreferencesPage = () => {
     return (
         <>
             <DocumentTitle title="Preferences" />
+
             <Box sx={{ maxWidth: 980, mx: "auto", pb: 4 }}>
                 <Stack spacing={3}>
                     <Box>
@@ -252,17 +263,25 @@ const PreferencesPage = () => {
                                     onChange={(e) => {
                                         const nextModel = e.target
                                             .value as SpeechModel;
+
                                         const nextLanguages = modelLanguages[
                                             nextModel
                                         ] ?? ["en_us"];
+
                                         const nextIsUniversal2 =
                                             nextModel === "universal-2";
 
+                                        const normalizedCurrentLanguage =
+                                            transcription.language ===
+                                            AUTO_LANGUAGE_CODE
+                                                ? "en_us"
+                                                : transcription.language;
+
                                         const fallbackLanguage =
                                             nextLanguages.includes(
-                                                transcription.language,
+                                                normalizedCurrentLanguage,
                                             )
-                                                ? transcription.language
+                                                ? normalizedCurrentLanguage
                                                 : nextLanguages[0];
 
                                         const shouldKeepAuto =
@@ -324,28 +343,26 @@ const PreferencesPage = () => {
                                                     ...transcription,
                                                     language: nextValue,
                                                     autoDetectLanguage:
+                                                        isUniversal2 &&
+                                                        selectingAuto,
+                                                    codeSwitching:
+                                                        isUniversal2 &&
                                                         selectingAuto
-                                                            ? true
-                                                            : transcription.autoDetectLanguage &&
-                                                                isUniversal2
-                                                              ? false
-                                                              : false,
-                                                    codeSwitching: selectingAuto
-                                                        ? transcription.codeSwitching
-                                                        : false,
+                                                            ? transcription.codeSwitching
+                                                            : false,
                                                 },
                                             },
                                             "Default language saved.",
                                         );
                                     }}
                                 >
-                                    {isUniversal2 && (
+                                    {isUniversal2 ? (
                                         <MenuItem value={AUTO_LANGUAGE_CODE}>
                                             {getLanguageLabel(
                                                 AUTO_LANGUAGE_CODE,
                                             )}
                                         </MenuItem>
-                                    )}
+                                    ) : null}
 
                                     {currentLanguages.map((lang) => (
                                         <MenuItem key={lang} value={lang}>
@@ -366,6 +383,7 @@ const PreferencesPage = () => {
                                         disabled={!isUniversal2}
                                         onChange={(e) => {
                                             const checked = e.target.checked;
+
                                             const fallbackLanguage =
                                                 currentLanguages.find(
                                                     (lang) =>
@@ -498,6 +516,100 @@ const PreferencesPage = () => {
                                         : "Enable speaker labels to edit."
                                 }
                             />
+
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={Boolean(
+                                            transcription.speakerId,
+                                        )}
+                                        onChange={(e) =>
+                                            void savePatch(
+                                                {
+                                                    transcription: {
+                                                        ...transcription,
+                                                        speakerId:
+                                                            e.target.checked,
+                                                    },
+                                                },
+                                                "Speaker identification default saved.",
+                                            )
+                                        }
+                                    />
+                                }
+                                label="Enable speaker identification"
+                            />
+
+                            <FormControl
+                                fullWidth
+                                disabled={!transcription.speakerId}
+                            >
+                                <InputLabel id="speaker-type-label">
+                                    Speaker type
+                                </InputLabel>
+                                <Select
+                                    labelId="speaker-type-label"
+                                    label="Speaker type"
+                                    value={transcription.speakerType}
+                                    onChange={(e) =>
+                                        void savePatch(
+                                            {
+                                                transcription: {
+                                                    ...transcription,
+                                                    speakerType: e.target
+                                                        .value as UserPreferences["transcription"]["speakerType"],
+                                                },
+                                            },
+                                            "Speaker type saved.",
+                                        )
+                                    }
+                                >
+                                    <MenuItem value="name">Name</MenuItem>
+                                    <MenuItem value="role">Role</MenuItem>
+                                </Select>
+                            </FormControl>
+
+                            <TextField
+                                label="Known speakers"
+                                value={transcription.knownSpeakerValues}
+                                disabled={!transcription.speakerId}
+                                onChange={(e) =>
+                                    void savePatch(
+                                        {
+                                            transcription: {
+                                                ...transcription,
+                                                knownSpeakerValues:
+                                                    e.target.value,
+                                            },
+                                        },
+                                        "Known speakers saved.",
+                                    )
+                                }
+                                helperText="Comma-separated names or roles used for speaker identification."
+                                fullWidth
+                                multiline
+                                minRows={2}
+                            />
+
+                            <TextField
+                                label="Prompt"
+                                value={transcription.prompt}
+                                onChange={(e) =>
+                                    void savePatch(
+                                        {
+                                            transcription: {
+                                                ...transcription,
+                                                prompt: e.target.value,
+                                            },
+                                        },
+                                        "Prompt default saved.",
+                                    )
+                                }
+                                helperText="Optional guidance passed to transcription requests."
+                                fullWidth
+                                multiline
+                                minRows={2}
+                            />
                         </Box>
 
                         <Box
@@ -560,46 +672,23 @@ const PreferencesPage = () => {
                                 control={
                                     <Switch
                                         checked={Boolean(
-                                            transcription.entityDetection,
+                                            transcription.disfluencies,
                                         )}
                                         onChange={(e) =>
                                             void savePatch(
                                                 {
                                                     transcription: {
                                                         ...transcription,
-                                                        entityDetection:
+                                                        disfluencies:
                                                             e.target.checked,
                                                     },
                                                 },
-                                                "Entity detection default saved.",
+                                                "Disfluencies default saved.",
                                             )
                                         }
                                     />
                                 }
-                                label="Entity detection"
-                            />
-
-                            <FormControlLabel
-                                control={
-                                    <Switch
-                                        checked={Boolean(
-                                            transcription.sentimentAnalysis,
-                                        )}
-                                        onChange={(e) =>
-                                            void savePatch(
-                                                {
-                                                    transcription: {
-                                                        ...transcription,
-                                                        sentimentAnalysis:
-                                                            e.target.checked,
-                                                    },
-                                                },
-                                                "Sentiment analysis default saved.",
-                                            )
-                                        }
-                                    />
-                                }
-                                label="Sentiment analysis"
+                                label="Include disfluencies"
                             />
                         </Box>
                     </SettingsSection>
@@ -716,10 +805,10 @@ const PreferencesPage = () => {
                                         )
                                     }
                                 >
-                                    <MenuItem value="bullets">Bullets</MenuItem>
-                                    <MenuItem value="journal">Journal</MenuItem>
-                                    <MenuItem value="action_items">
-                                        Action items
+                                    <MenuItem value="concise">Concise</MenuItem>
+                                    <MenuItem value="bullet">Bullet</MenuItem>
+                                    <MenuItem value="detailed">
+                                        Detailed
                                     </MenuItem>
                                 </Select>
                             </FormControl>
