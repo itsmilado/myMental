@@ -8,8 +8,8 @@ import type {
 
 const AUTO_LANGUAGE_CODE = "auto";
 
-const parseKnownSpeakerValues = (rawValue: string): string[] | undefined => {
-    const values = rawValue
+const parseKnownSpeakerValues = (rawValue?: string): string[] | undefined => {
+    const values = (rawValue ?? "")
         .split(",")
         .map((value) => value.trim())
         .filter(Boolean);
@@ -18,7 +18,7 @@ const parseKnownSpeakerValues = (rawValue: string): string[] | undefined => {
 };
 
 const mapSpeechModels = (
-    model: UserPreferences["transcription"]["model"],
+    model?: UserPreferences["transcription"]["model"],
 ): TranscriptionOptions["speech_models"] => {
     if (model === "universal-3-pro") {
         return ["universal-3-pro", "universal-2"];
@@ -40,7 +40,7 @@ const mapSpeakerOptions = (
         speaker_type?: SpeakerType;
         speakers?: string[];
     } = {
-        speaker_type: transcription.speakerType,
+        speaker_type: transcription.speakerType ?? "name",
     };
 
     if (speakers) {
@@ -57,18 +57,34 @@ export const mapPreferencesToUploadOptions = (
     preferences: UserPreferences,
 ): TranscriptionOptions => {
     const transcription = preferences.transcription;
-    const isUniversal2 = transcription.model === "universal-2";
-    const autoDetect = isUniversal2 && transcription.autoDetectLanguage;
-    const codeSwitching = autoDetect && transcription.codeSwitching;
-    const prompt = transcription.prompt.trim();
+
+    const model = transcription.model ?? "universal-2";
+    const isUniversal2 = model === "universal-2";
+    const isUniversal3Pro = model === "universal-3-pro";
+
+    const autoDetect =
+        isUniversal3Pro ||
+        (isUniversal2 && Boolean(transcription.autoDetectLanguage));
+
+    const codeSwitching =
+        isUniversal2 && autoDetect && Boolean(transcription.codeSwitching);
+
+    const language =
+        transcription.language && transcription.language !== AUTO_LANGUAGE_CODE
+            ? transcription.language
+            : "en_us";
+    const prompt = (transcription.prompt ?? "").trim();
 
     return {
-        speaker_labels: transcription.speakerLabels,
-        speakers_expected: Math.max(1, transcription.speakersExpected || 1),
+        speaker_labels: Boolean(transcription.speakerLabels),
+        speakers_expected: Math.max(
+            1,
+            Number(transcription.speakersExpected) || 1,
+        ),
 
-        speech_models: mapSpeechModels(transcription.model),
+        speech_models: mapSpeechModels(model),
 
-        language_code: autoDetect ? AUTO_LANGUAGE_CODE : transcription.language,
+        language_code: autoDetect ? AUTO_LANGUAGE_CODE : language,
         language_detection: autoDetect || undefined,
         language_detection_options: codeSwitching
             ? { code_switching: true }
@@ -76,10 +92,18 @@ export const mapPreferencesToUploadOptions = (
 
         prompt: prompt || undefined,
 
-        speaker_options: mapSpeakerOptions(transcription),
+        speaker_options: mapSpeakerOptions({
+            ...transcription,
+            speakerType: transcription.speakerType ?? "name",
+            knownSpeakerValues: transcription.knownSpeakerValues ?? "",
+            speakerId: Boolean(transcription.speakerId),
+        }),
 
-        format_text: transcription.formatText,
-        punctuate: transcription.punctuate,
-        disfluencies: transcription.disfluencies,
+        format_text: Boolean(transcription.formatText),
+        punctuate:
+            transcription.punctuate === undefined
+                ? true
+                : Boolean(transcription.punctuate),
+        disfluencies: Boolean(transcription.disfluencies),
     };
 };
