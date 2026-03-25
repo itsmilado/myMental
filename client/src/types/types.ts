@@ -129,8 +129,10 @@ export interface AuthResponse {
     userData: User;
 }
 
-export type ThemePreference = "system" | "light" | "dark";
-export type SummaryStyle = "bullets" | "journal" | "action_items";
+export type ThemePreference = "light" | "dark" | "system";
+export type SummaryStyle = "concise" | "bullet" | "detailed";
+export type SpeechModel = "universal-3-pro" | "universal-2";
+export type SpeakerType = "name" | "role";
 
 export type UserPreferences = {
     schemaVersion: number;
@@ -142,12 +144,20 @@ export type UserPreferences = {
         language: string;
         autoDetectLanguage: boolean;
         codeSwitching: boolean;
+
         speakerLabels: boolean;
+        speakerId: boolean;
+        speakerType: SpeakerType;
+        knownSpeakerValues: string;
+
         speakersExpected: number;
+
         formatText: boolean;
         punctuate: boolean;
-        entityDetection: boolean;
-        sentimentAnalysis: boolean;
+        disfluencies: boolean;
+
+        prompt: string;
+
         showSpeakers: boolean;
         showTimestamps: boolean;
     };
@@ -203,25 +213,31 @@ export type TranscriptUtterance = {
     end: number | null; // ms
 };
 
-export type SpeechModel = "universal-2" | "slam-1" | "nano";
-
 export type TranscriptionOptions = {
     speaker_labels?: boolean;
     speakers_expected?: number;
-    sentiment_analysis?: boolean;
 
-    // Preferred API request field for model selection (priority order).
     speech_models?: SpeechModel[];
     language_code: string;
 
-    // Enable automatic language detection.
     language_detection?: boolean;
     language_detection_options?: {
         code_switching?: boolean;
     };
+
+    prompt?: string;
+
+    speaker_options?: {
+        speaker_id?: boolean;
+        speaker_id_config?: {
+            speaker_type?: SpeakerType;
+            speakers?: string[];
+        };
+    };
+
     format_text?: boolean;
     punctuate?: boolean;
-    entity_detection?: boolean;
+    disfluencies?: boolean;
 };
 
 export type TranscriptionStepKey =
