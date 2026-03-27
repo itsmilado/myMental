@@ -279,6 +279,7 @@ export interface ErrorEventPayload {
     jobId?: string;
     steps?: TranscriptionStepsState;
     error: string;
+    message: string;
 }
 
 export interface TranscriptionPayload {
