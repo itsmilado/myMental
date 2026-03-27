@@ -6,27 +6,34 @@ const DEFAULT_PREFERENCES = {
     schemaVersion: PREFERENCES_SCHEMA_VERSION,
 
     appearance: {
-        theme: "system", // "system" | "light" | "dark"
+        theme: "system",
     },
 
     transcription: {
-        model: "slam-1",
+        model: "universal-3-pro",
         language: "en_us",
-        autoDetectLanguage: false,
+        autoDetectLanguage: true,
         codeSwitching: false,
+
         speakerLabels: false,
+        speakerId: false,
+        speakerType: "name",
+        knownSpeakerValues: "",
         speakersExpected: 2,
+
         formatText: true,
         punctuate: true,
-        entityDetection: false,
-        sentimentAnalysis: false,
+        disfluencies: false,
+
+        prompt: "",
+
         showSpeakers: true,
         showTimestamps: false,
     },
 
     ai: {
         autoSummarizeAfterTranscription: false,
-        summaryStyle: "bullets", // "bullets" | "journal" | "action_items"
+        summaryStyle: "bullets",
     },
 };
 
