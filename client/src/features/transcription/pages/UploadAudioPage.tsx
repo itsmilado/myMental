@@ -798,17 +798,10 @@ export const UploadAudioPage = () => {
             );
         }
 
-        if (speakerIdEnabled) {
-            userOptions.speaker_options = {
-                speaker_id: true,
-                speaker_id_config: {
-                    speaker_type: currentSpeakerType,
-                    speakers: sanitizeKnownSpeakers(
-                        options.speaker_options?.speaker_id_config?.speakers,
-                    ),
-                },
-            };
-        }
+        // Temporary Issue #113 stabilization:
+        // Do not send speaker identification payload yet.
+        // AssemblyAI speaker identification requires a different request shape
+        // and will be implemented separately under Issue #119.
 
         if (currentSpeechModel === "universal-2") {
             if (options.punctuate) userOptions.punctuate = true;
@@ -861,7 +854,8 @@ export const UploadAudioPage = () => {
                             event.data as string,
                         ) as ErrorEventPayload;
                         setErrorMessage(
-                            payload.error ||
+                            payload.message ||
+                                payload.error ||
                                 "An error occurred during transcription.",
                         );
                         if (payload.steps) {
