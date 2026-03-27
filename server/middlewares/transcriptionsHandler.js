@@ -276,28 +276,12 @@ const createTranscription = async (request, response, next) => {
             `[transcriptionHandler - createTranscription] => insertTranscriptionBackupQuery: Transcript's API response for User ${loggedUserId} with role ${userRole} successfully stored. `,
         );
 
-        const {
-            audio_duration,
-            language_code,
-            speech_model,
-            entity_detection,
-            sentiment_analysis,
-            speaker_labels,
-            speakers_expected,
-            punctuate,
-            format_text,
-        } = transcript;
+        const { audio_duration } = transcript;
 
-        const resTranscriptOptions = {
-            language_code: language_code,
-            speech_model: speech_model,
-            entity_detection: entity_detection,
-            sentiment_analysis: sentiment_analysis,
-            speaker_labels: speaker_labels,
-            speakers_expected: speakers_expected,
-            punctuate: punctuate,
-            format_text: format_text,
-        };
+        const resTranscriptOptions = buildStoredTranscriptionOptions({
+            transcript,
+            userOptions,
+        });
 
         const transcriptData = {
             user_id: loggedUserId,
@@ -1131,6 +1115,67 @@ const safeParseRaw = (raw) => {
     return raw;
 };
 
+const sanitizeSpeakerOptions = (speakerOptions) => {
+    if (!speakerOptions || speakerOptions.speaker_id !== true) {
+        return undefined;
+    }
+
+    const config = speakerOptions.speaker_id_config || {};
+    const speakers = Array.isArray(config.speakers)
+        ? config.speakers
+              .map((speaker) =>
+                  typeof speaker === "string" ? speaker.trim() : "",
+              )
+              .filter(Boolean)
+        : undefined;
+
+    return {
+        speaker_id: true,
+        speaker_id_config: {
+            speaker_type: config.speaker_type ?? "name",
+            ...(speakers && speakers.length > 0 ? { speakers } : {}),
+        },
+    };
+};
+
+const buildStoredTranscriptionOptions = ({
+    transcript = {},
+    userOptions = {},
+}) => {
+    const speech_models = getSpeechModelsFromTranscript(transcript);
+    const normalizedLanguageCode =
+        transcript.language_code ?? userOptions.language_code ?? null;
+
+    const normalizedPrompt =
+        typeof userOptions.prompt === "string" && userOptions.prompt.trim()
+            ? userOptions.prompt.trim()
+            : undefined;
+
+    return {
+        language_code: normalizedLanguageCode,
+        speech_models: speech_models ?? [],
+
+        language_detection:
+            userOptions.language_detection === true ? true : undefined,
+        language_detection_options:
+            userOptions.language_detection_options ?? undefined,
+
+        prompt: normalizedPrompt,
+
+        speaker_options: sanitizeSpeakerOptions(userOptions.speaker_options),
+
+        speaker_labels:
+            transcript.speaker_labels ?? userOptions.speaker_labels ?? false,
+        speakers_expected:
+            transcript.speakers_expected ?? userOptions.speakers_expected ?? 1,
+
+        format_text: transcript.format_text ?? userOptions.format_text ?? true,
+        punctuate: transcript.punctuate ?? userOptions.punctuate ?? true,
+        disfluencies:
+            transcript.disfluencies ?? userOptions.disfluencies ?? false,
+    };
+};
+
 const extractUtterances = (rawApiData) => {
     const raw = safeParseRaw(rawApiData);
     const transcriptObject = raw?.transcript ?? raw;
@@ -1240,6 +1285,13 @@ const runTranscriptionJob = async ({
             ...userOptions,
         };
 
+        if (
+            userOptions?.speaker_options?.speaker_id === true &&
+            userOptions?.speakers_expected != null
+        ) {
+            delete userOptions.speakers_expected;
+        }
+
         console.log(
             `[runTranscriptionJob] transcriptionOptions: ${JSON.stringify(
                 transcriptionOptions,
@@ -1273,35 +1325,12 @@ const runTranscriptionJob = async ({
             `[runTranscriptionJob] => insertTranscriptionBackupQuery: Transcript's API response for User ${loggedUserId} stored`,
         );
 
-        const {
-            audio_duration,
-            language_code,
-            speech_model,
-            entity_detection,
-            sentiment_analysis,
-            speaker_labels,
-            speakers_expected,
-            punctuate,
-            format_text,
-        } = transcript;
+        const { audio_duration } = transcript;
 
-        const resTranscriptOptions = {
-            language_code: language_code ?? null,
-            speech_model: getSpeechModelFromTranscript(transcript),
-            speech_models: getSpeechModelsFromTranscript(transcript),
-
-            language_detection: userOptions?.language_detection ?? null,
-            language_detection_options:
-                userOptions?.language_detection_options ?? null,
-
-            entity_detection,
-            sentiment_analysis,
-            speaker_labels,
-            speakers_expected,
-            punctuate,
-            format_text,
-        };
-
+        const resTranscriptOptions = buildStoredTranscriptionOptions({
+            transcript,
+            userOptions,
+        });
         const transcriptData = {
             user_id: loggedUserId,
             file_name: filename,
