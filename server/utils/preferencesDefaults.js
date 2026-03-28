@@ -1,14 +1,12 @@
 // utils/preferencesDefaults.js
 
-const PREFERENCES_SCHEMA_VERSION = 2;
+const PREFERENCES_SCHEMA_VERSION = 3;
 
 const DEFAULT_PREFERENCES = {
     schemaVersion: PREFERENCES_SCHEMA_VERSION,
-
     appearance: {
         theme: "system",
     },
-
     transcription: {
         model: "universal-3-pro",
         language: "en_us",
@@ -16,9 +14,12 @@ const DEFAULT_PREFERENCES = {
         codeSwitching: false,
 
         speakerLabels: false,
-        speakerId: false,
-        speakerType: "name",
-        knownSpeakerValues: "",
+        speakerIdentification: {
+            enabled: false,
+            speakerType: "name",
+            speakers: [],
+        },
+
         speakersExpected: 2,
 
         formatText: true,
@@ -30,30 +31,60 @@ const DEFAULT_PREFERENCES = {
         showSpeakers: true,
         showTimestamps: false,
     },
-
     ai: {
         autoSummarizeAfterTranscription: false,
-        summaryStyle: "bullets",
+        summaryStyle: "bullet",
     },
 };
 
-const mergePreferences = (stored) => {
-    const s = stored && typeof stored === "object" ? stored : {};
+const normalizeSpeakerIdentification = (transcription = {}) => {
+    const next = transcription.speakerIdentification;
+
+    if (next && typeof next === "object") {
+        return {
+            enabled: Boolean(next.enabled),
+            speakerType: next.speakerType === "role" ? "role" : "name",
+            speakers: Array.isArray(next.speakers)
+                ? next.speakers
+                      .map((value) => String(value).trim())
+                      .filter(Boolean)
+                : [],
+        };
+    }
+
+    const legacySpeakers =
+        typeof transcription.knownSpeakerValues === "string"
+            ? transcription.knownSpeakerValues
+                  .split(",")
+                  .map((value) => value.trim())
+                  .filter(Boolean)
+            : [];
 
     return {
+        enabled: Boolean(transcription.speakerId),
+        speakerType: transcription.speakerType === "role" ? "role" : "name",
+        speakers: legacySpeakers,
+    };
+};
+
+const mergePreferences = (stored = {}) => {
+    return {
         ...DEFAULT_PREFERENCES,
-        ...s,
+        ...stored,
         appearance: {
             ...DEFAULT_PREFERENCES.appearance,
-            ...(s.appearance || {}),
+            ...(stored.appearance || {}),
         },
         transcription: {
             ...DEFAULT_PREFERENCES.transcription,
-            ...(s.transcription || {}),
+            ...(stored.transcription || {}),
+            speakerIdentification: normalizeSpeakerIdentification(
+                stored.transcription || {},
+            ),
         },
         ai: {
             ...DEFAULT_PREFERENCES.ai,
-            ...(s.ai || {}),
+            ...(stored.ai || {}),
         },
         schemaVersion: DEFAULT_PREFERENCES.schemaVersion,
     };
