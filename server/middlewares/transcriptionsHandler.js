@@ -95,13 +95,11 @@ const startTranscriptionJob = async (request, response, next) => {
         }
 
         // Parse options from multipart body
-        let userOptions = {};
-        if (request.body.options) {
-            userOptions =
-                typeof request.body.options === "string"
-                    ? JSON.parse(request.body.options)
-                    : request.body.options;
-        }
+        const userOptions = sanitizeIncomingTranscriptionOptions(
+            typeof request.body.options === "string"
+                ? JSON.parse(request.body.options)
+                : request.body.options,
+        );
 
         const rawDate = request.body.fileModifiedDate || null;
 
@@ -214,105 +212,6 @@ const streamTranscriptionProgress = (request, response, next) => {
         logger.error(
             `[streamTranscriptionProgress] => Error streaming SSE: ${error.message}`,
         );
-        next(error);
-    }
-};
-
-/**
- * Create a new transcription from an uploaded audio file.
- * Handles file upload, transcription request, polling, DB storage, and file export.
- * Logs all major steps and errors.
- */
-const createTranscription = async (request, response, next) => {
-    try {
-        const loggedUserId = request.session.user.id;
-        const userRole = request.session.user.role;
-        const { path: filePath, filename } = request.file;
-        const rawDate = request.body.fileModifiedDate; // safe for DB
-        const fileModifiedDate = rawDate ? new Date(rawDate) : "00.00.00";
-
-        logger.info(
-            `Incoming request to Transcribe from user_id ${loggedUserId} to "${request.method} ${request.originalUrl}"`,
-        );
-
-        // Parse user options from request body
-        let userOptions = {};
-        userOptions =
-            typeof request.body.options === "string"
-                ? JSON.parse(request.body.options)
-                : request.body.options;
-
-        // Upload the audio file to AssemblyAI API
-        const uploadUrl = await uploadAudioFile(filePath);
-
-        // Prepare transcription options for API
-        const transcriptionOptions = {
-            audio_url: uploadUrl,
-            ...userOptions,
-        };
-
-        // Request a transcription from AssemblyAI
-        const transcriptId = await requestTranscription(transcriptionOptions);
-
-        // Poll for transcription result
-        const transcript = await pollTranscriptionResult(transcriptId);
-
-        // Store transcription in the database
-
-        // Create response backup
-        const createBackup = await insertTranscriptionBackupQuery({
-            transcript_id: transcriptId, //transcript_id as per API
-            user_id: loggedUserId,
-            user_role: userRole,
-            raw_api_data: transcript, // This is a JS object; pg will handle JSONB
-            file_recorded_at: fileModifiedDate,
-        });
-
-        if (!createBackup) {
-            throw error;
-        }
-
-        logger.info(
-            `[transcriptionHandler - createTranscription] => insertTranscriptionBackupQuery: Transcript's API response for User ${loggedUserId} with role ${userRole} successfully stored. `,
-        );
-
-        const { audio_duration } = transcript;
-
-        const resTranscriptOptions = buildStoredTranscriptionOptions({
-            transcript,
-            userOptions,
-        });
-
-        const transcriptData = {
-            user_id: loggedUserId,
-            file_name: filename,
-            audio_duration: audio_duration,
-            transcript_id: transcriptId,
-            options: resTranscriptOptions,
-            file_recorded_at: fileModifiedDate,
-            transcriptObject: transcript,
-        };
-        const insertedTranscription = await storeTranscriptionText({
-            transcriptData,
-        });
-
-        // Save the transcription to a file
-        const storedTxtfilePath = saveTranscriptionToFile(
-            filename,
-            insertedTranscription.transcription,
-        );
-
-        // Send response to client
-        response.status(200).json({
-            success: true,
-            message: `Transcription created and stored successfully at: ${storedTxtfilePath}`,
-            TranscriptData: {
-                ...insertedTranscription,
-                utterances: extractUtterances(transcript),
-            },
-        });
-    } catch (error) {
-        logger.error(`[createTranscription] => Error: ${error.message}`);
         next(error);
     }
 };
@@ -1115,65 +1014,126 @@ const safeParseRaw = (raw) => {
     return raw;
 };
 
-const sanitizeSpeakerOptions = (speakerOptions) => {
-    if (!speakerOptions || speakerOptions.speaker_id !== true) {
+const normalizeLanguageCodeForStorage = ({
+    transcript = {},
+    userOptions = {},
+}) => {
+    if (userOptions.language_detection === true) {
+        return "auto";
+    }
+
+    if (
+        typeof transcript.language_code === "string" &&
+        transcript.language_code
+    ) {
+        return transcript.language_code;
+    }
+
+    if (
+        typeof userOptions.language_code === "string" &&
+        userOptions.language_code
+    ) {
+        return userOptions.language_code;
+    }
+
+    return null;
+};
+
+const sanitizeSpeakerIdentificationForStorage = (speakerIdentification) => {
+    if (!speakerIdentification?.enabled) {
         return undefined;
     }
 
-    const config = speakerOptions.speaker_id_config || {};
-    const speakers = Array.isArray(config.speakers)
-        ? config.speakers
-              .map((speaker) =>
-                  typeof speaker === "string" ? speaker.trim() : "",
-              )
+    const speakers = Array.isArray(speakerIdentification.speakers)
+        ? speakerIdentification.speakers
+              .map((value) => String(value).trim())
               .filter(Boolean)
         : undefined;
 
     return {
-        speaker_id: true,
-        speaker_id_config: {
-            speaker_type: config.speaker_type ?? "name",
-            ...(speakers && speakers.length > 0 ? { speakers } : {}),
-        },
+        speaker_type: speakerIdentification.speaker_type ?? "name",
+        ...(speakers && speakers.length > 0 ? { speakers } : {}),
     };
+};
+
+const sanitizeIncomingTranscriptionOptions = (rawOptions = {}) => {
+    const userOptions =
+        rawOptions && typeof rawOptions === "object" ? { ...rawOptions } : {};
+
+    delete userOptions.speaker_options;
+
+    if (
+        userOptions.speaker_labels === true &&
+        userOptions.speaker_identification?.enabled
+    ) {
+        const error = new Error(
+            "speaker_labels and speaker_identification cannot be used together",
+        );
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (userOptions.speaker_identification?.enabled) {
+        userOptions.speaker_labels = false;
+        delete userOptions.speakers_expected;
+    }
+
+    return userOptions;
 };
 
 const buildStoredTranscriptionOptions = ({
     transcript = {},
     userOptions = {},
 }) => {
-    const speech_models = getSpeechModelsFromTranscript(transcript);
-    const normalizedLanguageCode =
-        transcript.language_code ?? userOptions.language_code ?? null;
+    const speech_models = getSpeechModelsFromTranscript(transcript) ?? [];
 
-    const normalizedPrompt =
-        typeof userOptions.prompt === "string" && userOptions.prompt.trim()
-            ? userOptions.prompt.trim()
-            : undefined;
+    const normalizedSpeakerIdentification =
+        sanitizeSpeakerIdentificationForStorage(
+            userOptions.speaker_identification,
+        );
 
-    return {
-        language_code: normalizedLanguageCode,
-        speech_models: speech_models ?? [],
+    const diarizationEnabled = normalizedSpeakerIdentification
+        ? false
+        : (transcript.speaker_labels ?? userOptions.speaker_labels ?? false);
+
+    const normalizedOptions = {
+        language_code: normalizeLanguageCodeForStorage({
+            transcript,
+            userOptions,
+        }),
+        speech_models,
 
         language_detection:
             userOptions.language_detection === true ? true : undefined,
         language_detection_options:
             userOptions.language_detection_options ?? undefined,
 
-        prompt: normalizedPrompt,
+        prompt:
+            typeof userOptions.prompt === "string" && userOptions.prompt.trim()
+                ? userOptions.prompt.trim()
+                : undefined,
 
-        speaker_options: sanitizeSpeakerOptions(userOptions.speaker_options),
+        speaker_labels: diarizationEnabled,
 
-        speaker_labels:
-            transcript.speaker_labels ?? userOptions.speaker_labels ?? false,
-        speakers_expected:
-            transcript.speakers_expected ?? userOptions.speakers_expected ?? 1,
+        speakers_expected: diarizationEnabled
+            ? (transcript.speakers_expected ??
+              userOptions.speakers_expected ??
+              1)
+            : undefined,
+
+        speaker_identification: normalizedSpeakerIdentification,
 
         format_text: transcript.format_text ?? userOptions.format_text ?? true,
         punctuate: transcript.punctuate ?? userOptions.punctuate ?? true,
         disfluencies:
             transcript.disfluencies ?? userOptions.disfluencies ?? false,
     };
+
+    return Object.fromEntries(
+        Object.entries(normalizedOptions).filter(
+            ([, value]) => value !== undefined,
+        ),
+    );
 };
 
 const extractUtterances = (rawApiData) => {
@@ -1236,7 +1196,12 @@ const runTranscriptionJob = async ({
             const msg = "User not authenticated";
             emitStep(TRANSCRIPTION_STEPS.INIT, "error", msg);
             setStepStatus(steps, TRANSCRIPTION_STEPS.COMPLETE, "error", msg);
-            emitter.emit("error", { jobId, steps, message: msg });
+            emitter.emit("error", {
+                jobId,
+                steps,
+                error: msg,
+                message: msg,
+            });
             return;
         }
 
@@ -1244,14 +1209,19 @@ const runTranscriptionJob = async ({
             const msg = "No audio file provided";
             emitStep(TRANSCRIPTION_STEPS.INIT, "error", msg);
             setStepStatus(steps, TRANSCRIPTION_STEPS.COMPLETE, "error", msg);
-            emitter.emit("error", { jobId, steps, message: msg });
+            emitter.emit("error", {
+                jobId,
+                steps,
+                error: msg,
+                message: msg,
+            });
             return;
         }
 
         const fileModifiedDate = rawDate ? new Date(rawDate) : "00.00.00";
         const fileModifiedDisplayDate =
             fileModifiedDate instanceof Date &&
-            !isNaN(fileModifiedDate.getTime())
+            !Number.isNaN(fileModifiedDate.getTime())
                 ? fileModifiedDate.toLocaleString("en-GB").replace(/\//g, ".")
                 : "00.00.00";
 
@@ -1285,13 +1255,6 @@ const runTranscriptionJob = async ({
             ...userOptions,
         };
 
-        if (
-            userOptions?.speaker_options?.speaker_id === true &&
-            userOptions?.speakers_expected != null
-        ) {
-            delete userOptions.speakers_expected;
-        }
-
         console.log(
             `[runTranscriptionJob] transcriptionOptions: ${JSON.stringify(
                 transcriptionOptions,
@@ -1307,7 +1270,7 @@ const runTranscriptionJob = async ({
         emitStep(TRANSCRIPTION_STEPS.SAVE_DB, "in_progress");
 
         const createBackup = await insertTranscriptionBackupQuery({
-            transcript_id: transcriptId, // as per API
+            transcript_id: transcriptId,
             user_id: loggedUserId,
             user_role: userRole,
             raw_api_data: transcript,
@@ -1331,6 +1294,7 @@ const runTranscriptionJob = async ({
             transcript,
             userOptions,
         });
+
         const transcriptData = {
             user_id: loggedUserId,
             file_name: filename,
@@ -1361,6 +1325,7 @@ const runTranscriptionJob = async ({
         // ----------------- COMPLETE -----------------
         setStepStatus(steps, TRANSCRIPTION_STEPS.COMPLETE, "success", null);
         job.result = insertedTranscription;
+        job.error = null;
 
         emitter.emit("completed", {
             jobId,
@@ -1380,16 +1345,15 @@ const runTranscriptionJob = async ({
         logger.error(`[runTranscriptionJob] => Error in job ${jobId}: ${msg}`);
         job.error = msg;
 
-        // mark complete as error
         setStepStatus(steps, TRANSCRIPTION_STEPS.COMPLETE, "error", msg);
 
         emitter.emit("error", {
             jobId,
             steps,
+            error: msg,
             message: msg,
         });
     } finally {
-        // Cleanup job from memory after 10 minutes
         setTimeout(
             () => {
                 delete transcriptionJobs[jobId];
@@ -1512,7 +1476,6 @@ const flattenTranscription = (transcriptObject) => {
 
 // Export all middleware functions for use in routes
 module.exports = {
-    createTranscription,
     fetchAllTranscriptions,
     fetchTranscriptionById,
     fetchTranscriptionByApiId,
