@@ -3,30 +3,52 @@
 const logger = require("./logger");
 const { assemblyClient } = require("../utils/assemblyaiClient");
 
-// Default transcription options
-// const transcriptionOptions = {
-//     speaker_labels: true,
-//     speakers_expected: 2,
-//     sentiment_analysis: false,
-//     speech_model: "slam-1",
-//     language_code: "en",
-//     format_text: true,
-//     entity_detection: true,
-// };
+const buildAssemblyAiTranscriptionRequest = (transcriptionOptions = {}) => {
+    const request = {
+        ...transcriptionOptions,
+    };
+
+    delete request.speaker_identification;
+
+    if (transcriptionOptions?.speaker_identification?.enabled) {
+        const speakers = Array.isArray(
+            transcriptionOptions.speaker_identification.speakers,
+        )
+            ? transcriptionOptions.speaker_identification.speakers
+                  .map((value) => String(value).trim())
+                  .filter(Boolean)
+            : undefined;
+
+        request.speech_understanding = {
+            request: {
+                speaker_identification: {
+                    speaker_type:
+                        transcriptionOptions.speaker_identification
+                            .speaker_type ?? "name",
+                    ...(speakers && speakers.length > 0 ? { speakers } : {}),
+                },
+            },
+        };
+    }
+
+    return request;
+};
 
 // Request transcription from AssemblyAI
 const requestTranscription = async (transcriptionOptions) => {
     try {
-        const transcript = await assemblyClient.transcripts.transcribe(
-            transcriptionOptions
-        );
+        const assemblyRequest =
+            buildAssemblyAiTranscriptionRequest(transcriptionOptions);
+
+        const transcript =
+            await assemblyClient.transcripts.transcribe(assemblyRequest);
 
         if (!transcript || !transcript.id) {
             throw new Error("Error requesting transcription");
         }
 
         logger.info(
-            `[requestTranscription] => Transcription requested successfully, ID: ${transcript.id}`
+            `[requestTranscription] => Transcription requested successfully, ID: ${transcript.id}`,
         );
         return transcript.id;
     } catch (error) {
@@ -43,7 +65,7 @@ const pollTranscriptionResult = async (transcriptId) => {
             transcript = await assemblyClient.transcripts.get(transcriptId);
             if (transcript.status === "completed") {
                 logger.info(
-                    `[pollTranscriptionResult] => Transcription completed and fetched`
+                    `[pollTranscriptionResult] => Transcription completed and fetched`,
                 );
                 return transcript;
             } else if (transcript.status === "failed") {
@@ -53,7 +75,7 @@ const pollTranscriptionResult = async (transcriptId) => {
         }
     } catch (error) {
         logger.error(
-            `[pollTranscriptionResult] => Error polling transcription: ${error.message}`
+            `[pollTranscriptionResult] => Error polling transcription: ${error.message}`,
         );
         throw error;
     }
