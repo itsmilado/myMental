@@ -146,9 +146,11 @@ export type UserPreferences = {
         codeSwitching: boolean;
 
         speakerLabels: boolean;
-        speakerId: boolean;
-        speakerType: SpeakerType;
-        knownSpeakerValues: string;
+        speakerIdentification: {
+            enabled: boolean;
+            speakerType: SpeakerType;
+            speakers: string[];
+        };
 
         speakersExpected: number;
 
@@ -213,6 +215,12 @@ export type TranscriptUtterance = {
     end: number | null; // ms
 };
 
+export type SpeakerIdentification = {
+    enabled: boolean;
+    speaker_type: SpeakerType;
+    speakers?: string[];
+};
+
 export type TranscriptionOptions = {
     speaker_labels?: boolean;
     speakers_expected?: number;
@@ -227,13 +235,7 @@ export type TranscriptionOptions = {
 
     prompt?: string;
 
-    speaker_options?: {
-        speaker_id?: boolean;
-        speaker_id_config?: {
-            speaker_type?: SpeakerType;
-            speakers?: string[];
-        };
-    };
+    speaker_identification?: SpeakerIdentification;
 
     format_text?: boolean;
     punctuate?: boolean;
