@@ -425,13 +425,17 @@ export const UploadAudioPage = () => {
         options.language_detection_options?.code_switching,
     );
 
-    const speakerIdEnabled = Boolean(options.speaker_options?.speaker_id);
+    const speakerIdentificationEnabled = Boolean(
+        options.speaker_identification?.enabled,
+    );
+
+    const diarizationEnabled = Boolean(options.speaker_labels);
 
     const currentSpeakerType: SpeakerType =
-        options.speaker_options?.speaker_id_config?.speaker_type ?? "name";
+        options.speaker_identification?.speaker_type ?? "name";
 
     const knownSpeakerInputs = normalizeKnownSpeakerInputs(
-        options.speaker_options?.speaker_id_config?.speakers,
+        options.speaker_identification?.speakers,
         options.speakers_expected ?? 1,
     );
 
@@ -445,40 +449,68 @@ export const UploadAudioPage = () => {
     }, [isUniversal3Pro, options.prompt]);
 
     useEffect(() => {
-        if (!speakerIdEnabled) return;
+        if (!speakerIdentificationEnabled) return;
 
         setOptions((prev) => {
             const nextValues = normalizeKnownSpeakerInputs(
-                prev.speaker_options?.speaker_id_config?.speakers,
+                prev.speaker_identification?.speakers,
                 prev.speakers_expected ?? 1,
             );
 
-            const currentValues =
-                prev.speaker_options?.speaker_id_config?.speakers ?? [];
+            const currentValues = prev.speaker_identification?.speakers ?? [];
+            const hasChanged =
+                nextValues.length !== currentValues.length ||
+                nextValues.some(
+                    (value, index) => value !== currentValues[index],
+                );
 
-            if (
-                currentValues.length === nextValues.length &&
-                currentValues.every(
-                    (value, index) => value === nextValues[index],
-                )
-            ) {
+            if (!hasChanged) {
                 return prev;
             }
 
             return {
                 ...prev,
-                speaker_options: {
-                    speaker_id: true,
-                    speaker_id_config: {
-                        speaker_type:
-                            prev.speaker_options?.speaker_id_config
-                                ?.speaker_type ?? "name",
-                        speakers: nextValues,
-                    },
+                speaker_identification: {
+                    enabled: true,
+                    speaker_type:
+                        prev.speaker_identification?.speaker_type ?? "name",
+                    speakers: nextValues,
                 },
             };
         });
-    }, [speakerIdEnabled, options.speakers_expected]);
+    }, [speakerIdentificationEnabled, options.speakers_expected]);
+
+    useEffect(() => {
+        if (!speakerIdentificationEnabled) return;
+
+        setOptions((prev) => {
+            const nextValues = normalizeKnownSpeakerInputs(
+                prev.speaker_identification?.speakers,
+                prev.speakers_expected ?? 1,
+            );
+
+            const currentValues = prev.speaker_identification?.speakers ?? [];
+            const hasChanged =
+                nextValues.length !== currentValues.length ||
+                nextValues.some(
+                    (value, index) => value !== currentValues[index],
+                );
+
+            if (!hasChanged) {
+                return prev;
+            }
+
+            return {
+                ...prev,
+                speaker_identification: {
+                    enabled: true,
+                    speaker_type:
+                        prev.speaker_identification?.speaker_type ?? "name",
+                    speakers: nextValues,
+                },
+            };
+        });
+    }, [speakerIdentificationEnabled, options.speakers_expected]);
 
     useEffect(() => {
         setOptions((prev) => {
@@ -534,8 +566,7 @@ export const UploadAudioPage = () => {
 
         setOptions((prev) => {
             const nextLanguages = modelLanguages[model] ?? ["en"];
-            const prevKnownValues =
-                prev.speaker_options?.speaker_id_config?.speakers;
+            const prevKnownValues = prev.speaker_identification?.speakers;
 
             const nextLanguageCode =
                 prev.language_code === AUTO_LANGUAGE_CODE ||
@@ -555,18 +586,16 @@ export const UploadAudioPage = () => {
                     ? prev.language_detection_options
                     : undefined,
                 prompt: model === "universal-2" ? "" : (prev.prompt ?? ""),
-                speaker_options: prev.speaker_options?.speaker_id
+                speaker_identification: prev.speaker_identification?.enabled
                     ? {
-                          speaker_id: true,
-                          speaker_id_config: {
-                              speaker_type:
-                                  prev.speaker_options.speaker_id_config
-                                      ?.speaker_type ?? "name",
-                              speakers: normalizeKnownSpeakerInputs(
-                                  prevKnownValues,
-                                  prev.speakers_expected ?? 1,
-                              ),
-                          },
+                          enabled: true,
+                          speaker_type:
+                              prev.speaker_identification?.speaker_type ??
+                              "name",
+                          speakers: normalizeKnownSpeakerInputs(
+                              prevKnownValues,
+                              prev.speakers_expected ?? 1,
+                          ),
                       }
                     : undefined,
             };
@@ -613,6 +642,9 @@ export const UploadAudioPage = () => {
             ...prev,
             speaker_labels: enabled,
             speakers_expected: Math.max(1, prev.speakers_expected ?? 1),
+            speaker_identification: enabled
+                ? undefined
+                : prev.speaker_identification,
         }));
     };
 
@@ -624,40 +656,35 @@ export const UploadAudioPage = () => {
         setOptions((prev) => ({
             ...prev,
             speakers_expected: nextCount,
-            speaker_options: prev.speaker_options?.speaker_id
+            speaker_identification: prev.speaker_identification?.enabled
                 ? {
-                      speaker_id: true,
-                      speaker_id_config: {
-                          speaker_type:
-                              prev.speaker_options.speaker_id_config
-                                  ?.speaker_type ?? "name",
-                          speakers: normalizeKnownSpeakerInputs(
-                              prev.speaker_options.speaker_id_config?.speakers,
-                              nextCount,
-                          ),
-                      },
+                      enabled: true,
+                      speaker_type:
+                          prev.speaker_identification.speaker_type ?? "name",
+                      speakers: normalizeKnownSpeakerInputs(
+                          prev.speaker_identification.speakers,
+                          nextCount,
+                      ),
                   }
-                : prev.speaker_options,
+                : prev.speaker_identification,
         }));
     };
 
-    const handleSpeakerIdToggle = (enabled: boolean): void => {
+    const handleSpeakerIdentificationToggle = (enabled: boolean): void => {
         setHasLocalOptionEdits(true);
 
         setOptions((prev) => ({
             ...prev,
-            speaker_options: enabled
+            speaker_labels: enabled ? false : prev.speaker_labels,
+            speaker_identification: enabled
                 ? {
-                      speaker_id: true,
-                      speaker_id_config: {
-                          speaker_type:
-                              prev.speaker_options?.speaker_id_config
-                                  ?.speaker_type ?? "name",
-                          speakers: normalizeKnownSpeakerInputs(
-                              prev.speaker_options?.speaker_id_config?.speakers,
-                              prev.speakers_expected ?? 1,
-                          ),
-                      },
+                      enabled: true,
+                      speaker_type:
+                          prev.speaker_identification?.speaker_type ?? "name",
+                      speakers: normalizeKnownSpeakerInputs(
+                          prev.speaker_identification?.speakers,
+                          prev.speakers_expected ?? 1,
+                      ),
                   }
                 : undefined,
         }));
@@ -668,15 +695,13 @@ export const UploadAudioPage = () => {
 
         setOptions((prev) => ({
             ...prev,
-            speaker_options: {
-                speaker_id: true,
-                speaker_id_config: {
-                    speaker_type: speakerType,
-                    speakers: normalizeKnownSpeakerInputs(
-                        prev.speaker_options?.speaker_id_config?.speakers,
-                        prev.speakers_expected ?? 1,
-                    ),
-                },
+            speaker_identification: {
+                enabled: true,
+                speaker_type: speakerType,
+                speakers: normalizeKnownSpeakerInputs(
+                    prev.speaker_identification?.speakers,
+                    prev.speakers_expected ?? 1,
+                ),
             },
         }));
     };
@@ -686,7 +711,7 @@ export const UploadAudioPage = () => {
 
         setOptions((prev) => {
             const nextValues = normalizeKnownSpeakerInputs(
-                prev.speaker_options?.speaker_id_config?.speakers,
+                prev.speaker_identification?.speakers,
                 prev.speakers_expected ?? 1,
             );
 
@@ -694,14 +719,11 @@ export const UploadAudioPage = () => {
 
             return {
                 ...prev,
-                speaker_options: {
-                    speaker_id: true,
-                    speaker_id_config: {
-                        speaker_type:
-                            prev.speaker_options?.speaker_id_config
-                                ?.speaker_type ?? "name",
-                        speakers: nextValues,
-                    },
+                speaker_identification: {
+                    enabled: true,
+                    speaker_type:
+                        prev.speaker_identification?.speaker_type ?? "name",
+                    speakers: nextValues,
                 },
             };
         });
@@ -716,17 +738,14 @@ export const UploadAudioPage = () => {
             return {
                 ...prev,
                 speakers_expected: nextCount,
-                speaker_options: {
-                    speaker_id: true,
-                    speaker_id_config: {
-                        speaker_type:
-                            prev.speaker_options?.speaker_id_config
-                                ?.speaker_type ?? "name",
-                        speakers: normalizeKnownSpeakerInputs(
-                            prev.speaker_options?.speaker_id_config?.speakers,
-                            nextCount,
-                        ),
-                    },
+                speaker_identification: {
+                    enabled: true,
+                    speaker_type:
+                        prev.speaker_identification?.speaker_type ?? "name",
+                    speakers: normalizeKnownSpeakerInputs(
+                        prev.speaker_identification?.speakers,
+                        nextCount,
+                    ),
                 },
             };
         });
@@ -790,18 +809,21 @@ export const UploadAudioPage = () => {
             }
         }
 
-        if (options.speaker_labels) {
+        if (options.speaker_identification?.enabled) {
+            userOptions.speaker_identification = {
+                enabled: true,
+                speaker_type: options.speaker_identification.speaker_type,
+                speakers: sanitizeKnownSpeakers(
+                    options.speaker_identification.speakers,
+                ),
+            };
+        } else if (options.speaker_labels) {
             userOptions.speaker_labels = true;
             userOptions.speakers_expected = Math.max(
                 1,
                 options.speakers_expected ?? 1,
             );
         }
-
-        // Temporary Issue #113 stabilization:
-        // Do not send speaker identification payload yet.
-        // AssemblyAI speaker identification requires a different request shape
-        // and will be implemented separately under Issue #119.
 
         if (currentSpeechModel === "universal-2") {
             if (options.punctuate) userOptions.punctuate = true;
@@ -1407,7 +1429,7 @@ export const UploadAudioPage = () => {
                     >
                         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                             <Typography variant="subtitle2">
-                                Speaker Diarization
+                                Speaker Handling
                             </Typography>
                         </AccordionSummary>
 
@@ -1418,88 +1440,78 @@ export const UploadAudioPage = () => {
                                 gap: 1.25,
                             }}
                         >
-                            <FormControlLabel
-                                control={
-                                    <Switch
-                                        checked={Boolean(
-                                            options.speaker_labels,
-                                        )}
-                                        onChange={(e) =>
-                                            handleSpeakerLabelsToggle(
-                                                e.target.checked,
-                                            )
-                                        }
-                                        sx={{
-                                            "& .MuiSwitch-switchBase.Mui-checked":
-                                                {
-                                                    color: colors
-                                                        .greenAccent[500],
-                                                },
-                                            "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
-                                                {
-                                                    backgroundColor:
-                                                        colors.greenAccent[500],
-                                                },
-                                        }}
-                                    />
-                                }
-                                label={
-                                    <InfoLabel
-                                        label="Speaker labels"
-                                        tooltip="Separates the transcript by speaker turns."
-                                    />
-                                }
-                            />
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 1,
+                                }}
+                            >
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={diarizationEnabled}
+                                            onChange={(e) =>
+                                                handleSpeakerLabelsToggle(
+                                                    e.target.checked,
+                                                )
+                                            }
+                                        />
+                                    }
+                                    label={
+                                        <InfoLabel
+                                            label="Speaker diarization"
+                                            tooltip="Separates the transcript into speaker turns."
+                                        />
+                                    }
+                                />
 
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={
+                                                speakerIdentificationEnabled
+                                            }
+                                            onChange={(e) =>
+                                                handleSpeakerIdentificationToggle(
+                                                    e.target.checked,
+                                                )
+                                            }
+                                        />
+                                    }
+                                    label={
+                                        <InfoLabel
+                                            label="Speaker identification"
+                                            tooltip="Guide transcription with known speaker names or roles."
+                                        />
+                                    }
+                                />
+                            </Box>
                             <TextField
                                 label="Speakers expected"
                                 type="number"
                                 value={options.speakers_expected ?? 1}
-                                disabled={!options.speaker_labels}
                                 onChange={(e) =>
                                     handleSpeakersExpectedChange(e.target.value)
                                 }
-                                inputProps={{ min: 1, max: 20 }}
+                                slotProps={{
+                                    htmlInput: { min: 1, max: 20 },
+                                }}
                                 size="small"
+                                disabled={
+                                    !diarizationEnabled &&
+                                    !speakerIdentificationEnabled
+                                }
                                 helperText={
-                                    options.speaker_labels
-                                        ? "Used to improve diarization. This also controls the number of known-value inputs when speaker ID is enabled."
-                                        : "Enable speaker labels to edit."
+                                    speakerIdentificationEnabled
+                                        ? "Controls how many known speaker inputs are shown."
+                                        : diarizationEnabled
+                                          ? "Used to improve diarization."
+                                          : "Used for diarization or to size known speaker inputs for identification."
                                 }
                             />
 
-                            <FormControlLabel
-                                control={
-                                    <Switch
-                                        checked={speakerIdEnabled}
-                                        onChange={(e) =>
-                                            handleSpeakerIdToggle(
-                                                e.target.checked,
-                                            )
-                                        }
-                                        sx={{
-                                            "& .MuiSwitch-switchBase.Mui-checked":
-                                                {
-                                                    color: colors
-                                                        .greenAccent[500],
-                                                },
-                                            "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
-                                                {
-                                                    backgroundColor:
-                                                        colors.greenAccent[500],
-                                                },
-                                        }}
-                                    />
-                                }
-                                label={
-                                    <InfoLabel
-                                        label="Speaker ID"
-                                        tooltip="Lets you guide speaker labeling with names or roles you already know."
-                                    />
-                                }
-                            />
-
-                            {speakerIdEnabled && (
+                            {speakerIdentificationEnabled && (
                                 <>
                                     <FormControl size="small" fullWidth>
                                         <InputLabel id="speaker-type-label">
@@ -1534,7 +1546,7 @@ export const UploadAudioPage = () => {
                                     >
                                         <InfoLabel
                                             label="Known values (optional)"
-                                            tooltip="Add names or roles you expect in the recording. The number of inputs stays aligned with Speakers expected."
+                                            tooltip="Add names or roles you expect in the recording."
                                         />
 
                                         {knownSpeakerInputs.map(
@@ -1769,7 +1781,7 @@ export const UploadAudioPage = () => {
                                     variant="outlined"
                                 />
                             )}
-                            {speakerIdEnabled && (
+                            {speakerIdentificationEnabled && (
                                 <Chip
                                     size="small"
                                     label={`Speaker ID: ${currentSpeakerType}`}
