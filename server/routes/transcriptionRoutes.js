@@ -7,7 +7,6 @@ const { isAuthenticated } = require("../middlewares/authMiddleware");
 const uploadMiddleware = require("../middlewares/uploadMiddleware");
 const errorHandler = require("../middlewares/errorHandler");
 const {
-    createTranscription,
     fetchAllTranscriptions,
     fetchTranscriptionById,
     fetchTranscriptionByApiId,
@@ -29,7 +28,7 @@ transcriptionRoutes.post(
     isAuthenticated,
     uploadMiddleware, // still need file from multipart form
     startTranscriptionJob,
-    errorHandler
+    errorHandler,
 );
 
 // Stream live progress for a given jobId via Server-Sent Events
@@ -37,93 +36,84 @@ transcriptionRoutes.get(
     "/progress/:jobId",
     isAuthenticated,
     streamTranscriptionProgress,
-    errorHandler
-);
-
-// Route to handle file upload and transcription (legacy, non-SSE)
-transcriptionRoutes.post(
-    "/upload",
-    isAuthenticated,
-    uploadMiddleware,
-    createTranscription,
-    errorHandler
+    errorHandler,
 );
 
 transcriptionRoutes.get(
     "/all_transcriptions",
     isAuthenticated,
     fetchAllTranscriptions,
-    errorHandler
+    errorHandler,
 );
 
 transcriptionRoutes.get(
     "/filtered_transcriptions",
     isAuthenticated,
     fetchFilteredTranscriptions,
-    errorHandler
+    errorHandler,
 );
 
 transcriptionRoutes.get(
     "/by_id/:id",
     isAuthenticated,
     fetchTranscriptionById,
-    errorHandler
+    errorHandler,
 );
 
 transcriptionRoutes.get(
     "/by_api_id/:transcriptId",
     isAuthenticated,
     fetchTranscriptionByApiId,
-    errorHandler
+    errorHandler,
 );
 
 transcriptionRoutes.get(
     "/apiTranscriptId",
     isAuthenticated,
     fetchApiTranscriptionById,
-    errorHandler
+    errorHandler,
 );
 
 transcriptionRoutes.get(
     "/export/:id",
     isAuthenticated,
     exportTranscription,
-    errorHandler
+    errorHandler,
 );
 
 transcriptionRoutes.delete(
     "/delete/dbTranscription/:id",
     isAuthenticated,
     deleteDBTranscription,
-    errorHandler
+    errorHandler,
 );
 
 transcriptionRoutes.get(
     "/assemblyai/history",
     isAuthenticated,
     fetchAssemblyAIHistory,
-    errorHandler
+    errorHandler,
 );
 
 transcriptionRoutes.delete(
     "/assemblyai/delete/:transcriptId",
     isAuthenticated,
     deleteAssemblyAiTranscript,
-    errorHandler
+    errorHandler,
 );
 
 transcriptionRoutes.post(
     "/restore",
     isAuthenticated,
     restoreTranscription,
-    errorHandler
+    errorHandler,
 );
 
 transcriptionRoutes.get(
     "/audio/:fileName",
     isAuthenticated,
     streamAudioFile,
-    errorHandler
+    errorHandler,
 );
 
 module.exports = { transcriptionRoutes };
