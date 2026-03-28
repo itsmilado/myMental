@@ -560,7 +560,9 @@ const PreferencesPage = () => {
                                             disabled={
                                                 !transcription.speakerLabels
                                             }
-                                            inputProps={{ min: 1, max: 20 }}
+                                            slotProps={{
+                                                htmlInput: { min: 1, max: 20 },
+                                            }}
                                             onChange={(e) =>
                                                 void savePatch(
                                                     {
