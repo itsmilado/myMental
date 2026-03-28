@@ -45,7 +45,17 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
                 ? { ...prev.appearance, ...patch.appearance }
                 : prev.appearance,
             transcription: patch.transcription
-                ? { ...prev.transcription, ...patch.transcription }
+                ? {
+                      ...prev.transcription,
+                      ...patch.transcription,
+                      speakerIdentification: patch.transcription
+                          .speakerIdentification
+                          ? {
+                                ...prev.transcription.speakerIdentification,
+                                ...patch.transcription.speakerIdentification,
+                            }
+                          : prev.transcription.speakerIdentification,
+                  }
                 : prev.transcription,
             ai: patch.ai ? { ...prev.ai, ...patch.ai } : prev.ai,
         };
