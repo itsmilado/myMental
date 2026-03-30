@@ -1039,48 +1039,64 @@ const normalizeLanguageCodeForStorage = ({
     return null;
 };
 
+/**
+- Normalizes speaker identification data for storage
+- Ensures stored structure matches actual API request
+*/
 const sanitizeSpeakerIdentificationForStorage = (speakerIdentification) => {
     if (!speakerIdentification?.enabled) {
         return undefined;
     }
 
-    const speakers = Array.isArray(speakerIdentification.speakers)
-        ? speakerIdentification.speakers
+    const knownValues = Array.isArray(speakerIdentification.known_values)
+        ? speakerIdentification.known_values
               .map((value) => String(value).trim())
               .filter(Boolean)
         : undefined;
 
+    // Storage must reflect actual API request
+    // Empty arrays are omitted to avoid invalid structure
     return {
         speaker_type: speakerIdentification.speaker_type ?? "name",
-        ...(speakers && speakers.length > 0 ? { speakers } : {}),
+        ...(knownValues && knownValues.length > 0
+            ? { known_values: knownValues }
+            : {}),
     };
 };
 
+/**
+- Normalizes and sanitizes incoming transcription options from client
+- Removes unsupported fields and enforces API-required constraints
+*/
 const sanitizeIncomingTranscriptionOptions = (rawOptions = {}) => {
     const userOptions =
         rawOptions && typeof rawOptions === "object" ? { ...rawOptions } : {};
 
+    // legacy schema must not reach AssemblyAI
     delete userOptions.speaker_options;
 
-    if (
-        userOptions.speaker_labels === true &&
-        userOptions.speaker_identification?.enabled
-    ) {
-        const error = new Error(
-            "speaker_labels and speaker_identification cannot be used together",
-        );
-        error.statusCode = 400;
-        throw error;
-    }
+    // Speaker identification depends on diarization in AssemblyAI
+    // UI enforces exclusivity, backend enforces API requirements
 
     if (userOptions.speaker_identification?.enabled) {
-        userOptions.speaker_labels = false;
-        delete userOptions.speakers_expected;
+        userOptions.speaker_labels = true;
+
+        if (
+            userOptions.speakers_expected !== undefined &&
+            (!Number.isFinite(Number(userOptions.speakers_expected)) ||
+                Number(userOptions.speakers_expected) < 1)
+        ) {
+            delete userOptions.speakers_expected;
+        }
     }
 
     return userOptions;
 };
 
+/**
+- Builds normalized transcription options for database storage
+- Aligns stored values with final AssemblyAI request and response
+*/
 const buildStoredTranscriptionOptions = ({
     transcript = {},
     userOptions = {},
@@ -1092,9 +1108,10 @@ const buildStoredTranscriptionOptions = ({
             userOptions.speaker_identification,
         );
 
-    const diarizationEnabled = normalizedSpeakerIdentification
-        ? false
-        : (transcript.speaker_labels ?? userOptions.speaker_labels ?? false);
+    // speaker_labels is required for identification and must be persisted
+    // transcript value takes priority when available
+    const diarizationEnabled =
+        transcript.speaker_labels ?? userOptions.speaker_labels ?? false;
 
     const normalizedOptions = {
         language_code: normalizeLanguageCodeForStorage({
@@ -1153,8 +1170,8 @@ const extractUtterances = (rawApiData) => {
 };
 
 /**
- * Internal worker that runs the full transcription pipeline for one jobId.
- * Emits step events via job.emitter for SSE clients.
+ - Internal worker that runs the full transcription pipeline for one jobId.
+ - Emits step events via job.emitter for SSE clients.
  */
 const runTranscriptionJob = async ({
     jobId,
@@ -1432,17 +1449,6 @@ const storeTranscriptionText = async ({ transcriptData }) => {
         );
         throw error;
     }
-};
-
-const buildRestoredFileName = (dateStr) => {
-    const d = new Date(dateStr);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    const hh = String(d.getHours()).padStart(2, "0");
-    const min = String(d.getMinutes()).padStart(2, "0");
-    const ss = String(d.getSeconds()).padStart(2, "0");
-    return `restored-${yyyy}${mm}${dd}-${hh}${min}${ss}.txt`;
 };
 
 const flattenTranscription = (transcriptObject) => {
