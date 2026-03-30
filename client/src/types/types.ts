@@ -218,7 +218,7 @@ export type TranscriptUtterance = {
 export type SpeakerIdentification = {
     enabled: boolean;
     speaker_type: SpeakerType;
-    speakers?: string[];
+    known_values?: string[];
 };
 
 export type TranscriptionOptions = {
