@@ -236,6 +236,10 @@ const buildSpeechModels = (model: SpeechModel): SpeechModel[] => {
     return ["universal-2"];
 };
 
+/**
+- Normalizes known speaker inputs to match the selected speaker count
+- Preserves stable input slots for the identification form
+*/
 const normalizeKnownSpeakerInputs = (
     values: string[] | undefined,
     count: number,
@@ -254,7 +258,11 @@ const normalizeKnownSpeakerInputs = (
     return current;
 };
 
-const sanitizeKnownSpeakers = (
+/**
+- Sanitizes known speaker values before request submission
+- deletes empty entries from identification payload
+*/
+const sanitizeKnownValues = (
     values: string[] | undefined,
 ): string[] | undefined => {
     const cleaned = (values ?? []).map((value) => value.trim()).filter(Boolean);
@@ -435,12 +443,16 @@ export const UploadAudioPage = () => {
         options.speaker_identification?.speaker_type ?? "name";
 
     const knownSpeakerInputs = normalizeKnownSpeakerInputs(
-        options.speaker_identification?.speakers,
+        options.speaker_identification?.known_values,
         options.speakers_expected ?? 1,
     );
 
     const knownValuePlaceholder =
         currentSpeakerType === "role" ? "e.g. Host" : "e.g. Maya";
+
+    const codeSwitchingSupported = true;
+
+    const languageSelectionDisabled = codeSwitchingEnabled;
 
     useEffect(() => {
         setSelectedPromptPreset(
@@ -453,11 +465,12 @@ export const UploadAudioPage = () => {
 
         setOptions((prev) => {
             const nextValues = normalizeKnownSpeakerInputs(
-                prev.speaker_identification?.speakers,
+                prev.speaker_identification?.known_values,
                 prev.speakers_expected ?? 1,
             );
 
-            const currentValues = prev.speaker_identification?.speakers ?? [];
+            const currentValues =
+                prev.speaker_identification?.known_values ?? [];
             const hasChanged =
                 nextValues.length !== currentValues.length ||
                 nextValues.some(
@@ -474,66 +487,11 @@ export const UploadAudioPage = () => {
                     enabled: true,
                     speaker_type:
                         prev.speaker_identification?.speaker_type ?? "name",
-                    speakers: nextValues,
+                    known_values: nextValues,
                 },
             };
         });
     }, [speakerIdentificationEnabled, options.speakers_expected]);
-
-    useEffect(() => {
-        if (!speakerIdentificationEnabled) return;
-
-        setOptions((prev) => {
-            const nextValues = normalizeKnownSpeakerInputs(
-                prev.speaker_identification?.speakers,
-                prev.speakers_expected ?? 1,
-            );
-
-            const currentValues = prev.speaker_identification?.speakers ?? [];
-            const hasChanged =
-                nextValues.length !== currentValues.length ||
-                nextValues.some(
-                    (value, index) => value !== currentValues[index],
-                );
-
-            if (!hasChanged) {
-                return prev;
-            }
-
-            return {
-                ...prev,
-                speaker_identification: {
-                    enabled: true,
-                    speaker_type:
-                        prev.speaker_identification?.speaker_type ?? "name",
-                    speakers: nextValues,
-                },
-            };
-        });
-    }, [speakerIdentificationEnabled, options.speakers_expected]);
-
-    useEffect(() => {
-        setOptions((prev) => {
-            const selectedModel = getVisibleSpeechModel(prev.speech_models);
-
-            if (selectedModel !== "universal-3-pro") {
-                return prev;
-            }
-
-            if (
-                prev.language_code === AUTO_LANGUAGE_CODE ||
-                prev.language_detection
-            ) {
-                return prev;
-            }
-
-            return {
-                ...prev,
-                language_code: AUTO_LANGUAGE_CODE,
-                language_detection: true,
-            };
-        });
-    }, [currentSpeechModel]);
 
     useEffect(() => {
         setOptions((prev) => {
@@ -566,11 +524,12 @@ export const UploadAudioPage = () => {
 
         setOptions((prev) => {
             const nextLanguages = modelLanguages[model] ?? ["en"];
-            const prevKnownValues = prev.speaker_identification?.speakers;
+            const prevKnownValues = prev.speaker_identification?.known_values;
 
             const nextLanguageCode =
                 prev.language_code === AUTO_LANGUAGE_CODE ||
-                prev.language_detection
+                prev.language_detection ||
+                prev.language_detection_options?.code_switching
                     ? AUTO_LANGUAGE_CODE
                     : nextLanguages.includes(prev.language_code)
                       ? prev.language_code
@@ -582,8 +541,9 @@ export const UploadAudioPage = () => {
                 language_code: nextLanguageCode,
                 language_detection:
                     nextLanguageCode === AUTO_LANGUAGE_CODE ? true : undefined,
-                language_detection_options: autoLanguageEnabled
-                    ? prev.language_detection_options
+                language_detection_options: prev.language_detection_options
+                    ?.code_switching
+                    ? { code_switching: true }
                     : undefined,
                 prompt: model === "universal-2" ? "" : (prev.prompt ?? ""),
                 speaker_identification: prev.speaker_identification?.enabled
@@ -592,7 +552,7 @@ export const UploadAudioPage = () => {
                           speaker_type:
                               prev.speaker_identification?.speaker_type ??
                               "name",
-                          speakers: normalizeKnownSpeakerInputs(
+                          known_values: normalizeKnownSpeakerInputs(
                               prevKnownValues,
                               prev.speakers_expected ?? 1,
                           ),
@@ -612,9 +572,11 @@ export const UploadAudioPage = () => {
                 ...prev,
                 language_code: selectingAuto ? AUTO_LANGUAGE_CODE : nextValue,
                 language_detection: selectingAuto ? true : undefined,
-                language_detection_options: selectingAuto
-                    ? prev.language_detection_options
-                    : undefined,
+                language_detection_options:
+                    selectingAuto &&
+                    prev.language_detection_options?.code_switching
+                        ? { code_switching: true }
+                        : undefined,
             };
         });
     };
@@ -625,16 +587,17 @@ export const UploadAudioPage = () => {
         setOptions((prev) => ({
             ...prev,
             language_code: enabled ? AUTO_LANGUAGE_CODE : prev.language_code,
-            language_detection:
-                enabled || prev.language_code === AUTO_LANGUAGE_CODE
-                    ? true
-                    : undefined,
+            language_detection: enabled ? true : undefined,
             language_detection_options: enabled
                 ? { code_switching: true }
                 : undefined,
         }));
     };
 
+    /**
+- Toggles speaker label mode in upload options
+- Disables identification when labels are turned off
+*/
     const handleSpeakerLabelsToggle = (enabled: boolean): void => {
         setHasLocalOptionEdits(true);
 
@@ -643,11 +606,15 @@ export const UploadAudioPage = () => {
             speaker_labels: enabled,
             speakers_expected: Math.max(1, prev.speakers_expected ?? 1),
             speaker_identification: enabled
-                ? undefined
-                : prev.speaker_identification,
+                ? prev.speaker_identification
+                : undefined,
         }));
     };
 
+    /**
+- Updates expected speaker count in upload options
+- Keeps identification inputs aligned with the selected count
+*/
     const handleSpeakersExpectedChange = (rawValue: string): void => {
         const nextCount = Math.max(1, Number.parseInt(rawValue, 10) || 1);
 
@@ -661,8 +628,8 @@ export const UploadAudioPage = () => {
                       enabled: true,
                       speaker_type:
                           prev.speaker_identification.speaker_type ?? "name",
-                      speakers: normalizeKnownSpeakerInputs(
-                          prev.speaker_identification.speakers,
+                      known_values: normalizeKnownSpeakerInputs(
+                          prev.speaker_identification.known_values,
                           nextCount,
                       ),
                   }
@@ -670,26 +637,40 @@ export const UploadAudioPage = () => {
         }));
     };
 
+    /**
+- Toggles speaker identification mode in upload options
+- Identification depends on speaker labels in the backend request
+*/
     const handleSpeakerIdentificationToggle = (enabled: boolean): void => {
         setHasLocalOptionEdits(true);
 
-        setOptions((prev) => ({
-            ...prev,
-            speaker_labels: enabled ? false : prev.speaker_labels,
-            speaker_identification: enabled
-                ? {
-                      enabled: true,
-                      speaker_type:
-                          prev.speaker_identification?.speaker_type ?? "name",
-                      speakers: normalizeKnownSpeakerInputs(
-                          prev.speaker_identification?.speakers,
-                          prev.speakers_expected ?? 1,
-                      ),
-                  }
-                : undefined,
-        }));
+        setOptions((prev) => {
+            if (!prev.speaker_labels) {
+                return prev;
+            }
+
+            return {
+                ...prev,
+                speaker_identification: enabled
+                    ? {
+                          enabled: true,
+                          speaker_type:
+                              prev.speaker_identification?.speaker_type ??
+                              "name",
+                          known_values: normalizeKnownSpeakerInputs(
+                              prev.speaker_identification?.known_values,
+                              prev.speakers_expected ?? 1,
+                          ),
+                      }
+                    : undefined,
+            };
+        });
     };
 
+    /**
+- Updates speaker identification type in upload options
+- Preserves normalized known speaker inputs
+*/
     const handleSpeakerTypeChange = (speakerType: SpeakerType): void => {
         setHasLocalOptionEdits(true);
 
@@ -698,20 +679,24 @@ export const UploadAudioPage = () => {
             speaker_identification: {
                 enabled: true,
                 speaker_type: speakerType,
-                speakers: normalizeKnownSpeakerInputs(
-                    prev.speaker_identification?.speakers,
+                known_values: normalizeKnownSpeakerInputs(
+                    prev.speaker_identification?.known_values,
                     prev.speakers_expected ?? 1,
                 ),
             },
         }));
     };
 
+    /**
+- Updates a single known speaker input in upload options
+- Preserves the current identification configuration
+*/
     const handleKnownSpeakerChange = (index: number, value: string): void => {
         setHasLocalOptionEdits(true);
 
         setOptions((prev) => {
             const nextValues = normalizeKnownSpeakerInputs(
-                prev.speaker_identification?.speakers,
+                prev.speaker_identification?.known_values,
                 prev.speakers_expected ?? 1,
             );
 
@@ -723,7 +708,7 @@ export const UploadAudioPage = () => {
                     enabled: true,
                     speaker_type:
                         prev.speaker_identification?.speaker_type ?? "name",
-                    speakers: nextValues,
+                    known_values: nextValues,
                 },
             };
         });
@@ -742,8 +727,8 @@ export const UploadAudioPage = () => {
                     enabled: true,
                     speaker_type:
                         prev.speaker_identification?.speaker_type ?? "name",
-                    speakers: normalizeKnownSpeakerInputs(
-                        prev.speaker_identification?.speakers,
+                    known_values: normalizeKnownSpeakerInputs(
+                        prev.speaker_identification?.known_values,
                         nextCount,
                     ),
                 },
@@ -809,12 +794,18 @@ export const UploadAudioPage = () => {
             }
         }
 
+        // Identification depends on diarization in the backend request
         if (options.speaker_identification?.enabled) {
+            userOptions.speaker_labels = true;
+            userOptions.speakers_expected = Math.max(
+                1,
+                options.speakers_expected ?? 1,
+            );
             userOptions.speaker_identification = {
                 enabled: true,
                 speaker_type: options.speaker_identification.speaker_type,
-                speakers: sanitizeKnownSpeakers(
-                    options.speaker_identification.speakers,
+                known_values: sanitizeKnownValues(
+                    options.speaker_identification.known_values,
                 ),
             };
         } else if (options.speaker_labels) {
@@ -823,6 +814,22 @@ export const UploadAudioPage = () => {
                 1,
                 options.speakers_expected ?? 1,
             );
+        }
+
+        if (
+            options.speaker_identification?.enabled &&
+            options.speaker_identification.speaker_type === "role"
+        ) {
+            const validValues = sanitizeKnownValues(
+                options.speaker_identification.known_values,
+            );
+
+            if (!validValues || validValues.length === 0) {
+                setErrorMessage(
+                    "Known values are required when using role-based identification.",
+                );
+                return;
+            }
         }
 
         if (currentSpeechModel === "universal-2") {
@@ -1261,6 +1268,7 @@ export const UploadAudioPage = () => {
                                         ? AUTO_LANGUAGE_CODE
                                         : options.language_code
                                 }
+                                disabled={languageSelectionDisabled}
                                 onChange={(e) =>
                                     handleLanguageChange(String(e.target.value))
                                 }
@@ -1282,7 +1290,7 @@ export const UploadAudioPage = () => {
                             control={
                                 <Switch
                                     checked={codeSwitchingEnabled}
-                                    disabled={!autoLanguageEnabled}
+                                    disabled={!codeSwitchingSupported}
                                     onChange={(e) =>
                                         handleCodeSwitchingToggle(
                                             e.target.checked,
@@ -1302,8 +1310,8 @@ export const UploadAudioPage = () => {
                             }
                             label={
                                 <InfoLabel
-                                    label="Code switching"
-                                    tooltip="Use this when speakers switch between languages in the same recording. It works with automatic language detection and helps preserve mixed-language speech."
+                                    label="Code Switching"
+                                    tooltip="Transcribes speech that naturally switches between multiple languages in the same conversation. When enabled, the request uses automatic language detection instead of a fixed language."
                                 />
                             }
                         />
@@ -1460,7 +1468,7 @@ export const UploadAudioPage = () => {
                                     }
                                     label={
                                         <InfoLabel
-                                            label="Speaker diarization"
+                                            label="Speaker Label"
                                             tooltip="Separates the transcript into speaker turns."
                                         />
                                     }
@@ -1472,6 +1480,7 @@ export const UploadAudioPage = () => {
                                             checked={
                                                 speakerIdentificationEnabled
                                             }
+                                            disabled={!diarizationEnabled}
                                             onChange={(e) =>
                                                 handleSpeakerIdentificationToggle(
                                                     e.target.checked,
@@ -1481,8 +1490,8 @@ export const UploadAudioPage = () => {
                                     }
                                     label={
                                         <InfoLabel
-                                            label="Speaker identification"
-                                            tooltip="Guide transcription with known speaker names or roles."
+                                            label="Speaker ID"
+                                            tooltip="Guides identification with known names or roles when speaker labels are enabled."
                                         />
                                     }
                                 />
@@ -1506,8 +1515,8 @@ export const UploadAudioPage = () => {
                                     speakerIdentificationEnabled
                                         ? "Controls how many known speaker inputs are shown."
                                         : diarizationEnabled
-                                          ? "Used to improve diarization."
-                                          : "Used for diarization or to size known speaker inputs for identification."
+                                          ? "Used to improve speaker labeling."
+                                          : "Enable Speaker Label to configure speaker handling."
                                 }
                             />
 
@@ -1545,8 +1554,16 @@ export const UploadAudioPage = () => {
                                         }}
                                     >
                                         <InfoLabel
-                                            label="Known values (optional)"
-                                            tooltip="Add names or roles you expect in the recording."
+                                            label={
+                                                currentSpeakerType === "role"
+                                                    ? "Known values (required)"
+                                                    : "Known values (optional)"
+                                            }
+                                            tooltip={
+                                                currentSpeakerType === "role"
+                                                    ? "Provide all expected roles. Role-based identification requires known values."
+                                                    : "Add names you expect in the recording."
+                                            }
                                         />
 
                                         {knownSpeakerInputs.map(
