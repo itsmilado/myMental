@@ -3,21 +3,33 @@
 const logger = require("./logger");
 const { assemblyClient } = require("../utils/assemblyaiClient");
 
+/**
+- Builds AssemblyAI-compatible transcription request
+- Maps internal speaker_identification schema to speech_understanding structure
+*/
 const buildAssemblyAiTranscriptionRequest = (transcriptionOptions = {}) => {
     const request = {
         ...transcriptionOptions,
     };
 
+    // speaker_identification is not a top-level AssemblyAI field
     delete request.speaker_identification;
 
+    //AssemblyAI Speaker Identification requires diarization (speaker_labels)
+    //speech_understanding is ignored if speaker_labels is false
+    //known_values replaces legacy speakers array
+
     if (transcriptionOptions?.speaker_identification?.enabled) {
-        const speakers = Array.isArray(
-            transcriptionOptions.speaker_identification.speakers,
+        const knownValues = Array.isArray(
+            transcriptionOptions.speaker_identification.known_values,
         )
-            ? transcriptionOptions.speaker_identification.speakers
+            ? transcriptionOptions.speaker_identification.known_values
                   .map((value) => String(value).trim())
                   .filter(Boolean)
             : undefined;
+
+        // API requirement: identification depends on diarization
+        request.speaker_labels = true;
 
         request.speech_understanding = {
             request: {
@@ -25,7 +37,9 @@ const buildAssemblyAiTranscriptionRequest = (transcriptionOptions = {}) => {
                     speaker_type:
                         transcriptionOptions.speaker_identification
                             .speaker_type ?? "name",
-                    ...(speakers && speakers.length > 0 ? { speakers } : {}),
+                    ...(knownValues && knownValues.length > 0
+                        ? { known_values: knownValues }
+                        : {}),
                 },
             },
         };
@@ -34,11 +48,20 @@ const buildAssemblyAiTranscriptionRequest = (transcriptionOptions = {}) => {
     return request;
 };
 
-// Request transcription from AssemblyAI
+/**
+- Sends transcription request to AssemblyAI and returns transcript ID
+*/
 const requestTranscription = async (transcriptionOptions) => {
     try {
         const assemblyRequest =
             buildAssemblyAiTranscriptionRequest(transcriptionOptions);
+
+        logger.info(
+            `[requestTranscription] => AssemblyAI request: ${JSON.stringify({
+                ...assemblyRequest,
+                audio_url: assemblyRequest.audio_url ? "[redacted]" : undefined,
+            })}`,
+        );
 
         const transcript =
             await assemblyClient.transcripts.transcribe(assemblyRequest);
@@ -50,6 +73,7 @@ const requestTranscription = async (transcriptionOptions) => {
         logger.info(
             `[requestTranscription] => Transcription requested successfully, ID: ${transcript.id}`,
         );
+
         return transcript.id;
     } catch (error) {
         logger.error(`[requestTranscription] => Error: ${error.message}`);
