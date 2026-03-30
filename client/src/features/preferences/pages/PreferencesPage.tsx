@@ -170,7 +170,7 @@ const PreferencesPage = () => {
     const ai = preferences?.ai;
 
     const currentModel: SpeechModel = transcription?.model ?? "universal-3-pro";
-    const isUniversal2 = currentModel === "universal-2";
+    //const isUniversal2 = currentModel === "universal-2";
     const isUniversal3Pro = currentModel === "universal-3-pro";
 
     const currentLanguages = useMemo(
@@ -178,10 +178,11 @@ const PreferencesPage = () => {
         [currentModel],
     );
 
-    const currentLanguageValue =
-        (isUniversal2 || isUniversal3Pro) && transcription?.autoDetectLanguage
-            ? AUTO_LANGUAGE_CODE
-            : (transcription?.language ?? "en_us");
+    const currentLanguageValue = transcription?.autoDetectLanguage
+        ? AUTO_LANGUAGE_CODE
+        : (transcription?.language ?? "en_us");
+
+    const languageSelectionDisabled = Boolean(transcription?.codeSwitching);
 
     if (loading && !preferences) {
         return (
@@ -287,11 +288,6 @@ const PreferencesPage = () => {
                                                     modelLanguages[
                                                         nextModel
                                                     ] ?? ["en_us"];
-                                                const nextIsUniversal2 =
-                                                    nextModel === "universal-2";
-                                                const nextIsUniversal3Pro =
-                                                    nextModel ===
-                                                    "universal-3-pro";
 
                                                 const normalizedCurrentLanguage =
                                                     transcription.language ===
@@ -306,12 +302,15 @@ const PreferencesPage = () => {
                                                         ? normalizedCurrentLanguage
                                                         : nextLanguages[0];
 
-                                                const nextAutoDetect =
-                                                    nextIsUniversal3Pro ||
-                                                    (nextIsUniversal2 &&
-                                                        Boolean(
-                                                            transcription.autoDetectLanguage,
-                                                        ));
+                                                const keepAutomaticLanguage =
+                                                    Boolean(
+                                                        transcription.codeSwitching,
+                                                    ) ||
+                                                    Boolean(
+                                                        transcription.autoDetectLanguage,
+                                                    ) ||
+                                                    transcription.language ===
+                                                        AUTO_LANGUAGE_CODE;
 
                                                 void savePatch(
                                                     {
@@ -319,21 +318,23 @@ const PreferencesPage = () => {
                                                             ...transcription,
                                                             model: nextModel,
                                                             language:
-                                                                nextAutoDetect
+                                                                keepAutomaticLanguage
                                                                     ? AUTO_LANGUAGE_CODE
                                                                     : fallbackLanguage,
                                                             autoDetectLanguage:
-                                                                nextAutoDetect,
+                                                                keepAutomaticLanguage,
                                                             codeSwitching:
-                                                                nextIsUniversal2
-                                                                    ? transcription.codeSwitching
-                                                                    : transcription.codeSwitching,
+                                                                Boolean(
+                                                                    transcription.codeSwitching,
+                                                                ),
                                                             formatText:
-                                                                nextIsUniversal3Pro
+                                                                nextModel ===
+                                                                "universal-3-pro"
                                                                     ? false
                                                                     : transcription.formatText,
                                                             punctuate:
-                                                                nextIsUniversal3Pro
+                                                                nextModel ===
+                                                                "universal-3-pro"
                                                                     ? false
                                                                     : transcription.punctuate,
                                                         },
@@ -361,10 +362,7 @@ const PreferencesPage = () => {
                                             labelId="language-label"
                                             label="Default language"
                                             value={currentLanguageValue}
-                                            disabled={
-                                                isUniversal2 &&
-                                                transcription.codeSwitching
-                                            }
+                                            disabled={languageSelectionDisabled}
                                             onChange={(e) => {
                                                 const nextValue = String(
                                                     e.target.value,
@@ -379,30 +377,21 @@ const PreferencesPage = () => {
                                                             ...transcription,
                                                             language: nextValue,
                                                             autoDetectLanguage:
-                                                                isUniversal3Pro
-                                                                    ? true
-                                                                    : isUniversal2 &&
-                                                                      selectingAuto,
-                                                            codeSwitching:
-                                                                isUniversal2 &&
-                                                                selectingAuto
-                                                                    ? transcription.codeSwitching
-                                                                    : transcription.codeSwitching,
+                                                                selectingAuto,
+                                                            codeSwitching: false,
                                                         },
                                                     },
                                                     "Default language saved.",
                                                 );
                                             }}
                                         >
-                                            {isUniversal2 || isUniversal3Pro ? (
-                                                <MenuItem
-                                                    value={AUTO_LANGUAGE_CODE}
-                                                >
-                                                    {getLanguageLabel(
-                                                        AUTO_LANGUAGE_CODE,
-                                                    )}
-                                                </MenuItem>
-                                            ) : null}
+                                            <MenuItem
+                                                value={AUTO_LANGUAGE_CODE}
+                                            >
+                                                {getLanguageLabel(
+                                                    AUTO_LANGUAGE_CODE,
+                                                )}
+                                            </MenuItem>
 
                                             {currentLanguages.map((lang) => (
                                                 <MenuItem
@@ -421,55 +410,8 @@ const PreferencesPage = () => {
                                         control={
                                             <Switch
                                                 checked={Boolean(
-                                                    transcription.autoDetectLanguage,
-                                                )}
-                                                onChange={(e) => {
-                                                    const checked =
-                                                        e.target.checked;
-
-                                                    const fallbackLanguage =
-                                                        currentLanguages.find(
-                                                            (lang) =>
-                                                                lang !==
-                                                                AUTO_LANGUAGE_CODE,
-                                                        ) ?? "en_us";
-
-                                                    void savePatch(
-                                                        {
-                                                            transcription: {
-                                                                ...transcription,
-                                                                autoDetectLanguage:
-                                                                    checked,
-                                                                language:
-                                                                    checked
-                                                                        ? AUTO_LANGUAGE_CODE
-                                                                        : transcription.language ===
-                                                                            AUTO_LANGUAGE_CODE
-                                                                          ? fallbackLanguage
-                                                                          : transcription.language,
-                                                                codeSwitching:
-                                                                    checked
-                                                                        ? transcription.codeSwitching
-                                                                        : false,
-                                                            },
-                                                        },
-                                                        "Automatic language detection updated.",
-                                                    );
-                                                }}
-                                            />
-                                        }
-                                        label="Enable automatic language detection"
-                                    />
-
-                                    <FormControlLabel
-                                        control={
-                                            <Switch
-                                                checked={Boolean(
                                                     transcription.codeSwitching,
                                                 )}
-                                                disabled={
-                                                    !transcription.autoDetectLanguage
-                                                }
                                                 onChange={(e) => {
                                                     const checked =
                                                         e.target.checked;
@@ -483,7 +425,8 @@ const PreferencesPage = () => {
                                                                 autoDetectLanguage:
                                                                     checked
                                                                         ? true
-                                                                        : transcription.autoDetectLanguage,
+                                                                        : transcription.language ===
+                                                                          AUTO_LANGUAGE_CODE,
                                                                 language:
                                                                     checked
                                                                         ? AUTO_LANGUAGE_CODE
@@ -495,7 +438,7 @@ const PreferencesPage = () => {
                                                 }}
                                             />
                                         }
-                                        label="Enable code switching"
+                                        label="Code Switching"
                                     />
                                 </Stack>
                             </Box>
@@ -523,7 +466,7 @@ const PreferencesPage = () => {
                                         variant="subtitle2"
                                         sx={{ mb: 1.5 }}
                                     >
-                                        Speaker Diarization
+                                        Speaker Label
                                     </Typography>
 
                                     <Stack spacing={1.5}>
@@ -548,7 +491,7 @@ const PreferencesPage = () => {
                                                     }
                                                 />
                                             }
-                                            label="Enable speaker labels"
+                                            label="Enable Speaker Label"
                                         />
 
                                         <TextField
@@ -584,8 +527,8 @@ const PreferencesPage = () => {
                                             }
                                             helperText={
                                                 transcription.speakerLabels
-                                                    ? "Used when diarization is enabled."
-                                                    : "Enable speaker labels to edit."
+                                                    ? "Used when speaker labeling is enabled."
+                                                    : "Enable Speaker Label to edit."
                                             }
                                             fullWidth
                                         />
