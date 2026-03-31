@@ -1,16 +1,22 @@
 // src/features/account/pages/AccountPage.tsx
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
     Avatar,
     Box,
     Button,
     Chip,
+    CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
     Divider,
     Paper,
     Snackbar,
     Stack,
+    Switch,
     TextField,
     Typography,
 } from "@mui/material";
@@ -27,12 +33,23 @@ import SetPasswordBeforeUnlinkDialog from "../components/SetPasswordBeforeUnlink
 
 import {
     changeMyPassword,
+    createMyAssemblyConnection,
     deleteMyAccount,
+    deleteMyAssemblyConnection,
+    fetchMyAssemblyConnections,
     requestCurrentEmailConfirmation,
+    setDefaultMyAssemblyConnection,
     unlinkGoogleAccount,
     updateCurrentUser,
+    updateMyAssemblyConnection,
     startGoogleOAuth,
 } from "../../auth/api";
+
+import type {
+    AssemblyAiConnection,
+    CreateAssemblyAiConnectionPayload,
+    UpdateAssemblyAiConnectionPayload,
+} from "../../../types/types";
 
 const isValidName = (value: string) => {
     const v = value.trim();
@@ -45,12 +62,16 @@ const sectionCardSx = {
     borderRadius: 3,
 };
 
-type ReauthAction = "delete" | "email" | "link" | "unlink" | "password" | null;
+type ReauthAction =
+    | "delete"
+    | "email"
+    | "link"
+    | "unlink"
+    | "password"
+    | "assembly_connection"
+    | null;
 
-// type ChangePasswordPayload = {
-//     currentPassword?: string;
-//     newPassword: string;
-// };
+type ConnectionDialogMode = "create" | "edit_label" | "replace_key" | null;
 
 const AccountPage = () => {
     const user = useAuthStore((s) => s.user);
@@ -88,6 +109,32 @@ const AccountPage = () => {
 
     const [sendingEmailConfirm, setSendingEmailConfirm] = useState(false);
     const [removingGoogle, setRemovingGoogle] = useState(false);
+
+    const [assemblyConnections, setAssemblyConnections] = useState<
+        AssemblyAiConnection[]
+    >([]);
+    const [connectionsLoading, setConnectionsLoading] = useState(false);
+    const [connectionsSaving, setConnectionsSaving] = useState(false);
+    const [connectionsError, setConnectionsError] = useState<string | null>(
+        null,
+    );
+    const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
+    const [connectionDialogMode, setConnectionDialogMode] =
+        useState<ConnectionDialogMode>(null);
+    const [connectionTarget, setConnectionTarget] =
+        useState<AssemblyAiConnection | null>(null);
+    const [connectionDeleteTarget, setConnectionDeleteTarget] =
+        useState<AssemblyAiConnection | null>(null);
+    const [connectionLabel, setConnectionLabel] = useState("");
+    const [connectionApiKey, setConnectionApiKey] = useState("");
+    const [connectionIsDefault, setConnectionIsDefault] = useState(false);
+    const [settingDefaultId, setSettingDefaultId] = useState<number | null>(
+        null,
+    );
+
+    const pendingProtectedActionRef = useRef<null | (() => Promise<void>)>(
+        null,
+    );
 
     const [toast, setToast] = useState<{
         open: boolean;
@@ -130,6 +177,261 @@ const AccountPage = () => {
         severity: "success" | "error" | "info",
     ) => {
         setToast({ open: true, message, severity });
+    };
+
+    const formatConnectionDate = (value: string | null) => {
+        if (!value) return "Not validated yet";
+
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return "Not validated yet";
+        }
+
+        return date.toLocaleString();
+    };
+
+    const resetConnectionDialogState = () => {
+        setConnectionDialogOpen(false);
+        setConnectionDialogMode(null);
+        setConnectionTarget(null);
+        setConnectionLabel("");
+        setConnectionApiKey("");
+        setConnectionIsDefault(false);
+    };
+
+    const loadAssemblyConnections = useCallback(async () => {
+        if (!user?.id) return;
+
+        try {
+            setConnectionsLoading(true);
+            setConnectionsError(null);
+
+            const connections = await fetchMyAssemblyConnections();
+            setAssemblyConnections(connections);
+        } catch (e: any) {
+            setConnectionsError(
+                e?.message || "Failed to load AssemblyAI connections.",
+            );
+        } finally {
+            setConnectionsLoading(false);
+        }
+    }, [user?.id]);
+
+    const openCreateConnectionDialog = () => {
+        setConnectionDialogMode("create");
+        setConnectionTarget(null);
+        setConnectionLabel("");
+        setConnectionApiKey("");
+        setConnectionIsDefault(false);
+        setConnectionDialogOpen(true);
+    };
+
+    const openEditConnectionDialog = (connection: AssemblyAiConnection) => {
+        setConnectionDialogMode("edit_label");
+        setConnectionTarget(connection);
+        setConnectionLabel(connection.label);
+        setConnectionApiKey("");
+        setConnectionIsDefault(connection.is_default);
+        setConnectionDialogOpen(true);
+    };
+
+    const openReplaceConnectionDialog = (connection: AssemblyAiConnection) => {
+        setConnectionDialogMode("replace_key");
+        setConnectionTarget(connection);
+        setConnectionLabel(connection.label);
+        setConnectionApiKey("");
+        setConnectionIsDefault(connection.is_default);
+        setConnectionDialogOpen(true);
+    };
+
+    useEffect(() => {
+        void loadAssemblyConnections();
+    }, [loadAssemblyConnections]);
+
+    const handleProtectedConnectionAction = async (
+        action: () => Promise<void>,
+        description: string,
+    ) => {
+        try {
+            await action();
+        } catch (e: any) {
+            const message = String(e?.message || "");
+
+            if (
+                message.toLowerCase().includes("re-authentication required") ||
+                message.toLowerCase().includes("reauthentication required")
+            ) {
+                if (isGooglePrimaryAccount) {
+                    openToast(
+                        "This action requires recent re-authentication. Password-based re-authentication is the active flow in this Account page right now.",
+                        "info",
+                    );
+                    return;
+                }
+
+                pendingProtectedActionRef.current = action;
+                setReauthAction("assembly_connection");
+                setReauthMode("password");
+                setReauthTitle("Confirm AssemblyAI connection change");
+                setReauthDescription(description);
+                setReauthGoogleIntent("reauth_email");
+                setReauthOpen(true);
+                return;
+            }
+
+            throw e;
+        }
+    };
+
+    const handleSaveConnection = async () => {
+        const trimmedLabel = connectionLabel.trim();
+        const trimmedApiKey = connectionApiKey.trim();
+
+        if (connectionDialogMode === "create") {
+            if (!trimmedLabel) {
+                openToast("Connection label is required.", "error");
+                return;
+            }
+
+            if (!trimmedApiKey) {
+                openToast("AssemblyAI API key is required.", "error");
+                return;
+            }
+
+            const payload: CreateAssemblyAiConnectionPayload = {
+                label: trimmedLabel,
+                api_key: trimmedApiKey,
+                is_default: connectionIsDefault,
+            };
+
+            try {
+                setConnectionsSaving(true);
+
+                await handleProtectedConnectionAction(async () => {
+                    await createMyAssemblyConnection(payload);
+                    await loadAssemblyConnections();
+                    resetConnectionDialogState();
+                    openToast("AssemblyAI connection saved.", "success");
+                }, "Enter your current password to continue saving this AssemblyAI connection.");
+            } catch (e: any) {
+                openToast(
+                    e?.message || "Failed to save AssemblyAI connection.",
+                    "error",
+                );
+            } finally {
+                setConnectionsSaving(false);
+            }
+
+            return;
+        }
+
+        if (!connectionTarget) {
+            openToast("No AssemblyAI connection selected.", "error");
+            return;
+        }
+
+        if (connectionDialogMode === "edit_label") {
+            if (!trimmedLabel) {
+                openToast("Connection label cannot be empty.", "error");
+                return;
+            }
+
+            const payload: UpdateAssemblyAiConnectionPayload = {
+                label: trimmedLabel,
+            };
+
+            try {
+                setConnectionsSaving(true);
+                await updateMyAssemblyConnection(connectionTarget.id, payload);
+                await loadAssemblyConnections();
+                resetConnectionDialogState();
+                openToast("AssemblyAI connection updated.", "success");
+            } catch (e: any) {
+                openToast(
+                    e?.message || "Failed to update AssemblyAI connection.",
+                    "error",
+                );
+            } finally {
+                setConnectionsSaving(false);
+            }
+
+            return;
+        }
+
+        if (connectionDialogMode === "replace_key") {
+            if (!trimmedApiKey) {
+                openToast("AssemblyAI API key is required.", "error");
+                return;
+            }
+
+            const payload: UpdateAssemblyAiConnectionPayload = {
+                api_key: trimmedApiKey,
+            };
+
+            try {
+                setConnectionsSaving(true);
+
+                await handleProtectedConnectionAction(async () => {
+                    await updateMyAssemblyConnection(
+                        connectionTarget.id,
+                        payload,
+                    );
+                    await loadAssemblyConnections();
+                    resetConnectionDialogState();
+                    openToast("AssemblyAI key replaced.", "success");
+                }, "Enter your current password to continue replacing this AssemblyAI key.");
+            } catch (e: any) {
+                openToast(
+                    e?.message || "Failed to replace AssemblyAI key.",
+                    "error",
+                );
+            } finally {
+                setConnectionsSaving(false);
+            }
+        }
+    };
+
+    const handleDeleteConnection = async () => {
+        if (!connectionDeleteTarget) {
+            openToast("No AssemblyAI connection selected.", "error");
+            return;
+        }
+
+        try {
+            setConnectionsSaving(true);
+
+            await handleProtectedConnectionAction(async () => {
+                await deleteMyAssemblyConnection(connectionDeleteTarget.id);
+                await loadAssemblyConnections();
+                setConnectionDeleteTarget(null);
+                openToast("AssemblyAI connection removed.", "success");
+            }, "Enter your current password to continue removing this AssemblyAI connection.");
+        } catch (e: any) {
+            openToast(
+                e?.message || "Failed to remove AssemblyAI connection.",
+                "error",
+            );
+        } finally {
+            setConnectionsSaving(false);
+        }
+    };
+
+    const handleSetDefaultConnection = async (
+        connection: AssemblyAiConnection,
+    ) => {
+        try {
+            setSettingDefaultId(connection.id);
+            await setDefaultMyAssemblyConnection(connection.id);
+            await loadAssemblyConnections();
+            openToast("Default AssemblyAI connection updated.", "success");
+        } catch (e: any) {
+            openToast(
+                e?.message || "Failed to update default AssemblyAI connection.",
+                "error",
+            );
+        } finally {
+            setSettingDefaultId(null);
+        }
     };
 
     const clearAccountQueryState = () => {
@@ -428,9 +730,27 @@ const AccountPage = () => {
             return;
         }
 
+        if (reauthAction === "assembly_connection") {
+            const pendingAction = pendingProtectedActionRef.current;
+            pendingProtectedActionRef.current = null;
+            setReauthAction(null);
+
+            if (pendingAction) {
+                void pendingAction().catch((e: any) => {
+                    openToast(
+                        e?.message || "AssemblyAI action failed.",
+                        "error",
+                    );
+                });
+            }
+
+            return;
+        }
+
         setReauthAction(null);
         openToast("Identity confirmed.", "success");
     };
+
     if (!user) {
         return (
             <Box>
@@ -992,7 +1312,216 @@ const AccountPage = () => {
                             </Paper>
                         </>
                     )}
+                    <Paper sx={sectionCardSx}>
+                        <Stack spacing={2.5}>
+                            <Stack
+                                direction={{ xs: "column", sm: "row" }}
+                                spacing={2}
+                                alignItems={{ xs: "flex-start", sm: "center" }}
+                                justifyContent="space-between"
+                            >
+                                <Box>
+                                    <Typography variant="h6" fontWeight={700}>
+                                        AssemblyAI connections
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Manage the AssemblyAI API keys saved to
+                                        your account. Protected changes require
+                                        recent re-authentication.
+                                    </Typography>
+                                </Box>
 
+                                <Button
+                                    variant="contained"
+                                    onClick={openCreateConnectionDialog}
+                                >
+                                    Add connection
+                                </Button>
+                            </Stack>
+
+                            <Divider />
+
+                            {isGooglePrimaryAccount ? (
+                                <Alert severity="info">
+                                    This page currently uses the password-based
+                                    re-authentication flow for protected
+                                    AssemblyAI connection changes.
+                                </Alert>
+                            ) : null}
+
+                            {connectionsError ? (
+                                <Alert severity="error">
+                                    {connectionsError}
+                                </Alert>
+                            ) : null}
+
+                            {connectionsLoading ? (
+                                <Box
+                                    sx={{
+                                        py: 4,
+                                        display: "flex",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    <CircularProgress size={28} />
+                                </Box>
+                            ) : assemblyConnections.length === 0 ? (
+                                <Alert severity="info">
+                                    No AssemblyAI connection has been added yet.
+                                </Alert>
+                            ) : (
+                                <Stack spacing={2}>
+                                    {assemblyConnections.map((connection) => (
+                                        <Paper
+                                            key={connection.id}
+                                            variant="outlined"
+                                            sx={{
+                                                p: 2,
+                                                borderRadius: 2,
+                                            }}
+                                        >
+                                            <Stack
+                                                spacing={2}
+                                                direction={{
+                                                    xs: "column",
+                                                    md: "row",
+                                                }}
+                                                justifyContent="space-between"
+                                                alignItems={{
+                                                    xs: "flex-start",
+                                                    md: "center",
+                                                }}
+                                            >
+                                                <Box>
+                                                    <Stack
+                                                        direction="row"
+                                                        spacing={1}
+                                                        useFlexGap
+                                                        flexWrap="wrap"
+                                                        alignItems="center"
+                                                        sx={{ mb: 1 }}
+                                                    >
+                                                        <Typography
+                                                            fontWeight={700}
+                                                        >
+                                                            {connection.label}
+                                                        </Typography>
+
+                                                        {connection.is_default ? (
+                                                            <Chip
+                                                                size="small"
+                                                                label="Default"
+                                                                color="primary"
+                                                            />
+                                                        ) : null}
+
+                                                        <Chip
+                                                            size="small"
+                                                            label={
+                                                                connection.status ===
+                                                                "active"
+                                                                    ? "Active"
+                                                                    : "Invalid"
+                                                            }
+                                                            color={
+                                                                connection.status ===
+                                                                "active"
+                                                                    ? "success"
+                                                                    : "warning"
+                                                            }
+                                                            variant="outlined"
+                                                        />
+                                                    </Stack>
+
+                                                    <Typography
+                                                        variant="body2"
+                                                        color="text.secondary"
+                                                    >
+                                                        {connection.masked_key}
+                                                    </Typography>
+
+                                                    <Typography
+                                                        variant="caption"
+                                                        color="text.secondary"
+                                                    >
+                                                        Last validated:{" "}
+                                                        {formatConnectionDate(
+                                                            connection.last_validated_at,
+                                                        )}
+                                                    </Typography>
+                                                </Box>
+
+                                                <Stack
+                                                    direction="row"
+                                                    spacing={1}
+                                                    useFlexGap
+                                                    flexWrap="wrap"
+                                                >
+                                                    {!connection.is_default ? (
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            onClick={() =>
+                                                                handleSetDefaultConnection(
+                                                                    connection,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                settingDefaultId ===
+                                                                connection.id
+                                                            }
+                                                        >
+                                                            Set default
+                                                        </Button>
+                                                    ) : null}
+
+                                                    <Button
+                                                        size="small"
+                                                        variant="outlined"
+                                                        onClick={() =>
+                                                            openEditConnectionDialog(
+                                                                connection,
+                                                            )
+                                                        }
+                                                    >
+                                                        Edit label
+                                                    </Button>
+
+                                                    <Button
+                                                        size="small"
+                                                        variant="outlined"
+                                                        onClick={() =>
+                                                            openReplaceConnectionDialog(
+                                                                connection,
+                                                            )
+                                                        }
+                                                    >
+                                                        Replace key
+                                                    </Button>
+
+                                                    <Button
+                                                        size="small"
+                                                        color="error"
+                                                        variant="outlined"
+                                                        onClick={() =>
+                                                            setConnectionDeleteTarget(
+                                                                connection,
+                                                            )
+                                                        }
+                                                    >
+                                                        Delete
+                                                    </Button>
+                                                </Stack>
+                                            </Stack>
+                                        </Paper>
+                                    ))}
+                                </Stack>
+                            )}
+                        </Stack>
+                    </Paper>
                     <Paper
                         sx={{
                             ...sectionCardSx,
@@ -1081,6 +1610,154 @@ const AccountPage = () => {
                     onInfo={(message) => openToast(message, "info")}
                     currentEmail={user.email}
                 />
+
+                <Dialog
+                    open={connectionDialogOpen}
+                    onClose={() => {
+                        if (!connectionsSaving) {
+                            resetConnectionDialogState();
+                        }
+                    }}
+                    fullWidth
+                    maxWidth="sm"
+                >
+                    <DialogTitle>
+                        {connectionDialogMode === "create"
+                            ? "Add AssemblyAI connection"
+                            : connectionDialogMode === "edit_label"
+                              ? "Edit AssemblyAI connection label"
+                              : "Replace AssemblyAI key"}
+                    </DialogTitle>
+
+                    <DialogContent>
+                        <Stack spacing={2} sx={{ pt: 1 }}>
+                            {connectionDialogMode !== "replace_key" ? (
+                                <TextField
+                                    label="Connection label"
+                                    value={connectionLabel}
+                                    onChange={(e) =>
+                                        setConnectionLabel(e.target.value)
+                                    }
+                                    fullWidth
+                                    disabled={connectionsSaving}
+                                    helperText="Use a clear label such as Primary or Backup."
+                                />
+                            ) : (
+                                <TextField
+                                    label="Connection label"
+                                    value={connectionLabel}
+                                    fullWidth
+                                    disabled
+                                    helperText="The current label stays unchanged while the key is replaced."
+                                />
+                            )}
+
+                            {connectionDialogMode !== "edit_label" ? (
+                                <TextField
+                                    label="AssemblyAI API key"
+                                    value={connectionApiKey}
+                                    onChange={(e) =>
+                                        setConnectionApiKey(e.target.value)
+                                    }
+                                    fullWidth
+                                    disabled={connectionsSaving}
+                                    type="password"
+                                    autoComplete="off"
+                                    helperText={
+                                        connectionDialogMode === "create"
+                                            ? "The key is validated before it is saved."
+                                            : "Enter the replacement key for this connection."
+                                    }
+                                />
+                            ) : null}
+
+                            {connectionDialogMode === "create" ? (
+                                <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    alignItems="center"
+                                >
+                                    <Switch
+                                        checked={connectionIsDefault}
+                                        onChange={(e) =>
+                                            setConnectionIsDefault(
+                                                e.target.checked,
+                                            )
+                                        }
+                                        disabled={connectionsSaving}
+                                    />
+                                    <Typography variant="body2">
+                                        Set as default connection
+                                    </Typography>
+                                </Stack>
+                            ) : null}
+                        </Stack>
+                    </DialogContent>
+
+                    <DialogActions sx={{ px: 3, pb: 3 }}>
+                        <Button
+                            onClick={resetConnectionDialogState}
+                            disabled={connectionsSaving}
+                        >
+                            Cancel
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            onClick={handleSaveConnection}
+                            disabled={connectionsSaving}
+                        >
+                            {connectionDialogMode === "create"
+                                ? "Save connection"
+                                : connectionDialogMode === "edit_label"
+                                  ? "Save label"
+                                  : "Replace key"}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                <Dialog
+                    open={Boolean(connectionDeleteTarget)}
+                    onClose={() => {
+                        if (!connectionsSaving) {
+                            setConnectionDeleteTarget(null);
+                        }
+                    }}
+                    fullWidth
+                    maxWidth="xs"
+                >
+                    <DialogTitle>Delete AssemblyAI connection</DialogTitle>
+
+                    <DialogContent>
+                        <Typography variant="body2" color="text.secondary">
+                            Remove{" "}
+                            <strong>
+                                {connectionDeleteTarget?.label ||
+                                    "this connection"}
+                            </strong>{" "}
+                            from your account. This action removes the saved key
+                            reference from this app.
+                        </Typography>
+                    </DialogContent>
+
+                    <DialogActions sx={{ px: 3, pb: 3 }}>
+                        <Button
+                            onClick={() => setConnectionDeleteTarget(null)}
+                            disabled={connectionsSaving}
+                        >
+                            Cancel
+                        </Button>
+
+                        <Button
+                            color="error"
+                            variant="contained"
+                            onClick={handleDeleteConnection}
+                            disabled={connectionsSaving}
+                        >
+                            Delete
+                        </Button>
+                    </DialogActions>
+                </Dialog>
 
                 <Snackbar
                     open={toast.open}
