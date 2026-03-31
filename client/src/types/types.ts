@@ -129,6 +129,32 @@ export interface AuthResponse {
     userData: User;
 }
 
+export type AssemblyAiConnectionStatus = "active" | "invalid";
+
+export interface AssemblyAiConnection {
+    id: number;
+    provider: "assemblyai";
+    label: string;
+    masked_key: string;
+    key_hint_last4: string;
+    is_default: boolean;
+    status: AssemblyAiConnectionStatus;
+    last_validated_at: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface CreateAssemblyAiConnectionPayload {
+    label: string;
+    api_key: string;
+    is_default?: boolean;
+}
+
+export interface UpdateAssemblyAiConnectionPayload {
+    label?: string;
+    api_key?: string;
+}
+
 export type ThemePreference = "light" | "dark" | "system";
 export type SummaryStyle = "concise" | "bullet" | "detailed";
 export type SpeechModel = "universal-3-pro" | "universal-2";
