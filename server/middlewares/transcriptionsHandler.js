@@ -1348,7 +1348,7 @@ const runTranscriptionJob = async ({
             jobId,
             steps,
             message: `Transcription created and stored successfully at: ${storedTxtfilePath}`,
-            TranscriptData: {
+            transcriptData: {
                 ...insertedTranscription,
                 utterances: extractUtterances(transcript),
             },
