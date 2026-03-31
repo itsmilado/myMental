@@ -1,6 +1,6 @@
 // src/features/transcription/pages/UploadAudioPage.tsx
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
     Accordion,
     AccordionDetails,
@@ -27,6 +27,7 @@ import {
     TextField,
     Tooltip,
     Typography,
+    FormHelperText,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
@@ -54,10 +55,11 @@ import type {
     SpeakerType,
     SpeechModel,
     StepEventPayload,
-    TranscriptData,
     TranscriptionOptions,
     TranscriptionStepKey,
     TranscriptionStepsState,
+    UploadItemStatus,
+    UploadItem,
 } from "../../../types/types";
 
 import { formatDateTime } from "../../../utils/formatDate";
@@ -117,6 +119,178 @@ const labelForStepKey = (key: TranscriptionStepKey): string => {
         default:
             return key;
     }
+};
+
+const MAX_UPLOAD_FILES = 10;
+
+const createUploadItemId = (): string =>
+    `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+const createUploadItem = (file: File): UploadItem => ({
+    id: createUploadItemId(),
+    file,
+    status: "queued",
+    jobId: null,
+    stepsState: createInitialStepsState(),
+});
+
+const buildQueueItems = (files: File[]): UploadItem[] =>
+    files.slice(0, MAX_UPLOAD_FILES).map(createUploadItem);
+
+const getUploadItemStatusFromSteps = (
+    steps: TranscriptionStepsState,
+): UploadItemStatus => {
+    if (Object.values(steps).some((step) => step.status === "error")) {
+        return "failed";
+    }
+
+    if (steps.complete.status === "success") {
+        return "completed";
+    }
+
+    if (
+        steps.transcribe.status === "in_progress" ||
+        steps.transcribe.status === "success" ||
+        steps.save_db.status === "in_progress" ||
+        steps.save_db.status === "success" ||
+        steps.save_file.status === "in_progress" ||
+        steps.save_file.status === "success" ||
+        steps.complete.status === "in_progress"
+    ) {
+        return "processing";
+    }
+
+    if (
+        steps.upload.status === "in_progress" ||
+        steps.upload.status === "success"
+    ) {
+        return "uploading";
+    }
+
+    return "queued";
+};
+
+const getStatusChipColor = (
+    status: UploadItemStatus,
+): "default" | "success" | "error" | "warning" | "info" => {
+    switch (status) {
+        case "completed":
+            return "success";
+        case "failed":
+            return "error";
+        case "uploading":
+            return "info";
+        case "processing":
+            return "warning";
+        default:
+            return "default";
+    }
+};
+
+const getStatusLabel = (status: UploadItemStatus): string => {
+    switch (status) {
+        case "queued":
+            return "Queued";
+        case "uploading":
+            return "Uploading";
+        case "processing":
+            return "Processing";
+        case "completed":
+            return "Completed";
+        case "failed":
+            return "Failed";
+        default:
+            return status;
+    }
+};
+
+/**
+- Builds shared request payload for all files
+- Keeps model, language, and speaker logic identical to single file flow
+*/
+const buildUploadRequestOptions = ({
+    options,
+    currentSpeechModel,
+    autoLanguageEnabled,
+    codeSwitchingEnabled,
+}: {
+    options: TranscriptionOptions;
+    currentSpeechModel: SpeechModel;
+    autoLanguageEnabled: boolean;
+    codeSwitchingEnabled: boolean;
+}): {
+    userOptions: Partial<TranscriptionOptions>;
+    validationError: string | null;
+} => {
+    const userOptions: Partial<TranscriptionOptions> = {
+        speech_models: buildSpeechModels(currentSpeechModel),
+    };
+
+    if (autoLanguageEnabled) {
+        userOptions.language_detection = true;
+
+        if (currentSpeechModel === "universal-2" && codeSwitchingEnabled) {
+            userOptions.language_detection_options = {
+                code_switching: true,
+            };
+        }
+    } else {
+        userOptions.language_code = options.language_code;
+    }
+
+    if (currentSpeechModel === "universal-3-pro") {
+        const trimmedPrompt = options.prompt?.trim();
+        if (trimmedPrompt) {
+            userOptions.prompt = trimmedPrompt;
+        }
+    }
+
+    if (options.speaker_identification?.enabled) {
+        userOptions.speaker_labels = true;
+        userOptions.speakers_expected = Math.max(
+            1,
+            options.speakers_expected ?? 1,
+        );
+
+        userOptions.speaker_identification = {
+            enabled: true,
+            speaker_type: options.speaker_identification.speaker_type,
+            known_values: sanitizeKnownValues(
+                options.speaker_identification.known_values,
+            ),
+        };
+    } else if (options.speaker_labels) {
+        userOptions.speaker_labels = true;
+        userOptions.speakers_expected = Math.max(
+            1,
+            options.speakers_expected ?? 1,
+        );
+    }
+
+    if (
+        options.speaker_identification?.enabled &&
+        options.speaker_identification.speaker_type === "role"
+    ) {
+        const validValues = sanitizeKnownValues(
+            options.speaker_identification.known_values,
+        );
+
+        if (!validValues || validValues.length === 0) {
+            return {
+                userOptions,
+                validationError:
+                    "Known values are required when using role-based identification.",
+            };
+        }
+    }
+
+    if (currentSpeechModel === "universal-2") {
+        if (options.punctuate) userOptions.punctuate = true;
+        if (options.format_text) userOptions.format_text = true;
+        if (options.disfluencies) userOptions.disfluencies = true;
+    }
+
+    return { userOptions, validationError: null };
 };
 
 const defaultTranscriptionOptions: TranscriptionOptions = {
@@ -332,20 +506,18 @@ export const UploadAudioPage = () => {
         loading: preferencesLoading,
     } = usePreferencesStore();
 
-    const [file, setFile] = useState<File | null>(null);
+    const [items, setItems] = useState<UploadItem[]>([]);
+    const [isProcessingQueue, setIsProcessingQueue] = useState(false);
+    const [selectedResultItemId, setSelectedResultItemId] = useState<
+        string | null
+    >(null);
+    const [batchError, setBatchError] = useState<string | null>(null);
+    const [isDragOver, setIsDragOver] = useState(false);
+
     const [hasLocalOptionEdits, setHasLocalOptionEdits] = useState(false);
     const [options, setOptions] = useState<TranscriptionOptions>(
         defaultTranscriptionOptions,
     );
-    const [results, setResults] = useState<TranscriptData | null>(null);
-    const [loading, setLoading] = useState(false);
-
-    const [jobId, setJobId] = useState<string | null>(null);
-    const [stepsState, setStepsState] = useState<TranscriptionStepsState>(
-        createInitialStepsState,
-    );
-    const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const [speakerSectionOpen, setSpeakerSectionOpen] = useState(true);
     const [formatSectionOpen, setFormatSectionOpen] = useState(false);
@@ -353,6 +525,15 @@ export const UploadAudioPage = () => {
         useState<PromptPresetKey>("default");
 
     const eventSourceRef = useRef<EventSource | null>(null);
+
+    const updateUploadItem = useCallback(
+        (itemId: string, updater: (item: UploadItem) => UploadItem) => {
+            setItems((prev) =>
+                prev.map((item) => (item.id === itemId ? updater(item) : item)),
+            );
+        },
+        [],
+    );
 
     useEffect(() => {
         if (!preferences && !preferencesLoading) {
@@ -395,9 +576,31 @@ export const UploadAudioPage = () => {
         };
     }, []);
 
-    const transcriptMaxHeight = useMemo(
-        () => "min(820px, calc(100vh - 360px))",
-        [],
+    //const transcriptMaxHeight = "100%";
+
+    const selectedResultItem = useMemo(
+        () => items.find((item) => item.id === selectedResultItemId) ?? null,
+        [items, selectedResultItemId],
+    );
+
+    const selectedTranscript = selectedResultItem?.result;
+    const selectedTranscriptItemId = selectedResultItem?.id ?? null;
+
+    const activeQueueItem = useMemo(
+        () =>
+            items.find(
+                (item) =>
+                    item.status === "uploading" || item.status === "processing",
+            ) ?? null,
+        [items],
+    );
+
+    const activeQueueSteps =
+        activeQueueItem?.stepsState ?? createInitialStepsState();
+
+    const activeStepIndex = useMemo(
+        () => getActiveStepIndexFromSteps(activeQueueSteps),
+        [activeQueueSteps],
     );
 
     const currentStepLabel = useMemo(() => {
@@ -405,14 +608,34 @@ export const UploadAudioPage = () => {
             activeStepIndex,
             TRANSCRIPTION_STEP_ORDER.length - 1,
         );
+
         return labelForStepKey(TRANSCRIPTION_STEP_ORDER[safeIndex]);
     }, [activeStepIndex]);
 
-    const rightPanelSubtitle = results
+    const batchSummary = useMemo(() => {
+        const total = items.length;
+        const completed = items.filter(
+            (item) => item.status === "completed",
+        ).length;
+        const failed = items.filter((item) => item.status === "failed").length;
+
+        return {
+            total,
+            completed,
+            failed,
+        };
+    }, [items]);
+
+    const rightPanelSubtitle = selectedResultItem?.result
         ? "Transcript ready."
-        : loading
+        : activeQueueItem
           ? "Processing… this panel updates automatically."
-          : "Select a file and start transcription to see results here.";
+          : "Select files and start transcription to see results here.";
+
+    const failedItems = useMemo(
+        () => items.filter((item) => item.status === "failed"),
+        [items],
+    );
 
     const currentSpeechModel: SpeechModel = getVisibleSpeechModel(
         options.speech_models,
@@ -518,6 +741,20 @@ export const UploadAudioPage = () => {
             };
         });
     }, [autoLanguageEnabled, currentModelLanguages]);
+
+    useEffect(() => {
+        if (selectedResultItem?.result) {
+            return;
+        }
+
+        const latestCompletedItem = [...items]
+            .reverse()
+            .find((item) => item.result);
+
+        if (latestCompletedItem) {
+            setSelectedResultItemId(latestCompletedItem.id);
+        }
+    }, [items, selectedResultItem]);
 
     const handleSelectModel = (model: SpeechModel): void => {
         setHasLocalOptionEdits(true);
@@ -756,166 +993,279 @@ export const UploadAudioPage = () => {
         }));
     };
 
-    const handleUpload = async (): Promise<void> => {
-        if (!file) return;
-
-        if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-        }
-
-        setLoading(true);
-        setErrorMessage(null);
-        setResults(null);
-        setStepsState(createInitialStepsState());
-        setActiveStepIndex(0);
-        setJobId(null);
-
-        const userOptions: Partial<TranscriptionOptions> = {
-            speech_models: buildSpeechModels(currentSpeechModel),
-        };
-
-        if (autoLanguageEnabled) {
-            userOptions.language_detection = true;
-
-            if (codeSwitchingEnabled) {
-                userOptions.language_detection_options = {
-                    code_switching: true,
-                };
-            }
-        } else {
-            userOptions.language_code = options.language_code;
-        }
-
-        if (currentSpeechModel === "universal-3-pro") {
-            const trimmedPrompt = options.prompt?.trim();
-            if (trimmedPrompt) {
-                userOptions.prompt = trimmedPrompt;
-            }
-        }
-
-        // Identification depends on diarization in the backend request
-        if (options.speaker_identification?.enabled) {
-            userOptions.speaker_labels = true;
-            userOptions.speakers_expected = Math.max(
-                1,
-                options.speakers_expected ?? 1,
-            );
-            userOptions.speaker_identification = {
-                enabled: true,
-                speaker_type: options.speaker_identification.speaker_type,
-                known_values: sanitizeKnownValues(
-                    options.speaker_identification.known_values,
-                ),
-            };
-        } else if (options.speaker_labels) {
-            userOptions.speaker_labels = true;
-            userOptions.speakers_expected = Math.max(
-                1,
-                options.speakers_expected ?? 1,
-            );
-        }
-
-        if (
-            options.speaker_identification?.enabled &&
-            options.speaker_identification.speaker_type === "role"
-        ) {
-            const validValues = sanitizeKnownValues(
-                options.speaker_identification.known_values,
-            );
-
-            if (!validValues || validValues.length === 0) {
-                setErrorMessage(
-                    "Known values are required when using role-based identification.",
-                );
-                return;
-            }
-        }
-
-        if (currentSpeechModel === "universal-2") {
-            if (options.punctuate) userOptions.punctuate = true;
-            if (options.format_text) userOptions.format_text = true;
-            if (options.disfluencies) userOptions.disfluencies = true;
-        }
-
+    /**
+- Handles full lifecycle for a single file
+- SSE progress uses credentialed requests and named event listeners
+*/
+    const runSingleUpload = async (
+        item: UploadItem,
+        sharedOptions: Partial<TranscriptionOptions>,
+    ): Promise<void> => {
         try {
-            const startResponse = await startTranscriptionJob(
-                file,
-                userOptions,
-            );
-            const newJobId = startResponse.jobId;
-            setJobId(newJobId);
+            updateUploadItem(item.id, (prev) => ({
+                ...prev,
+                status: "uploading",
+                stepsState: createInitialStepsState(),
+                error: undefined,
+            }));
 
-            const url = getTranscriptionProgressUrl(newJobId);
-            const eventSource = new EventSource(url, { withCredentials: true });
+            const response = await startTranscriptionJob(
+                item.file,
+                sharedOptions,
+            );
+
+            if (!response?.success || !response.jobId) {
+                throw new Error("Failed to start transcription job.");
+            }
+
+            const jobId = response.jobId;
+
+            updateUploadItem(item.id, (prev) => ({
+                ...prev,
+                jobId,
+            }));
+
+            const progressUrl = getTranscriptionProgressUrl(jobId);
+            const eventSource = new EventSource(progressUrl, {
+                withCredentials: true,
+            });
             eventSourceRef.current = eventSource;
 
-            eventSource.addEventListener("step", (event: MessageEvent) => {
-                const payload = JSON.parse(event.data) as StepEventPayload;
-                setStepsState(payload.steps);
-                setActiveStepIndex(
-                    getActiveStepIndexFromSteps(
-                        payload.steps,
-                        TRANSCRIPTION_STEP_ORDER,
-                    ),
-                );
-            });
+            await new Promise<void>((resolve) => {
+                let settled = false;
 
-            eventSource.addEventListener("completed", (event: MessageEvent) => {
-                const payload = JSON.parse(event.data) as CompletedEventPayload;
-                setStepsState(payload.steps);
-                setActiveStepIndex(
-                    getActiveStepIndexFromSteps(
-                        payload.steps,
-                        TRANSCRIPTION_STEP_ORDER,
-                    ),
-                );
-                setResults(payload.TranscriptData);
-                setLoading(false);
-                eventSource.close();
-                eventSourceRef.current = null;
-            });
+                const finish = () => {
+                    if (settled) return;
+                    settled = true;
+                    eventSource.close();
+                    resolve();
+                };
 
-            eventSource.addEventListener("error", (event: MessageEvent) => {
-                try {
-                    if (event.data) {
+                const handleStep = (event: MessageEvent) => {
+                    try {
                         const payload = JSON.parse(
-                            event.data as string,
-                        ) as ErrorEventPayload;
-                        setErrorMessage(
-                            payload.message ||
-                                payload.error ||
-                                "An error occurred during transcription.",
-                        );
-                        if (payload.steps) {
-                            setStepsState(payload.steps);
-                            setActiveStepIndex(
-                                getActiveStepIndexFromSteps(
-                                    payload.steps,
-                                    TRANSCRIPTION_STEP_ORDER,
+                            event.data,
+                        ) as StepEventPayload;
+
+                        updateUploadItem(item.id, (prev) => {
+                            const updatedSteps = {
+                                ...prev.stepsState,
+                                ...payload.steps,
+                            };
+
+                            return {
+                                ...prev,
+                                stepsState: updatedSteps,
+                                status: getUploadItemStatusFromSteps(
+                                    updatedSteps,
                                 ),
-                            );
-                        }
-                    } else {
-                        setErrorMessage(
-                            "An error occurred during transcription (no data).",
-                        );
+                            };
+                        });
+                    } catch {
+                        updateUploadItem(item.id, (prev) => ({
+                            ...prev,
+                            status: "failed",
+                            error: "Invalid progress response.",
+                        }));
+
+                        finish();
                     }
-                } catch {
-                    setErrorMessage("An error occurred during transcription.");
-                }
-                setLoading(false);
-                eventSource.close();
-                eventSourceRef.current = null;
+                };
+
+                const handleCompleted = (event: MessageEvent) => {
+                    try {
+                        const payload = JSON.parse(
+                            event.data,
+                        ) as CompletedEventPayload;
+
+                        updateUploadItem(item.id, (prev) => ({
+                            ...prev,
+                            status: "completed",
+                            result: payload.transcriptData,
+                            stepsState: payload.steps,
+                            error: undefined,
+                        }));
+
+                        finish();
+                    } catch {
+                        updateUploadItem(item.id, (prev) => ({
+                            ...prev,
+                            status: "failed",
+                            error: "Invalid completed response.",
+                        }));
+
+                        finish();
+                    }
+                };
+
+                const handleErrorEvent = (event: MessageEvent) => {
+                    try {
+                        const payload = JSON.parse(
+                            event.data,
+                        ) as ErrorEventPayload;
+
+                        updateUploadItem(item.id, (prev) => ({
+                            ...prev,
+                            status: "failed",
+                            error: payload.error || payload.message,
+                            stepsState: payload.steps ?? prev.stepsState,
+                        }));
+                    } catch {
+                        updateUploadItem(item.id, (prev) => ({
+                            ...prev,
+                            status: "failed",
+                            error: "Invalid error response.",
+                        }));
+                    }
+
+                    finish();
+                };
+
+                eventSource.addEventListener(
+                    "step",
+                    handleStep as EventListener,
+                );
+                eventSource.addEventListener(
+                    "completed",
+                    handleCompleted as EventListener,
+                );
+                eventSource.addEventListener(
+                    "error",
+                    handleErrorEvent as EventListener,
+                );
+
+                eventSource.onerror = () => {
+                    updateUploadItem(item.id, (prev) => ({
+                        ...prev,
+                        status: "failed",
+                        error: "Connection lost.",
+                    }));
+
+                    finish();
+                };
             });
-        } catch (error) {
-            setErrorMessage(
-                error instanceof Error
-                    ? error.message
-                    : "Failed to start transcription job.",
-            );
-            setLoading(false);
+        } catch (error: any) {
+            updateUploadItem(item.id, (prev) => ({
+                ...prev,
+                status: "failed",
+                error: error?.message || "Upload failed.",
+            }));
         }
+    };
+
+    /**
+- Processes queued items one-by-one
+- Prevents parallel API requests
+*/
+    const processQueueSequentially = async () => {
+        if (isProcessingQueue) return;
+
+        setIsProcessingQueue(true);
+        setBatchError(null);
+
+        try {
+            const { userOptions, validationError } = buildUploadRequestOptions({
+                options,
+                currentSpeechModel,
+                autoLanguageEnabled,
+                codeSwitchingEnabled,
+            });
+
+            if (validationError) {
+                setBatchError(validationError);
+                return;
+            }
+
+            for (const item of items) {
+                if (item.status !== "queued") continue;
+
+                await runSingleUpload(item, userOptions);
+            }
+        } finally {
+            setIsProcessingQueue(false);
+        }
+    };
+
+    const handleFileSelect = (files: FileList | null) => {
+        if (!files) return;
+
+        const fileArray = Array.from(files);
+        const availableSlots = Math.max(0, MAX_UPLOAD_FILES - items.length);
+
+        if (availableSlots === 0) {
+            setBatchError(
+                `You can upload up to ${MAX_UPLOAD_FILES} files at once.`,
+            );
+            return;
+        }
+
+        const nextFiles = fileArray.slice(0, availableSlots);
+        const newItems = buildQueueItems(nextFiles);
+
+        setItems((prev) => [...prev, ...newItems]);
+        setBatchError(null);
+
+        if (!selectedResultItemId && newItems[0]) {
+            setSelectedResultItemId(newItems[0].id);
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDragOver(false);
+
+        if (e.dataTransfer.files?.length) {
+            handleFileSelect(e.dataTransfer.files);
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDragOver(true);
+    };
+
+    const handleDragLeave = () => {
+        setIsDragOver(false);
+    };
+
+    const handleSelectResultItem = (itemId: string) => {
+        setSelectedResultItemId(itemId);
+    };
+
+    const handleRemoveQueueItem = (itemId: string) => {
+        setItems((prev) => {
+            const nextItems = prev.filter((item) => item.id !== itemId);
+
+            setSelectedResultItemId((currentSelectedId) => {
+                if (currentSelectedId !== itemId) return currentSelectedId;
+                return nextItems[0]?.id ?? null;
+            });
+
+            return nextItems;
+        });
+    };
+
+    const handleClearCompletedItems = () => {
+        setItems((prev) => {
+            const nextItems = prev.filter(
+                (item) =>
+                    item.status !== "completed" && item.status !== "failed",
+            );
+
+            setSelectedResultItemId((currentSelectedId) => {
+                if (!currentSelectedId) return nextItems[0]?.id ?? null;
+
+                const stillExists = nextItems.some(
+                    (item) => item.id === currentSelectedId,
+                );
+
+                return stillExists
+                    ? currentSelectedId
+                    : (nextItems[0]?.id ?? null);
+            });
+
+            return nextItems;
+        });
     };
 
     const renderModelButton = (model: SpeechModel) => {
@@ -1058,7 +1408,7 @@ export const UploadAudioPage = () => {
                     display: "flex",
                     flexDirection: { xs: "column", md: "row" },
                     gap: 3,
-                    alignItems: "flex-start",
+                    alignItems: { xs: "flex-start", md: "stretch" },
                 }}
             >
                 <Paper
@@ -1071,21 +1421,22 @@ export const UploadAudioPage = () => {
                         display: "flex",
                         flexDirection: "column",
                         gap: 2,
-                        minHeight: { md: "calc(100vh - 180px)" },
+                        // minHeight: { md: "calc(100vh - 180px)" },
                         transition: "box-shadow 150ms ease",
                         "&:hover": { boxShadow: 2 },
                     }}
                 >
                     <Box>
                         <Typography variant="h5">Transcribe Audio</Typography>
-                        {jobId && (
+
+                        {activeQueueItem?.jobId ? (
                             <Typography
                                 variant="body2"
                                 sx={{ color: "text.secondary", mt: 0.5 }}
                             >
-                                Job: {jobId}
+                                Active job: {activeQueueItem.jobId}
                             </Typography>
-                        )}
+                        ) : null}
                     </Box>
 
                     <Box>
@@ -1126,7 +1477,8 @@ export const UploadAudioPage = () => {
                                 <Step key={key}>
                                     <StepLabel
                                         error={
-                                            stepsState[key].status === "error"
+                                            activeQueueSteps[key].status ===
+                                            "error"
                                         }
                                     >
                                         {labelForStepKey(key)}
@@ -1135,7 +1487,7 @@ export const UploadAudioPage = () => {
                             ))}
                         </Stepper>
 
-                        {loading && (
+                        {activeQueueItem ? (
                             <Box mt={2} aria-live="polite">
                                 <LinearProgress
                                     sx={{
@@ -1149,63 +1501,311 @@ export const UploadAudioPage = () => {
                                     variant="body2"
                                     sx={{ color: "text.secondary", mt: 1 }}
                                 >
+                                    Current file: {activeQueueItem.file.name}
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    sx={{ color: "text.secondary", mt: 0.5 }}
+                                >
                                     Current step: {currentStepLabel}
                                 </Typography>
                             </Box>
-                        )}
+                        ) : null}
 
-                        {errorMessage && (
+                        {batchError ? (
                             <Box mt={2}>
                                 <Alert severity="error" variant="outlined">
-                                    {errorMessage}
+                                    {batchError}
                                 </Alert>
+                            </Box>
+                        ) : null}
+                    </Box>
+
+                    <Divider sx={{ borderColor: theme.palette.divider }} />
+
+                    <Box
+                        onDrop={handleDrop}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 1.5,
+                            p: 2,
+                            borderRadius: 2,
+                            border: `1px dashed ${
+                                isDragOver
+                                    ? colors.greenAccent[500]
+                                    : theme.palette.divider
+                            }`,
+                            backgroundColor: isDragOver
+                                ? theme.palette.action.hover
+                                : "transparent",
+                            transition:
+                                "border-color 150ms ease, background-color 150ms ease",
+                        }}
+                    >
+                        <Button
+                            variant="outlined"
+                            component="label"
+                            startIcon={<UploadFileOutlinedIcon />}
+                            fullWidth
+                            disabled={isProcessingQueue}
+                            sx={{
+                                color: colors.grey[100],
+                                borderColor: colors.grey[300],
+                                "&:hover": {
+                                    borderColor: colors.grey[200],
+                                    backgroundColor: theme.palette.action.hover,
+                                },
+                            }}
+                        >
+                            Choose Audio Files
+                            <input
+                                hidden
+                                type="file"
+                                accept="audio/*"
+                                multiple
+                                onChange={(e) => {
+                                    handleFileSelect(e.target.files);
+                                    e.target.value = "";
+                                }}
+                            />
+                        </Button>
+
+                        <Typography
+                            variant="body2"
+                            sx={{ color: "text.secondary" }}
+                        >
+                            Drag and drop up to {MAX_UPLOAD_FILES} audio files,
+                            or click to browse.
+                        </Typography>
+
+                        <FormHelperText sx={{ m: 0, color: "text.secondary" }}>
+                            All files in the batch use the current transcription
+                            options.
+                        </FormHelperText>
+                    </Box>
+
+                    <Box
+                        sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 1.25,
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 1,
+                            }}
+                        >
+                            <Typography
+                                variant="subtitle2"
+                                sx={{ color: "text.secondary" }}
+                            >
+                                Upload queue
+                            </Typography>
+
+                            {(batchSummary.completed > 0 ||
+                                batchSummary.failed > 0) && (
+                                <Button
+                                    size="small"
+                                    onClick={handleClearCompletedItems}
+                                    disabled={isProcessingQueue}
+                                    sx={{ textTransform: "none" }}
+                                >
+                                    Clear processed
+                                </Button>
+                            )}
+                        </Box>
+
+                        {items.length === 0 ? (
+                            <Typography
+                                variant="body2"
+                                sx={{ color: "text.secondary" }}
+                            >
+                                No files added yet.
+                            </Typography>
+                        ) : (
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 1,
+                                }}
+                            >
+                                {items.map((item) => {
+                                    const itemActiveStepIndex =
+                                        getActiveStepIndexFromSteps(
+                                            item.stepsState,
+                                        );
+                                    const itemStepLabel = labelForStepKey(
+                                        TRANSCRIPTION_STEP_ORDER[
+                                            itemActiveStepIndex
+                                        ],
+                                    );
+
+                                    return (
+                                        <Paper
+                                            key={item.id}
+                                            variant="outlined"
+                                            onClick={() =>
+                                                handleSelectResultItem(item.id)
+                                            }
+                                            sx={{
+                                                p: 1.5,
+                                                borderRadius: 2,
+                                                cursor: "pointer",
+                                                borderColor:
+                                                    selectedResultItemId ===
+                                                    item.id
+                                                        ? colors
+                                                              .greenAccent[500]
+                                                        : theme.palette.divider,
+                                                backgroundColor:
+                                                    selectedResultItemId ===
+                                                    item.id
+                                                        ? theme.palette.action
+                                                              .hover
+                                                        : "transparent",
+                                            }}
+                                        >
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    alignItems: "flex-start",
+                                                    justifyContent:
+                                                        "space-between",
+                                                    gap: 1,
+                                                }}
+                                            >
+                                                <Box
+                                                    sx={{
+                                                        minWidth: 0,
+                                                        flex: 1,
+                                                    }}
+                                                >
+                                                    <Typography
+                                                        variant="body2"
+                                                        sx={{
+                                                            fontWeight: 600,
+                                                            wordBreak:
+                                                                "break-word",
+                                                        }}
+                                                    >
+                                                        {item.file.name}
+                                                    </Typography>
+
+                                                    <Typography
+                                                        variant="caption"
+                                                        sx={{
+                                                            color: "text.secondary",
+                                                            display: "block",
+                                                            mt: 0.5,
+                                                        }}
+                                                    >
+                                                        {Math.round(
+                                                            item.file.size /
+                                                                1024,
+                                                        )}{" "}
+                                                        KB
+                                                    </Typography>
+
+                                                    {(item.status ===
+                                                        "uploading" ||
+                                                        item.status ===
+                                                            "processing") && (
+                                                        <Typography
+                                                            variant="caption"
+                                                            sx={{
+                                                                color: "text.secondary",
+                                                                display:
+                                                                    "block",
+                                                                mt: 0.5,
+                                                            }}
+                                                        >
+                                                            Step:{" "}
+                                                            {itemStepLabel}
+                                                        </Typography>
+                                                    )}
+
+                                                    {item.error ? (
+                                                        <Typography
+                                                            variant="caption"
+                                                            sx={{
+                                                                color: theme
+                                                                    .palette
+                                                                    .error.main,
+                                                                display:
+                                                                    "block",
+                                                                mt: 0.5,
+                                                            }}
+                                                        >
+                                                            {item.error}
+                                                        </Typography>
+                                                    ) : null}
+                                                </Box>
+
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 1,
+                                                    }}
+                                                >
+                                                    <Chip
+                                                        size="small"
+                                                        label={getStatusLabel(
+                                                            item.status,
+                                                        )}
+                                                        color={getStatusChipColor(
+                                                            item.status,
+                                                        )}
+                                                        variant={
+                                                            item.status ===
+                                                            "queued"
+                                                                ? "outlined"
+                                                                : "filled"
+                                                        }
+                                                    />
+
+                                                    {!isProcessingQueue ||
+                                                    item.status === "queued" ||
+                                                    item.status ===
+                                                        "completed" ||
+                                                    item.status === "failed" ? (
+                                                        <Button
+                                                            size="small"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleRemoveQueueItem(
+                                                                    item.id,
+                                                                );
+                                                            }}
+                                                            sx={{
+                                                                minWidth:
+                                                                    "auto",
+                                                                px: 1,
+                                                                textTransform:
+                                                                    "none",
+                                                            }}
+                                                        >
+                                                            Remove
+                                                        </Button>
+                                                    ) : null}
+                                                </Box>
+                                            </Box>
+                                        </Paper>
+                                    );
+                                })}
                             </Box>
                         )}
                     </Box>
 
                     <Divider sx={{ borderColor: theme.palette.divider }} />
-
-                    <Button
-                        variant="outlined"
-                        component="label"
-                        startIcon={<UploadFileOutlinedIcon />}
-                        fullWidth
-                        sx={{
-                            color: colors.grey[100],
-                            borderColor: colors.grey[300],
-                            "&:hover": {
-                                borderColor: colors.grey[200],
-                                backgroundColor: theme.palette.action.hover,
-                            },
-                        }}
-                    >
-                        {file ? "Change Audio File" : "Choose Audio File"}
-                        <input
-                            hidden
-                            type="file"
-                            accept="audio/*"
-                            onChange={(e) => {
-                                const selected = e.target.files?.[0];
-                                if (selected) setFile(selected);
-                            }}
-                        />
-                    </Button>
-
-                    {file ? (
-                        <Typography
-                            variant="body2"
-                            sx={{ color: "text.secondary" }}
-                        >
-                            Selected: {file.name}
-                        </Typography>
-                    ) : (
-                        <Typography
-                            variant="body2"
-                            sx={{ color: "text.secondary" }}
-                        >
-                            Choose an audio file to begin.
-                        </Typography>
-                    )}
 
                     <Box
                         sx={{
@@ -1672,13 +2272,97 @@ export const UploadAudioPage = () => {
                     <Box sx={{ mt: "auto", pt: 1 }}>
                         <Button
                             variant="contained"
-                            onClick={handleUpload}
-                            disabled={!file || loading}
                             fullWidth
-                            sx={{ py: 1.2 }}
+                            onClick={processQueueSequentially}
+                            disabled={isProcessingQueue || items.length === 0}
+                            sx={{
+                                mt: 1,
+                                py: 1.25,
+                                fontWeight: 600,
+                                backgroundColor: colors.greenAccent[500],
+                                color: theme.palette.getContrastText(
+                                    colors.greenAccent[500],
+                                ),
+                                "&:hover": {
+                                    backgroundColor: colors.greenAccent[600],
+                                },
+                                "&.Mui-disabled": {
+                                    backgroundColor:
+                                        theme.palette.action.disabledBackground,
+                                    color: theme.palette.action.disabled,
+                                },
+                            }}
                         >
-                            {loading ? "Transcribing…" : "Upload & Transcribe"}
+                            {isProcessingQueue
+                                ? "Processing Batch..."
+                                : "Start Transcription Batch"}
                         </Button>
+                    </Box>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 1,
+                        }}
+                    >
+                        <Typography
+                            variant="subtitle2"
+                            sx={{ color: "text.secondary" }}
+                        >
+                            Batch summary
+                        </Typography>
+
+                        <Box
+                            sx={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: 1,
+                            }}
+                        >
+                            <Chip
+                                label={`Total: ${batchSummary.total}`}
+                                variant="outlined"
+                            />
+                            <Chip
+                                label={`Success: ${batchSummary.completed}`}
+                                color="success"
+                                variant={
+                                    batchSummary.completed > 0
+                                        ? "filled"
+                                        : "outlined"
+                                }
+                            />
+                            <Chip
+                                label={`Failed: ${batchSummary.failed}`}
+                                color="error"
+                                variant={
+                                    batchSummary.failed > 0
+                                        ? "filled"
+                                        : "outlined"
+                                }
+                            />
+                        </Box>
+
+                        {failedItems.length > 0 ? (
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 0.5,
+                                }}
+                            >
+                                {failedItems.map((item) => (
+                                    <Typography
+                                        key={item.id}
+                                        variant="caption"
+                                        sx={{ color: theme.palette.error.main }}
+                                    >
+                                        {item.file.name}:{" "}
+                                        {item.error ?? "Unknown error"}
+                                    </Typography>
+                                ))}
+                            </Box>
+                        ) : null}
                     </Box>
                 </Paper>
 
@@ -1692,7 +2376,8 @@ export const UploadAudioPage = () => {
                         border: `1px solid ${theme.palette.divider}`,
                         display: "flex",
                         flexDirection: "column",
-                        minHeight: { md: "calc(100vh - 180px)" },
+                        // minHeight: { md: "calc(100vh - 200px)" },
+                        // height: { md: "calc(140vh - 100px)" },
                         transition: "box-shadow 150ms ease",
                         "&:hover": { boxShadow: 2 },
                     }}
@@ -1726,11 +2411,11 @@ export const UploadAudioPage = () => {
                                 gap: 1,
                             }}
                         >
-                            {results && (
+                            {selectedTranscript && selectedTranscriptItemId && (
                                 <>
                                     <ExportButton
-                                        transcriptId={results.id}
-                                        fileName={results.file_name}
+                                        transcriptId={selectedTranscript.id}
+                                        fileName={selectedTranscript.file_name}
                                     />
                                     <DeleteButton
                                         label="Delete"
@@ -1740,7 +2425,7 @@ export const UploadAudioPage = () => {
                                         }) => {
                                             const msg =
                                                 await deleteTranscription(
-                                                    results.id,
+                                                    selectedTranscript.id,
                                                     {
                                                         deleteFromAssembly,
                                                         deleteTxtFile:
@@ -1749,24 +2434,38 @@ export const UploadAudioPage = () => {
                                                             deleteServerFiles,
                                                     },
                                                 );
-                                            setResults(null);
+
+                                            updateUploadItem(
+                                                selectedTranscriptItemId,
+                                                (prev) => ({
+                                                    ...prev,
+                                                    result: undefined,
+                                                    error: undefined,
+                                                    status: "queued",
+                                                    jobId: null,
+                                                    stepsState:
+                                                        createInitialStepsState(),
+                                                }),
+                                            );
+
                                             return msg;
                                         }}
                                     />
                                 </>
                             )}
 
-                            {!results && !loading && (
-                                <Tooltip title="Results appear here after transcription">
-                                    <IconButton size="small">
-                                        <DescriptionOutlinedIcon fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
-                            )}
+                            {!selectedResultItem?.result &&
+                                !activeQueueItem && (
+                                    <Tooltip title="Results appear here after transcription">
+                                        <IconButton size="small">
+                                            <DescriptionOutlinedIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                )}
                         </Box>
                     </Box>
 
-                    {results && (
+                    {selectedResultItem?.result && (
                         <Box
                             sx={{
                                 display: "flex",
@@ -1777,7 +2476,11 @@ export const UploadAudioPage = () => {
                         >
                             <Chip
                                 size="small"
-                                label={`Model: ${results.options?.speech_models?.[0] ?? currentSpeechModel}`}
+                                label={`Model: ${
+                                    selectedResultItem.result.options
+                                        ?.speech_models?.[0] ??
+                                    currentSpeechModel
+                                }`}
                                 variant="outlined"
                             />
                             <Chip
@@ -1820,11 +2523,14 @@ export const UploadAudioPage = () => {
                         sx={{
                             flex: 1,
                             minHeight: 0,
+                            display: "flex",
+                            flexDirection: "column",
+                            overflow: "hidden",
                             transition: "opacity 180ms ease",
-                            opacity: results ? 1 : 0.98,
+                            opacity: selectedResultItem?.result ? 1 : 0.98,
                         }}
                     >
-                        {!results && !loading && (
+                        {!selectedResultItem && !activeQueueItem && (
                             <Box
                                 sx={{
                                     border: `1px dashed ${theme.palette.divider}`,
@@ -1843,7 +2549,7 @@ export const UploadAudioPage = () => {
                                     sx={{ fontSize: 52, opacity: 0.35 }}
                                 />
                                 <Typography sx={{ fontWeight: 700 }}>
-                                    No transcript yet
+                                    No transcript selected
                                 </Typography>
                                 <Typography
                                     variant="body2"
@@ -1852,14 +2558,14 @@ export const UploadAudioPage = () => {
                                         maxWidth: 420,
                                     }}
                                 >
-                                    Choose a file on the left and start the
-                                    transcription. When it completes, the
-                                    transcript will show up here.
+                                    Add files on the left and select one from
+                                    the queue to inspect its status or
+                                    transcript.
                                 </Typography>
                             </Box>
                         )}
 
-                        {!results && loading && (
+                        {!selectedResultItem?.result && activeQueueItem && (
                             <Box sx={{ mt: 1 }}>
                                 <LinearProgress
                                     sx={{
@@ -1874,17 +2580,28 @@ export const UploadAudioPage = () => {
                                     sx={{ color: "text.secondary", mt: 1 }}
                                     aria-live="polite"
                                 >
-                                    Processing: {currentStepLabel}
+                                    Processing: {activeQueueItem.file.name} —{" "}
+                                    {currentStepLabel}
                                 </Typography>
                             </Box>
                         )}
 
-                        {results && (
+                        {selectedResultItem?.status === "failed" && (
+                            <Alert severity="error" variant="outlined">
+                                {selectedResultItem.error ||
+                                    "This transcription failed."}
+                            </Alert>
+                        )}
+
+                        {selectedResultItem?.result && (
                             <Box
                                 sx={{
                                     display: "flex",
                                     flexDirection: "column",
                                     gap: 1.5,
+                                    flex: 1,
+                                    minHeight: 0,
+                                    overflow: "hidden",
                                     animation: "fadeIn 180ms ease",
                                     "@keyframes fadeIn": {
                                         from: {
@@ -1912,7 +2629,10 @@ export const UploadAudioPage = () => {
                                             variant="subtitle1"
                                             sx={{ fontWeight: 700 }}
                                         >
-                                            {results.file_name}
+                                            {
+                                                selectedResultItem.result
+                                                    .file_name
+                                            }
                                         </Typography>
                                         <Typography
                                             variant="body2"
@@ -1920,17 +2640,31 @@ export const UploadAudioPage = () => {
                                         >
                                             Recorded at:{" "}
                                             {formatDateTime(
-                                                results.file_recorded_at,
+                                                selectedResultItem.result
+                                                    .file_recorded_at,
                                             )}
                                         </Typography>
                                     </Box>
                                 </Box>
 
-                                <TranscriptText
-                                    text={results.transcription}
-                                    utterances={results.utterances}
-                                    maxHeight={transcriptMaxHeight}
-                                />
+                                <Box
+                                    sx={{
+                                        flex: 1,
+                                        minHeight: 0,
+                                        overflowY: "auto",
+                                    }}
+                                >
+                                    <TranscriptText
+                                        text={
+                                            selectedResultItem.result
+                                                .transcription
+                                        }
+                                        utterances={
+                                            selectedResultItem.result.utterances
+                                        }
+                                        maxHeight="100%"
+                                    />
+                                </Box>
                             </Box>
                         )}
                     </Box>
