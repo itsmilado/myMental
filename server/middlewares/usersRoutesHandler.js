@@ -4,9 +4,11 @@ require("dotenv").config();
 const { compare } = require("bcryptjs");
 const crypto = require("crypto");
 const { hashPassword } = require("../utils/hashPass");
+const { encryptSecret } = require("../utils/secretCrypto");
 const logger = require("../utils/logger");
 const pool = require("../db/db");
 const loginCheck = require("../utils/loginCheck");
+const { hasRecentReauth } = require("../middlewares/authMiddleware");
 const { establishAuthenticatedSession } = require("../utils/sessionAuth");
 const {
     createUserQuery,
@@ -18,7 +20,6 @@ const {
     updateUserPreferencesByIdQuery,
     updateUserPasswordByIdQuery,
     setPendingEmailChangeQuery,
-    // confirmPendingEmailByTokenHashQuery,
     setPasswordResetTokenByIdQuery,
     getUserByPasswordResetTokenHashQuery,
     clearPasswordResetTokenByIdQuery,
@@ -27,11 +28,21 @@ const {
     setEmailConfirmationTokenByIdQuery,
 } = require("../db/usersQueries");
 const {
+    getUserApiKeysQuery,
+    getUserApiKeyByIdQuery,
+    createUserApiKeyQuery,
+    updateUserApiKeyQuery,
+    setDefaultUserApiKeyQuery,
+    deleteUserApiKeyQuery,
+    countUserApiKeysQuery,
+} = require("../db/userApiKeysQueries");
+const {
     deleteTranscriptionTxtFile,
     deleteAudioFileCopy,
 } = require("../utils/fileProcessor");
 const { mergePreferences } = require("../utils/preferencesDefaults");
 const { sendEmail } = require("../utils/mailer");
+const { validateAssemblyApiKey } = require("../utils/assemblyaiClient");
 
 const createUsers = async (request, response, next) => {
     try {
@@ -1112,6 +1123,406 @@ const resetPassword = async (request, response, next) => {
     }
 };
 
+const ASSEMBLYAI_PROVIDER = "assemblyai";
+const MAX_CONNECTION_LABEL_LENGTH = 60;
+
+const parsePositiveInteger = (value) => {
+    const parsed = Number(value);
+
+    if (!Number.isInteger(parsed) || parsed < 1) {
+        return null;
+    }
+
+    return parsed;
+};
+
+const normalizeConnectionLabel = (value) => {
+    if (typeof value !== "string") return "";
+    return value.trim();
+};
+
+const normalizeApiKey = (value) => {
+    if (typeof value !== "string") return "";
+    return value.trim();
+};
+
+const serializeAssemblyConnection = (connection) => {
+    return {
+        id: connection.id,
+        provider: connection.provider,
+        label: connection.label,
+        masked_key: `••••${connection.key_hint_last4}`,
+        key_hint_last4: connection.key_hint_last4,
+        is_default: Boolean(connection.is_default),
+        status: connection.status,
+        last_validated_at: connection.last_validated_at,
+        created_at: connection.created_at,
+        updated_at: connection.updated_at,
+    };
+};
+
+const getMyAssemblyConnections = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`,
+        );
+
+        const sessionUser = request.session?.user;
+        if (!sessionUser?.id) {
+            return response.status(401).json({
+                success: false,
+                message: "Unauthorized access. Please log in.",
+            });
+        }
+
+        const connections = await getUserApiKeysQuery({
+            user_id: sessionUser.id,
+            provider: ASSEMBLYAI_PROVIDER,
+        });
+
+        return response.status(200).json({
+            success: true,
+            message: "AssemblyAI connections loaded.",
+            connections: connections.map(serializeAssemblyConnection),
+        });
+    } catch (error) {
+        logger.error(`[getMyAssemblyConnections] => Error: ${error.message}`);
+        next(error);
+    }
+};
+
+const createAssemblyConnection = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`,
+        );
+
+        const filteredBody = filterSensitiveFields(request.body, ["api_key"]);
+        logger.info(`Request body: ${JSON.stringify(filteredBody)}`);
+
+        const sessionUser = request.session?.user;
+        if (!sessionUser?.id) {
+            return response.status(401).json({
+                success: false,
+                message: "Unauthorized access. Please log in.",
+            });
+        }
+
+        const label = normalizeConnectionLabel(request.body?.label);
+        const apiKey = normalizeApiKey(request.body?.api_key);
+        const wantsDefault = Boolean(request.body?.is_default);
+
+        if (!label) {
+            return response.status(400).json({
+                success: false,
+                message: "Connection label is required.",
+            });
+        }
+
+        if (label.length > MAX_CONNECTION_LABEL_LENGTH) {
+            return response.status(400).json({
+                success: false,
+                message: `Connection label must be ${MAX_CONNECTION_LABEL_LENGTH} characters or fewer.`,
+            });
+        }
+
+        if (!apiKey) {
+            return response.status(400).json({
+                success: false,
+                message: "AssemblyAI API key is required.",
+            });
+        }
+
+        const validation = await validateAssemblyApiKey(apiKey);
+        if (!validation.valid) {
+            return response.status(400).json({
+                success: false,
+                message: validation.message || "Invalid AssemblyAI API key.",
+            });
+        }
+
+        const keyCount = await countUserApiKeysQuery({
+            user_id: sessionUser.id,
+            provider: ASSEMBLYAI_PROVIDER,
+        });
+
+        const created = await createUserApiKeyQuery({
+            user_id: sessionUser.id,
+            provider: ASSEMBLYAI_PROVIDER,
+            label,
+            encrypted_api_key: encryptSecret(apiKey),
+            key_hint_last4: apiKey.slice(-4),
+            is_default: false,
+            status: "active",
+            last_validated_at: new Date(),
+        });
+
+        const shouldSetDefault = keyCount === 0 || wantsDefault;
+
+        const connection = shouldSetDefault
+            ? await setDefaultUserApiKeyQuery({
+                  id: created.id,
+                  user_id: sessionUser.id,
+                  provider: ASSEMBLYAI_PROVIDER,
+              })
+            : created;
+
+        return response.status(201).json({
+            success: true,
+            message: "AssemblyAI connection saved.",
+            connection: serializeAssemblyConnection(connection),
+        });
+    } catch (error) {
+        logger.error(`[createAssemblyConnection] => Error: ${error.message}`);
+        next(error);
+    }
+};
+
+const updateAssemblyConnection = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`,
+        );
+
+        const filteredBody = filterSensitiveFields(request.body, ["api_key"]);
+        logger.info(`Request body: ${JSON.stringify(filteredBody)}`);
+
+        const sessionUser = request.session?.user;
+        if (!sessionUser?.id) {
+            return response.status(401).json({
+                success: false,
+                message: "Unauthorized access. Please log in.",
+            });
+        }
+
+        const connectionId = parsePositiveInteger(request.params?.id);
+        if (!connectionId) {
+            return response.status(400).json({
+                success: false,
+                message: "Invalid connection id.",
+            });
+        }
+
+        const existing = await getUserApiKeyByIdQuery({
+            id: connectionId,
+            user_id: sessionUser.id,
+            provider: ASSEMBLYAI_PROVIDER,
+        });
+
+        if (!existing) {
+            return response.status(404).json({
+                success: false,
+                message: "AssemblyAI connection not found.",
+            });
+        }
+
+        if (request.body?.is_default !== undefined) {
+            return response.status(400).json({
+                success: false,
+                message: "Use the set-default endpoint for default changes.",
+            });
+        }
+
+        const hasLabelField = request.body?.label !== undefined;
+        const hasApiKeyField = request.body?.api_key !== undefined;
+
+        if (!hasLabelField && !hasApiKeyField) {
+            return response.status(400).json({
+                success: false,
+                message: "No fields provided to update.",
+            });
+        }
+
+        let label;
+        if (hasLabelField) {
+            label = normalizeConnectionLabel(request.body?.label);
+
+            if (!label) {
+                return response.status(400).json({
+                    success: false,
+                    message: "Connection label cannot be empty.",
+                });
+            }
+
+            if (label.length > MAX_CONNECTION_LABEL_LENGTH) {
+                return response.status(400).json({
+                    success: false,
+                    message: `Connection label must be ${MAX_CONNECTION_LABEL_LENGTH} characters or fewer.`,
+                });
+            }
+        }
+
+        let encryptedApiKey;
+        let keyHintLast4;
+        let status;
+        let lastValidatedAt;
+
+        if (hasApiKeyField) {
+            if (!hasRecentReauth(request)) {
+                return response.status(403).json({
+                    success: false,
+                    message: "Re-authentication required",
+                });
+            }
+
+            const apiKey = normalizeApiKey(request.body?.api_key);
+
+            if (!apiKey) {
+                return response.status(400).json({
+                    success: false,
+                    message: "AssemblyAI API key cannot be empty.",
+                });
+            }
+
+            const validation = await validateAssemblyApiKey(apiKey);
+            if (!validation.valid) {
+                return response.status(400).json({
+                    success: false,
+                    message:
+                        validation.message || "Invalid AssemblyAI API key.",
+                });
+            }
+
+            encryptedApiKey = encryptSecret(apiKey);
+            keyHintLast4 = apiKey.slice(-4);
+            status = "active";
+            lastValidatedAt = new Date();
+        }
+
+        const updated = await updateUserApiKeyQuery({
+            id: connectionId,
+            user_id: sessionUser.id,
+            label,
+            encrypted_api_key: encryptedApiKey,
+            key_hint_last4: keyHintLast4,
+            status,
+            last_validated_at: lastValidatedAt,
+        });
+
+        return response.status(200).json({
+            success: true,
+            message: "AssemblyAI connection updated.",
+            connection: serializeAssemblyConnection(updated),
+        });
+    } catch (error) {
+        logger.error(`[updateAssemblyConnection] => Error: ${error.message}`);
+        next(error);
+    }
+};
+
+const deleteAssemblyConnection = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`,
+        );
+
+        const sessionUser = request.session?.user;
+        if (!sessionUser?.id) {
+            return response.status(401).json({
+                success: false,
+                message: "Unauthorized access. Please log in.",
+            });
+        }
+
+        const connectionId = parsePositiveInteger(request.params?.id);
+        if (!connectionId) {
+            return response.status(400).json({
+                success: false,
+                message: "Invalid connection id.",
+            });
+        }
+
+        const existing = await getUserApiKeyByIdQuery({
+            id: connectionId,
+            user_id: sessionUser.id,
+            provider: ASSEMBLYAI_PROVIDER,
+        });
+
+        if (!existing) {
+            return response.status(404).json({
+                success: false,
+                message: "AssemblyAI connection not found.",
+            });
+        }
+
+        const deleted = await deleteUserApiKeyQuery({
+            id: connectionId,
+            user_id: sessionUser.id,
+            provider: ASSEMBLYAI_PROVIDER,
+        });
+
+        return response.status(200).json({
+            success: true,
+            message: "AssemblyAI connection removed.",
+            connection: serializeAssemblyConnection(deleted),
+        });
+    } catch (error) {
+        logger.error(`[deleteAssemblyConnection] => Error: ${error.message}`);
+        next(error);
+    }
+};
+
+const setDefaultAssemblyConnection = async (request, response, next) => {
+    try {
+        logger.info(
+            `Incoming request to ${request.method} ${request.originalUrl}`,
+        );
+
+        const sessionUser = request.session?.user;
+        if (!sessionUser?.id) {
+            return response.status(401).json({
+                success: false,
+                message: "Unauthorized access. Please log in.",
+            });
+        }
+
+        const connectionId = parsePositiveInteger(request.params?.id);
+        if (!connectionId) {
+            return response.status(400).json({
+                success: false,
+                message: "Invalid connection id.",
+            });
+        }
+
+        const existing = await getUserApiKeyByIdQuery({
+            id: connectionId,
+            user_id: sessionUser.id,
+            provider: ASSEMBLYAI_PROVIDER,
+        });
+
+        if (!existing) {
+            return response.status(404).json({
+                success: false,
+                message: "AssemblyAI connection not found.",
+            });
+        }
+
+        if (existing.status !== "active") {
+            return response.status(400).json({
+                success: false,
+                message: "Only active connections can be set as default.",
+            });
+        }
+
+        const updated = await setDefaultUserApiKeyQuery({
+            id: connectionId,
+            user_id: sessionUser.id,
+            provider: ASSEMBLYAI_PROVIDER,
+        });
+
+        return response.status(200).json({
+            success: true,
+            message: "Default AssemblyAI connection updated.",
+            connection: serializeAssemblyConnection(updated),
+        });
+    } catch (error) {
+        logger.error(
+            `[setDefaultAssemblyConnection] => Error: ${error.message}`,
+        );
+        next(error);
+    }
+};
+
 // Helper function to filter sensitive fields
 const filterSensitiveFields = (body, fieldsToHide) => {
     const filteredBody = { ...body };
@@ -1185,4 +1596,9 @@ module.exports = {
     requestPasswordReset,
     resetPassword,
     unlinkMyGoogle,
+    getMyAssemblyConnections,
+    createAssemblyConnection,
+    updateAssemblyConnection,
+    deleteAssemblyConnection,
+    setDefaultAssemblyConnection,
 };
