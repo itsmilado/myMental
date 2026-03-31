@@ -20,6 +20,17 @@ const isAuthenticated = (request, response, next) => {
     next();
 };
 
+const hasRecentReauth = (request, windowMs = 1000 * 60 * 5) => {
+    const ts = request.session?.reauthenticatedAt;
+    const now = Date.now();
+
+    if (!ts || now - ts > windowMs) {
+        return false;
+    }
+
+    return true;
+};
+
 const requireRecentReauth = (windowMs = 1000 * 60 * 5) => {
     return (req, res, next) => {
         const ts = req.session?.reauthenticatedAt;
@@ -37,4 +48,4 @@ const requireRecentReauth = (windowMs = 1000 * 60 * 5) => {
     };
 };
 
-module.exports = { isAuthenticated, requireRecentReauth };
+module.exports = { isAuthenticated, requireRecentReauth, hasRecentReauth };
