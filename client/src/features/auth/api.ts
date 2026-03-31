@@ -9,6 +9,9 @@ import type {
     SortState,
     OnlineTranscription,
     RestorePayload,
+    AssemblyAiConnection,
+    CreateAssemblyAiConnectionPayload,
+    UpdateAssemblyAiConnectionPayload,
 } from "../../types/types";
 import {
     apiClient,
@@ -268,6 +271,134 @@ export const changeMyPassword = async (
         return (response.data?.message as string) || "Password updated";
     } catch (error) {
         throw new Error(getApiErrorMessage(error, "Password update failed"));
+    }
+};
+
+export const fetchMyAssemblyConnections = async (): Promise<
+    AssemblyAiConnection[]
+> => {
+    try {
+        const response = await apiClient.get(
+            `${USER_BASE_PATH}/me/assemblyai-connections`,
+        );
+
+        if (!response.data?.success) {
+            throw new Error(
+                response.data?.message ||
+                    "Failed to load AssemblyAI connections.",
+            );
+        }
+
+        return (response.data?.connections || []) as AssemblyAiConnection[];
+    } catch (error) {
+        throw new Error(
+            getApiErrorMessage(error, "Failed to load AssemblyAI connections."),
+        );
+    }
+};
+
+export const createMyAssemblyConnection = async (
+    payload: CreateAssemblyAiConnectionPayload,
+): Promise<AssemblyAiConnection> => {
+    try {
+        const response = await apiClient.post(
+            `${USER_BASE_PATH}/me/assemblyai-connections`,
+            payload,
+        );
+
+        if (!response.data?.success) {
+            throw new Error(
+                response.data?.message ||
+                    "Failed to save AssemblyAI connection.",
+            );
+        }
+
+        return response.data.connection as AssemblyAiConnection;
+    } catch (error) {
+        throw new Error(
+            getApiErrorMessage(error, "Failed to save AssemblyAI connection."),
+        );
+    }
+};
+
+export const updateMyAssemblyConnection = async (
+    id: number,
+    payload: UpdateAssemblyAiConnectionPayload,
+): Promise<AssemblyAiConnection> => {
+    try {
+        const response = await apiClient.patch(
+            `${USER_BASE_PATH}/me/assemblyai-connections/${id}`,
+            payload,
+        );
+
+        if (!response.data?.success) {
+            throw new Error(
+                response.data?.message ||
+                    "Failed to update AssemblyAI connection.",
+            );
+        }
+
+        return response.data.connection as AssemblyAiConnection;
+    } catch (error) {
+        throw new Error(
+            getApiErrorMessage(
+                error,
+                "Failed to update AssemblyAI connection.",
+            ),
+        );
+    }
+};
+
+export const deleteMyAssemblyConnection = async (
+    id: number,
+): Promise<AssemblyAiConnection> => {
+    try {
+        const response = await apiClient.delete(
+            `${USER_BASE_PATH}/me/assemblyai-connections/${id}`,
+        );
+
+        if (!response.data?.success) {
+            throw new Error(
+                response.data?.message ||
+                    "Failed to remove AssemblyAI connection.",
+            );
+        }
+
+        return response.data.connection as AssemblyAiConnection;
+    } catch (error) {
+        throw new Error(
+            getApiErrorMessage(
+                error,
+                "Failed to remove AssemblyAI connection.",
+            ),
+        );
+    }
+};
+
+export const setDefaultMyAssemblyConnection = async (
+    id: number,
+): Promise<AssemblyAiConnection> => {
+    try {
+        const response = await apiClient.post(
+            `${USER_BASE_PATH}/me/assemblyai-connections/${id}/set-default`,
+            {},
+        );
+
+        if (!response.data?.success) {
+            throw new Error(
+                response.data?.message ||
+                    "Failed to update default AssemblyAI connection.",
+            );
+        }
+
+        return response.data.connection as AssemblyAiConnection;
+    } catch (error) {
+        throw new Error(
+            getApiErrorMessage(
+                error,
+                "Failed to update default AssemblyAI connection.",
+            ),
+        );
     }
 };
 
