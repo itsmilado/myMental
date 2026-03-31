@@ -21,6 +21,11 @@ const {
     unlinkMyGoogle,
     requestPasswordReset,
     resetPassword,
+    getMyAssemblyConnections,
+    createAssemblyConnection,
+    updateAssemblyConnection,
+    deleteAssemblyConnection,
+    setDefaultAssemblyConnection,
 } = require("../middlewares/usersRoutesHandler");
 const errorHandler = require("../middlewares/errorHandler");
 const {
@@ -108,6 +113,43 @@ usersRoutes.patch(
     "/me/preferences",
     isAuthenticated,
     patchMyPreferences,
+    errorHandler,
+);
+
+usersRoutes.get(
+    "/me/assemblyai-connections",
+    isAuthenticated,
+    getMyAssemblyConnections,
+    errorHandler,
+);
+
+usersRoutes.post(
+    "/me/assemblyai-connections",
+    isAuthenticated,
+    requireRecentReauth(),
+    createAssemblyConnection,
+    errorHandler,
+);
+
+usersRoutes.patch(
+    "/me/assemblyai-connections/:id",
+    isAuthenticated,
+    updateAssemblyConnection,
+    errorHandler,
+);
+
+usersRoutes.delete(
+    "/me/assemblyai-connections/:id",
+    isAuthenticated,
+    requireRecentReauth(),
+    deleteAssemblyConnection,
+    errorHandler,
+);
+
+usersRoutes.post(
+    "/me/assemblyai-connections/:id/set-default",
+    isAuthenticated,
+    setDefaultAssemblyConnection,
     errorHandler,
 );
 
