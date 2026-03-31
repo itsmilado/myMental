@@ -242,6 +242,23 @@ export type TranscriptionOptions = {
     disfluencies?: boolean;
 };
 
+export type UploadItemStatus =
+    | "queued"
+    | "uploading"
+    | "processing"
+    | "completed"
+    | "failed";
+
+export type UploadItem = {
+    id: string;
+    file: File;
+    status: UploadItemStatus;
+    jobId: string | null;
+    stepsState: TranscriptionStepsState;
+    result?: TranscriptData;
+    error?: string;
+};
+
 export type TranscriptionStepKey =
     | "init"
     | "upload"
@@ -274,7 +291,7 @@ export interface CompletedEventPayload {
     jobId: string;
     steps: TranscriptionStepsState;
     message: string;
-    TranscriptData: TranscriptData;
+    transcriptData: TranscriptData;
 }
 
 export interface ErrorEventPayload {
@@ -293,7 +310,7 @@ export interface TranscriptionPayload {
 export interface transcriptUploadResponse {
     success: boolean;
     message: string;
-    TranscriptData: TranscriptData;
+    transcriptData: TranscriptData;
 }
 
 export type Filters = {
@@ -301,10 +318,6 @@ export type Filters = {
     transcript_id?: string;
     date_from?: string;
     date_to?: string;
-    // status?: string;
-    // model?: string;
-    // language?: string;
-    // dateRange?: { from: string; to: string };
 };
 
 export type TranscriptionState = {
