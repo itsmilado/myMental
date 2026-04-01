@@ -71,7 +71,21 @@ type ReauthAction =
     | "assembly_connection"
     | null;
 
+type GoogleReauthIntent =
+    | "link"
+    | "reauth_email"
+    | "reauth_delete"
+    | "reauth_unlink"
+    | "reauth_assembly_connection";
+
 type ConnectionDialogMode = "create" | "edit_label" | "replace_key" | null;
+
+type PendingAssemblyConnectionReauth =
+    | { kind: "create" }
+    | { kind: "replace_key"; connectionId: number }
+    | { kind: "delete"; connectionId: number };
+
+const ASSEMBLY_CONNECTION_REAUTH_STORAGE_KEY = "assemblyai-connection-reauth";
 
 const AccountPage = () => {
     const user = useAuthStore((s) => s.user);
@@ -93,9 +107,8 @@ const AccountPage = () => {
     );
     const [reauthTitle, setReauthTitle] = useState("Re-authenticate");
     const [reauthDescription, setReauthDescription] = useState("");
-    const [reauthGoogleIntent, setReauthGoogleIntent] = useState<
-        "link" | "reauth_email" | "reauth_delete" | "reauth_unlink"
-    >("reauth_email");
+    const [reauthGoogleIntent, setReauthGoogleIntent] =
+        useState<GoogleReauthIntent>("reauth_email");
 
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -151,11 +164,11 @@ const AccountPage = () => {
         if (!editingProfile) return { ok: true, reason: "" };
 
         if (!isValidName(firstName)) {
-            return { ok: false, reason: "First name must be 1–30 letters." };
+            return { ok: false, reason: "First name must be 1-30 letters." };
         }
 
         if (!isValidName(lastName)) {
-            return { ok: false, reason: "Last name must be 1–30 letters." };
+            return { ok: false, reason: "Last name must be 1-30 letters." };
         }
 
         return { ok: true, reason: "" };
@@ -179,6 +192,54 @@ const AccountPage = () => {
         setToast({ open: true, message, severity });
     };
 
+    const savePendingAssemblyConnectionReauth = (
+        context: PendingAssemblyConnectionReauth,
+    ) => {
+        sessionStorage.setItem(
+            ASSEMBLY_CONNECTION_REAUTH_STORAGE_KEY,
+            JSON.stringify(context),
+        );
+    };
+
+    const consumePendingAssemblyConnectionReauth =
+        (): PendingAssemblyConnectionReauth | null => {
+            const raw = sessionStorage.getItem(
+                ASSEMBLY_CONNECTION_REAUTH_STORAGE_KEY,
+            );
+
+            if (!raw) {
+                return null;
+            }
+
+            sessionStorage.removeItem(ASSEMBLY_CONNECTION_REAUTH_STORAGE_KEY);
+
+            try {
+                const parsed = JSON.parse(
+                    raw,
+                ) as PendingAssemblyConnectionReauth;
+
+                if (!parsed || typeof parsed !== "object") {
+                    return null;
+                }
+
+                if (parsed.kind === "create") {
+                    return parsed;
+                }
+
+                if (
+                    (parsed.kind === "replace_key" ||
+                        parsed.kind === "delete") &&
+                    typeof parsed.connectionId === "number"
+                ) {
+                    return parsed;
+                }
+
+                return null;
+            } catch {
+                return null;
+            }
+        };
+
     const formatConnectionDate = (value: string | null) => {
         if (!value) return "Not validated yet";
 
@@ -200,7 +261,7 @@ const AccountPage = () => {
     };
 
     const loadAssemblyConnections = useCallback(async () => {
-        if (!user?.id) return;
+        if (!user?.id) return [] as AssemblyAiConnection[];
 
         try {
             setConnectionsLoading(true);
@@ -208,10 +269,12 @@ const AccountPage = () => {
 
             const connections = await fetchMyAssemblyConnections();
             setAssemblyConnections(connections);
+            return connections;
         } catch (e: any) {
             setConnectionsError(
                 e?.message || "Failed to load AssemblyAI connections.",
             );
+            return [] as AssemblyAiConnection[];
         } finally {
             setConnectionsLoading(false);
         }
@@ -244,13 +307,89 @@ const AccountPage = () => {
         setConnectionDialogOpen(true);
     };
 
+    const startCreateConnectionFlow = () => {
+        if (hasGoogleConnection) {
+            savePendingAssemblyConnectionReauth({ kind: "create" });
+
+            openGoogleReauth(
+                "assembly_connection",
+                "Confirm AssemblyAI connection change",
+                "Continue with Google to verify your identity before adding an AssemblyAI connection.",
+                "reauth_assembly_connection",
+            );
+            return;
+        }
+
+        setReauthAction("assembly_connection");
+        setReauthMode("password");
+        setReauthTitle("Confirm AssemblyAI connection change");
+        setReauthDescription(
+            "Enter your current password before adding an AssemblyAI connection.",
+        );
+        setReauthGoogleIntent("reauth_email");
+        pendingProtectedActionRef.current = async () => {
+            openCreateConnectionDialog();
+        };
+        setReauthOpen(true);
+    };
+
     useEffect(() => {
         void loadAssemblyConnections();
     }, [loadAssemblyConnections]);
 
+    const resumeAssemblyConnectionAfterGoogleReauth = async () => {
+        const pending = consumePendingAssemblyConnectionReauth();
+
+        if (!pending) {
+            openToast(
+                "Identity confirmed. Continue with your AssemblyAI connection change.",
+                "success",
+            );
+            return;
+        }
+
+        if (pending.kind === "create") {
+            openCreateConnectionDialog();
+            openToast(
+                "Identity confirmed. Re-enter the AssemblyAI key to finish saving the connection.",
+                "success",
+            );
+            return;
+        }
+
+        const connections = await loadAssemblyConnections();
+        const target = connections.find(
+            (connection) => connection.id === pending.connectionId,
+        );
+
+        if (!target) {
+            openToast(
+                "Identity confirmed, but the selected AssemblyAI connection could not be found.",
+                "error",
+            );
+            return;
+        }
+
+        if (pending.kind === "replace_key") {
+            openReplaceConnectionDialog(target);
+            openToast(
+                "Identity confirmed. Re-enter the replacement key to continue.",
+                "success",
+            );
+            return;
+        }
+
+        setConnectionDeleteTarget(target);
+        openToast(
+            "Identity confirmed. Confirm the removal to continue.",
+            "success",
+        );
+    };
+
     const handleProtectedConnectionAction = async (
         action: () => Promise<void>,
         description: string,
+        pendingContext: PendingAssemblyConnectionReauth,
     ) => {
         try {
             await action();
@@ -261,10 +400,20 @@ const AccountPage = () => {
                 message.toLowerCase().includes("re-authentication required") ||
                 message.toLowerCase().includes("reauthentication required")
             ) {
-                if (isGooglePrimaryAccount) {
-                    openToast(
-                        "This action requires recent re-authentication. Password-based re-authentication is the active flow in this Account page right now.",
-                        "info",
+                if (hasGoogleConnection) {
+                    savePendingAssemblyConnectionReauth(pendingContext);
+
+                    if (pendingContext.kind === "delete") {
+                        setConnectionDeleteTarget(null);
+                    } else {
+                        resetConnectionDialogState();
+                    }
+
+                    openGoogleReauth(
+                        "assembly_connection",
+                        "Confirm AssemblyAI connection change",
+                        description,
+                        "reauth_assembly_connection",
                     );
                     return;
                 }
@@ -306,13 +455,10 @@ const AccountPage = () => {
 
             try {
                 setConnectionsSaving(true);
-
-                await handleProtectedConnectionAction(async () => {
-                    await createMyAssemblyConnection(payload);
-                    await loadAssemblyConnections();
-                    resetConnectionDialogState();
-                    openToast("AssemblyAI connection saved.", "success");
-                }, "Enter your current password to continue saving this AssemblyAI connection.");
+                await createMyAssemblyConnection(payload);
+                await loadAssemblyConnections();
+                resetConnectionDialogState();
+                openToast("AssemblyAI connection saved.", "success");
             } catch (e: any) {
                 openToast(
                     e?.message || "Failed to save AssemblyAI connection.",
@@ -371,15 +517,21 @@ const AccountPage = () => {
             try {
                 setConnectionsSaving(true);
 
-                await handleProtectedConnectionAction(async () => {
-                    await updateMyAssemblyConnection(
-                        connectionTarget.id,
-                        payload,
-                    );
-                    await loadAssemblyConnections();
-                    resetConnectionDialogState();
-                    openToast("AssemblyAI key replaced.", "success");
-                }, "Enter your current password to continue replacing this AssemblyAI key.");
+                await handleProtectedConnectionAction(
+                    async () => {
+                        await updateMyAssemblyConnection(
+                            connectionTarget.id,
+                            payload,
+                        );
+                        await loadAssemblyConnections();
+                        resetConnectionDialogState();
+                        openToast("AssemblyAI key replaced.", "success");
+                    },
+                    hasGoogleConnection
+                        ? "Continue with Google to verify your identity before replacing this AssemblyAI key."
+                        : "Enter your current password to continue replacing this AssemblyAI key.",
+                    { kind: "replace_key", connectionId: connectionTarget.id },
+                );
             } catch (e: any) {
                 openToast(
                     e?.message || "Failed to replace AssemblyAI key.",
@@ -400,12 +552,18 @@ const AccountPage = () => {
         try {
             setConnectionsSaving(true);
 
-            await handleProtectedConnectionAction(async () => {
-                await deleteMyAssemblyConnection(connectionDeleteTarget.id);
-                await loadAssemblyConnections();
-                setConnectionDeleteTarget(null);
-                openToast("AssemblyAI connection removed.", "success");
-            }, "Enter your current password to continue removing this AssemblyAI connection.");
+            await handleProtectedConnectionAction(
+                async () => {
+                    await deleteMyAssemblyConnection(connectionDeleteTarget.id);
+                    await loadAssemblyConnections();
+                    setConnectionDeleteTarget(null);
+                    openToast("AssemblyAI connection removed.", "success");
+                },
+                hasGoogleConnection
+                    ? "Continue with Google to verify your identity before removing this AssemblyAI connection."
+                    : "Enter your current password to continue removing this AssemblyAI connection.",
+                { kind: "delete", connectionId: connectionDeleteTarget.id },
+            );
         } catch (e: any) {
             openToast(
                 e?.message || "Failed to remove AssemblyAI connection.",
@@ -503,9 +661,14 @@ const AccountPage = () => {
                             setRemovingGoogle(true);
                             await handleFinishGoogleUnlink();
                         }
+                    } else if (intent === "reauth_assembly_connection") {
+                        await resumeAssemblyConnectionAfterGoogleReauth();
                     }
 
-                    if (intent !== "unlink") {
+                    if (
+                        intent !== "unlink" &&
+                        intent !== "reauth_assembly_connection"
+                    ) {
                         openToast(message || "Identity confirmed.", "success");
                     }
                 }
@@ -624,7 +787,7 @@ const AccountPage = () => {
         action: Exclude<ReauthAction, null>,
         title: string,
         description: string,
-        intent: "link" | "reauth_email" | "reauth_delete" | "reauth_unlink",
+        intent: GoogleReauthIntent,
     ) => {
         setReauthAction(action);
         setReauthMode("google");
@@ -1336,7 +1499,7 @@ const AccountPage = () => {
 
                                 <Button
                                     variant="contained"
-                                    onClick={openCreateConnectionDialog}
+                                    onClick={startCreateConnectionFlow}
                                 >
                                     Add connection
                                 </Button>
@@ -1346,9 +1509,9 @@ const AccountPage = () => {
 
                             {isGooglePrimaryAccount ? (
                                 <Alert severity="info">
-                                    This page currently uses the password-based
-                                    re-authentication flow for protected
-                                    AssemblyAI connection changes.
+                                    Protected AssemblyAI connection changes use
+                                    Google re-authentication for Google-based
+                                    accounts.
                                 </Alert>
                             ) : null}
 
