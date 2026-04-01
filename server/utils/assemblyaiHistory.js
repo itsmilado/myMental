@@ -1,9 +1,13 @@
 // utils/assemblyaiHistory.js
+
 const axios = require("axios");
 const logger = require("../utils/logger");
 const { getBackupsByTranscriptIdsQuery } = require("../db/transcribeQueries");
-const { log } = require("winston");
-const { Console } = require("winston/lib/winston/transports");
+const { decryptSecret } = require("../utils/secretCrypto");
+const {
+    getUserApiKeysQuery,
+    getUserApiKeyByIdQuery,
+} = require("../db/userApiKeysQueries");
 
 const ASSEMBLY_LIST_URL =
     "https://api.eu.assemblyai.com/v2/transcript?limit=200";
@@ -65,9 +69,9 @@ const flattenTranscription = (transcript) => {
     return "";
 };
 
-const fetchAssemblyTranscriptIds = async () => {
+const fetchAssemblyTranscriptIdsWithKey = async (apiKey) => {
     const headers = {
-        authorization: process.env.ASSEMBLYAI_API_KEY,
+        authorization: apiKey,
     };
 
     const response = await axios.get(ASSEMBLY_LIST_URL, { headers });
@@ -165,6 +169,44 @@ const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
         .filter(Boolean);
 };
 
+const resolveAssemblyHistoryApiKey = async ({ user_id }) => {
+    const connections = await getUserApiKeysQuery({ user_id });
+
+    // Try default first, then other active keys.
+
+    const orderedConnections = [
+        ...connections.filter((c) => c.is_default && c.status === "active"),
+        ...connections.filter((c) => !c.is_default && c.status === "active"),
+    ];
+
+    for (const connection of orderedConnections) {
+        try {
+            const full = await getUserApiKeyByIdQuery({
+                id: connection.id,
+                user_id,
+            });
+
+            if (!full?.encrypted_api_key) continue;
+
+            const decrypted = decryptSecret(full.encrypted_api_key);
+
+            // Test the key by attempting to fetch transcript IDs.
+
+            const result = await fetchAssemblyTranscriptIdsWithKey(decrypted);
+
+            return result;
+        } catch (err) {
+            logger.warn(
+                `[assemblyaiHistory] Skipping invalid key ${connection.id}: ${err.message}`,
+            );
+        }
+    }
+
+    // Fallback to app-level key
+
+    return fetchAssemblyTranscriptIdsWithKey(process.env.ASSEMBLYAI_API_KEY);
+};
+
 /**
  * Fetch AssemblyAI history for the logged in user:
  * - 1x AssemblyAI list (ids)
@@ -177,7 +219,14 @@ const fetchAssemblyHistory = async ({ user }) => {
     }
 
     try {
-        const historyIds = await fetchAssemblyTranscriptIds();
+        /*
+        Resolve transcript list using user-owned keys first,
+        falling back to app-level key if needed.
+        */
+        const historyIds = await resolveAssemblyHistoryApiKey({
+            user_id: user.id,
+        });
+
         const transcriptIds = historyIds.map((h) => h.transcript_id);
 
         if (transcriptIds.length === 0) return [];
