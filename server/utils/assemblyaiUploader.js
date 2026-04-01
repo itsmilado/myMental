@@ -4,11 +4,19 @@ const axios = require("axios");
 const fs = require("fs").promises;
 const logger = require("./logger");
 
-const uploadAudioFile = async (filePath) => {
+const uploadAudioFile = async (filePath, apiKey) => {
     const baseUrl = "https://api.eu.assemblyai.com/v2/upload";
+    const resolvedApiKey = String(
+        apiKey || process.env.ASSEMBLYAI_API_KEY || "",
+    ).trim();
+
+    if (!resolvedApiKey) {
+        throw new Error("AssemblyAI API key is required for upload.");
+    }
+
     const headers = {
         "content-type": "application/octet-stream",
-        authorization: process.env.ASSEMBLYAI_API_KEY,
+        authorization: resolvedApiKey,
     };
 
     try {
@@ -20,12 +28,12 @@ const uploadAudioFile = async (filePath) => {
         }
 
         logger.info(
-            `[uploadAudioFile] => Upload successful: ${response.data.upload_url}`
+            `[uploadAudioFile] => Upload successful: ${response.data.upload_url}`,
         );
         return response.data.upload_url;
     } catch (error) {
         logger.error(
-            `[uploadAudioFile] => Error uploading file: ${error.message}`
+            `[uploadAudioFile] => Error uploading file: ${error.message}`,
         );
         throw error;
     }
