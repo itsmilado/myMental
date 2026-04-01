@@ -25,9 +25,19 @@ const {
     getBackupWithRawByTranscriptIdQuery,
 } = require("../db/transcribeQueries");
 const logger = require("../utils/logger");
-const { assemblyClient } = require("../utils/assemblyaiClient");
+const {
+    assemblyClient,
+    createAssemblyClient,
+} = require("../utils/assemblyaiClient");
 const { fetchAssemblyHistory } = require("../utils/assemblyaiHistory");
 const { exportTranscriptionToFile } = require("../utils/exportService");
+
+const { decryptSecret } = require("../utils/secretCrypto");
+const {
+    getUserApiKeyByIdQuery,
+    getUserApiKeysQuery,
+} = require("../db/userApiKeysQueries");
+
 const { error, log } = require("winston");
 // imports for SSE + job ids
 const { EventEmitter } = require("events");
@@ -70,6 +80,152 @@ const setStepStatus = (steps, stepKey, status, errorMessage = null) => {
  */
 const transcriptionJobs = {};
 
+const resolveAssemblyClientForRequest = async ({
+    user_id,
+    selectedConnectionId = null,
+    useAppFallback = false,
+}) => {
+    /*
+    Existing transcripts must continue to work even when the user
+    has no saved key, so the app-level fallback remains valid.
+    */
+    if (!user_id) {
+        throw new Error("User id is required for AssemblyAI resolution.");
+    }
+
+    if (useAppFallback) {
+        return {
+            client: assemblyClient,
+            apiKey: process.env.ASSEMBLYAI_API_KEY,
+            assemblyai_connection_id: null,
+            assemblyai_connection_label: null,
+            assemblyai_connection_source: "app_fallback",
+        };
+    }
+
+    if (selectedConnectionId != null) {
+        const selectedConnection = await getUserApiKeyByIdQuery({
+            id: selectedConnectionId,
+            user_id,
+        });
+
+        if (!selectedConnection) {
+            throw new Error("Selected AssemblyAI connection was not found.");
+        }
+
+        const decryptedKey = decryptSecret(
+            selectedConnection.encrypted_api_key,
+        );
+
+        return {
+            client: createAssemblyClient(decryptedKey),
+            apiKey: decryptedKey,
+            assemblyai_connection_id: selectedConnection.id,
+            assemblyai_connection_label: selectedConnection.label,
+            assemblyai_connection_source: "selected_connection",
+        };
+    }
+
+    const userConnections = await getUserApiKeysQuery({ user_id });
+    const defaultConnection =
+        userConnections.find(
+            (connection) =>
+                connection.is_default === true &&
+                connection.status === "active",
+        ) ??
+        userConnections.find((connection) => connection.status === "active") ??
+        null;
+
+    if (defaultConnection) {
+        const fullDefaultConnection = await getUserApiKeyByIdQuery({
+            id: defaultConnection.id,
+            user_id,
+        });
+
+        if (!fullDefaultConnection) {
+            throw new Error("Default AssemblyAI connection was not found.");
+        }
+
+        const decryptedKey = decryptSecret(
+            fullDefaultConnection.encrypted_api_key,
+        );
+
+        return {
+            client: createAssemblyClient(decryptedKey),
+            apiKey: decryptedKey,
+            assemblyai_connection_id: fullDefaultConnection.id,
+            assemblyai_connection_label: fullDefaultConnection.label,
+            assemblyai_connection_source: "default_connection",
+        };
+    }
+
+    return {
+        client: assemblyClient,
+        apiKey: process.env.ASSEMBLYAI_API_KEY,
+        assemblyai_connection_id: null,
+        assemblyai_connection_label: null,
+        assemblyai_connection_source: "app_fallback",
+    };
+};
+
+const resolveAssemblyClientForStoredTranscript = async ({
+    user_id,
+    transcription = null,
+    backup = null,
+}) => {
+    const storedConnectionId =
+        transcription?.assemblyai_connection_id ??
+        backup?.assemblyai_connection_id ??
+        null;
+
+    const storedConnectionSource =
+        transcription?.assemblyai_connection_source ??
+        backup?.assemblyai_connection_source ??
+        "legacy_unknown";
+
+    /*
+    Follow-up operations should prefer the originally stored connection
+    and should not silently switch to another user key.
+    */
+    if (storedConnectionId != null) {
+        const storedConnection = await getUserApiKeyByIdQuery({
+            id: storedConnectionId,
+            user_id,
+        });
+
+        if (!storedConnection) {
+            throw new Error(
+                "The AssemblyAI connection used for this transcript is no longer available.",
+            );
+        }
+
+        const decryptedKey = decryptSecret(storedConnection.encrypted_api_key);
+
+        return {
+            client: createAssemblyClient(decryptedKey),
+            assemblyai_connection_id: storedConnection.id,
+            assemblyai_connection_label: storedConnection.label,
+            assemblyai_connection_source: storedConnectionSource,
+        };
+    }
+
+    if (storedConnectionSource === "app_fallback") {
+        return {
+            client: assemblyClient,
+            assemblyai_connection_id: null,
+            assemblyai_connection_label:
+                transcription?.assemblyai_connection_label ??
+                backup?.assemblyai_connection_label ??
+                null,
+            assemblyai_connection_source: "app_fallback",
+        };
+    }
+
+    throw new Error(
+        "No stored AssemblyAI connection context is available for this transcript.",
+    );
+};
+
 /**
  * SSE-enabled entry point:
  *  - expects multipart form with file (field: "audio") + options + fileModifiedDate
@@ -94,7 +250,10 @@ const startTranscriptionJob = async (request, response, next) => {
             });
         }
 
-        // Parse options from multipart body
+        /*
+Parse upload options and keep connection routing metadata
+outside the transcription options object.
+*/
         const userOptions = sanitizeIncomingTranscriptionOptions(
             typeof request.body.options === "string"
                 ? JSON.parse(request.body.options)
@@ -102,6 +261,32 @@ const startTranscriptionJob = async (request, response, next) => {
         );
 
         const rawDate = request.body.fileModifiedDate || null;
+        const rawConnectionId = String(
+            request.body.assemblyai_connection_id ?? "",
+        ).trim();
+        const selectedAssemblyConnectionId =
+            rawConnectionId.length > 0 ? Number(rawConnectionId) : null;
+        const useAppFallback =
+            String(request.body.use_app_fallback || "")
+                .trim()
+                .toLowerCase() === "true";
+
+        if (
+            selectedAssemblyConnectionId !== null &&
+            !Number.isInteger(selectedAssemblyConnectionId)
+        ) {
+            return response.status(400).json({
+                success: false,
+                message: "Invalid AssemblyAI connection selection.",
+            });
+        }
+
+        if (useAppFallback && selectedAssemblyConnectionId !== null) {
+            return response.status(400).json({
+                success: false,
+                message: "Conflicting AssemblyAI connection selection.",
+            });
+        }
 
         const jobId = randomUUID();
         const emitter = new EventEmitter();
@@ -128,6 +313,8 @@ const startTranscriptionJob = async (request, response, next) => {
             filename: file.filename,
             rawDate,
             userOptions,
+            selectedAssemblyConnectionId,
+            useAppFallback,
         }).catch((err) => {
             logger.error(
                 `[startTranscriptionJob] => Unhandled error in job ${jobId}: ${err.message}`,
@@ -460,26 +647,44 @@ const fetchTranscriptionByApiId = async (request, response, next) => {
 const fetchApiTranscriptionById = async (request, response, next) => {
     try {
         const { transcript_id } = request.body;
+        const user = request.session.user;
+
         logger.info(
             `Incoming request to ${request.method} ${
                 request.originalUrl
             } body: ${JSON.stringify(
                 request.body,
             )}, transcript_id: ${transcript_id}`,
-        ); // Log the request URL
+        );
 
-        const transcript = await assemblyClient.transcripts.get(
+        if (!user?.id) {
+            return response.status(401).json({
+                success: false,
+                message: "User not authenticated",
+            });
+        }
+
+        const transcription =
+            await getTranscriptionByApiTranscriptIdQuery(transcript_id);
+        const backup = await getBackupWithRawByTranscriptIdQuery(transcript_id);
+
+        const resolvedAssembly = await resolveAssemblyClientForStoredTranscript(
+            {
+                user_id: user.id,
+                transcription,
+                backup,
+            },
+        );
+
+        const transcript = await resolvedAssembly.client.transcripts.get(
             `${transcript_id}`,
         );
+
         if (!transcript) {
-            logger.error(
-                `[transcriptionsMiddleware - fetchApiTranscriptionById] => Error fetching transcription by ID: ${error.message}`,
-            );
-            response.status(500).json({
+            return response.status(404).json({
                 success: false,
-                message: "Error fetching transcription from API by ID",
+                message: "Transcript not found in AssemblyAI",
             });
-            throw new Error("Error fetching transcription from API by ID");
         }
 
         logger.info(
@@ -497,7 +702,6 @@ const fetchApiTranscriptionById = async (request, response, next) => {
         next(error);
     }
 };
-
 /**
  * Export a transcription in the requested format (txt, etc.).
  * Checks user authorization and logs all steps.
@@ -633,9 +837,22 @@ const deleteDBTranscription = async (request, response, next) => {
 
         if (deleteFromAssembly && transcription.transcript_id) {
             try {
-                const { status } = await assemblyClient.transcripts.delete(
+                const backup = await getBackupWithRawByTranscriptIdQuery(
                     transcription.transcript_id,
                 );
+
+                const resolvedAssembly =
+                    await resolveAssemblyClientForStoredTranscript({
+                        user_id: user.id,
+                        transcription,
+                        backup,
+                    });
+
+                const { status } =
+                    await resolvedAssembly.client.transcripts.delete(
+                        transcription.transcript_id,
+                    );
+
                 if (status === "completed") {
                     results.assemblyDeleted = true;
                     logger.info(
@@ -652,6 +869,7 @@ const deleteDBTranscription = async (request, response, next) => {
                 );
             }
         }
+
         return response.json({
             success: true,
             message: `transcription with ID ${id} successfully deleted.`,
@@ -688,33 +906,43 @@ const fetchAssemblyAIHistory = async (request, response, next) => {
 const deleteAssemblyAiTranscript = async (request, response, next) => {
     try {
         const { transcriptId } = request.params;
-        const userId = request.session.user.id;
+        const user = request.session.user;
+
         logger.info(
             `Incoming request to ${request.method} ${request.originalUrl}, params: ${request.params}`,
-        ); // Log the request URL
+        );
 
-        // Allow only if user is owner or admin
-        if (!userId && request.session.user.role !== "admin") {
-            logger.warn(
-                `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Unauthorized access attempt: ${request.originalUrl} `,
-            );
-            return response.status(403).json({
+        if (!user?.id) {
+            return response.status(401).json({
                 success: false,
-                message: "You are not Not Authorized to access this resource!",
+                message: "User not authenticated",
             });
         }
-        // Delete from AssemblyAI
-        // This permanently removes sensitive transcript data
+
+        const transcription =
+            await getTranscriptionByApiTranscriptIdQuery(transcriptId);
+        const backup = await getBackupWithRawByTranscriptIdQuery(transcriptId);
+
+        const resolvedAssembly = await resolveAssemblyClientForStoredTranscript(
+            {
+                user_id: user.id,
+                transcription,
+                backup,
+            },
+        );
+
         const { status } =
-            await assemblyClient.transcripts.delete(transcriptId);
+            await resolvedAssembly.client.transcripts.delete(transcriptId);
+
         if (status !== "completed") {
             logger.warn(
-                `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Request to ${request.originalUrl} not successfull.`,
+                `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Request to ${request.originalUrl} was not successful.`,
             );
-            throw error;
+            throw new Error("Failed to delete transcript from AssemblyAI.");
         }
+
         logger.info(
-            `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Transcript with ID ${transcriptId} deleted from AssemblyAI API `,
+            `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Transcript with ID ${transcriptId} deleted from AssemblyAI API`,
         );
         response.json({
             success: true,
@@ -882,6 +1110,11 @@ const restoreTranscription = async (request, response, next) => {
             options,
             file_recorded_at: restoredRecordedAt,
             audio_duration: restoredAudioDuration,
+            assemblyai_connection_id: backup.assemblyai_connection_id ?? null,
+            assemblyai_connection_label:
+                backup.assemblyai_connection_label ?? null,
+            assemblyai_connection_source:
+                backup.assemblyai_connection_source ?? "legacy_unknown",
         });
         logger.info(
             `[transcriptionsMiddleware - restoreTranscription] => Transcript with ID ${transcript_id} restored to offline successfully for user ${userId}`,
@@ -1180,6 +1413,8 @@ const runTranscriptionJob = async ({
     filename,
     rawDate,
     userOptions,
+    selectedAssemblyConnectionId = null,
+    useAppFallback = false,
 }) => {
     const job = transcriptionJobs[jobId];
     if (!job) {
@@ -1257,10 +1492,19 @@ const runTranscriptionJob = async ({
 
         emitStep(TRANSCRIPTION_STEPS.INIT, "success");
 
+        const resolvedAssembly = await resolveAssemblyClientForRequest({
+            user_id: loggedUserId,
+            selectedConnectionId: selectedAssemblyConnectionId,
+            useAppFallback,
+        });
+
         // ----------------- UPLOAD -----------------
         emitStep(TRANSCRIPTION_STEPS.UPLOAD, "in_progress");
 
-        const uploadUrl = await uploadAudioFile(filePath);
+        const uploadUrl = await uploadAudioFile(
+            filePath,
+            resolvedAssembly.apiKey,
+        );
 
         emitStep(TRANSCRIPTION_STEPS.UPLOAD, "success");
 
@@ -1278,8 +1522,36 @@ const runTranscriptionJob = async ({
             )}`,
         );
 
-        const transcriptId = await requestTranscription(transcriptionOptions);
-        const transcript = await pollTranscriptionResult(transcriptId);
+        const transcriptResponse =
+            await resolvedAssembly.client.transcripts.submit(
+                transcriptionOptions,
+            );
+        const transcriptId = transcriptResponse?.id;
+
+        if (!transcriptId) {
+            throw new Error("AssemblyAI did not return a transcript id.");
+        }
+
+        let transcript = null;
+
+        for (;;) {
+            transcript =
+                await resolvedAssembly.client.transcripts.get(transcriptId);
+
+            if (!transcript?.status || transcript.status === "completed") {
+                break;
+            }
+
+            if (transcript.status === "error") {
+                throw new Error(
+                    transcript.error || "AssemblyAI transcription failed.",
+                );
+            }
+
+            await new Promise((resolve) => {
+                setTimeout(resolve, 3000);
+            });
+        }
 
         emitStep(TRANSCRIPTION_STEPS.TRANSCRIBE, "success");
 
@@ -1292,7 +1564,12 @@ const runTranscriptionJob = async ({
             user_role: userRole,
             raw_api_data: transcript,
             file_name: filename,
-            file_recorded_at: rawDate,
+            file_recorded_at: fileModifiedDate,
+            assemblyai_connection_id: resolvedAssembly.assemblyai_connection_id,
+            assemblyai_connection_label:
+                resolvedAssembly.assemblyai_connection_label,
+            assemblyai_connection_source:
+                resolvedAssembly.assemblyai_connection_source,
         });
 
         if (!createBackup) {
@@ -1320,6 +1597,11 @@ const runTranscriptionJob = async ({
             options: resTranscriptOptions,
             file_recorded_at: fileModifiedDate,
             transcriptObject: transcript,
+            assemblyai_connection_id: resolvedAssembly.assemblyai_connection_id,
+            assemblyai_connection_label:
+                resolvedAssembly.assemblyai_connection_label,
+            assemblyai_connection_source:
+                resolvedAssembly.assemblyai_connection_source,
         };
 
         const insertedTranscription = await storeTranscriptionText({
