@@ -39,6 +39,7 @@ import { tokens } from "../../../theme/theme";
 
 import {
     deleteTranscription,
+    fetchMyAssemblyConnections,
     getTranscriptionProgressUrl,
     startTranscriptionJob,
 } from "../../auth/api";
@@ -50,6 +51,7 @@ import { DeleteButton } from "../components/DeleteButton";
 import { ExportButton } from "../components/ExportButton";
 
 import type {
+    AssemblyAiConnection,
     CompletedEventPayload,
     ErrorEventPayload,
     SpeakerType,
@@ -506,6 +508,8 @@ export const UploadAudioPage = () => {
         loading: preferencesLoading,
     } = usePreferencesStore();
 
+    const APP_FALLBACK_CONNECTION_VALUE = "app-fallback";
+
     const [items, setItems] = useState<UploadItem[]>([]);
     const [isProcessingQueue, setIsProcessingQueue] = useState(false);
     const [selectedResultItemId, setSelectedResultItemId] = useState<
@@ -524,6 +528,16 @@ export const UploadAudioPage = () => {
     const [selectedPromptPreset, setSelectedPromptPreset] =
         useState<PromptPresetKey>("default");
 
+    const [assemblyConnections, setAssemblyConnections] = useState<
+        AssemblyAiConnection[]
+    >([]);
+    const [connectionsLoading, setConnectionsLoading] = useState(false);
+    const [connectionsError, setConnectionsError] = useState<string | null>(
+        null,
+    );
+    const [selectedConnectionValue, setSelectedConnectionValue] =
+        useState<string>(APP_FALLBACK_CONNECTION_VALUE);
+
     const eventSourceRef = useRef<EventSource | null>(null);
 
     const updateUploadItem = useCallback(
@@ -540,6 +554,51 @@ export const UploadAudioPage = () => {
             void loadPreferences();
         }
     }, [preferences, preferencesLoading, loadPreferences]);
+
+    useEffect(() => {
+        let active = true;
+
+        const loadConnections = async () => {
+            try {
+                setConnectionsLoading(true);
+                setConnectionsError(null);
+
+                const connections = await fetchMyAssemblyConnections();
+
+                if (!active) return;
+
+                setAssemblyConnections(connections);
+
+                const defaultConnection = connections.find(
+                    (connection) => connection.is_default,
+                );
+
+                setSelectedConnectionValue(
+                    defaultConnection
+                        ? String(defaultConnection.id)
+                        : APP_FALLBACK_CONNECTION_VALUE,
+                );
+            } catch (error: any) {
+                if (!active) return;
+
+                setConnectionsError(
+                    error?.message || "Failed to load AssemblyAI connections.",
+                );
+                setAssemblyConnections([]);
+                setSelectedConnectionValue(APP_FALLBACK_CONNECTION_VALUE);
+            } finally {
+                if (active) {
+                    setConnectionsLoading(false);
+                }
+            }
+        };
+
+        void loadConnections();
+
+        return () => {
+            active = false;
+        };
+    }, []);
 
     useEffect(() => {
         if (!preferences || hasLocalOptionEdits) return;
@@ -636,6 +695,32 @@ export const UploadAudioPage = () => {
         () => items.filter((item) => item.status === "failed"),
         [items],
     );
+
+    const useExplicitAppFallback =
+        selectedConnectionValue === APP_FALLBACK_CONNECTION_VALUE;
+
+    const selectedAssemblyConnectionId = useMemo(() => {
+        if (useExplicitAppFallback) {
+            return null;
+        }
+
+        const parsed = Number(selectedConnectionValue);
+        return Number.isInteger(parsed) ? parsed : null;
+    }, [selectedConnectionValue, useExplicitAppFallback]);
+
+    const selectedAssemblyConnection = useMemo(() => {
+        if (selectedAssemblyConnectionId == null) return null;
+
+        return (
+            assemblyConnections.find(
+                (connection) => connection.id === selectedAssemblyConnectionId,
+            ) ?? null
+        );
+    }, [assemblyConnections, selectedAssemblyConnectionId]);
+
+    const selectedConnectionHelperText = selectedAssemblyConnection
+        ? `Using saved connection: ${selectedAssemblyConnection.label}`
+        : "Using the app default AssemblyAI key.";
 
     const currentSpeechModel: SpeechModel = getVisibleSpeechModel(
         options.speech_models,
@@ -1000,6 +1085,8 @@ export const UploadAudioPage = () => {
     const runSingleUpload = async (
         item: UploadItem,
         sharedOptions: Partial<TranscriptionOptions>,
+        assemblyaiConnectionId: number | null,
+        useAppFallback: boolean,
     ): Promise<void> => {
         try {
             updateUploadItem(item.id, (prev) => ({
@@ -1009,10 +1096,12 @@ export const UploadAudioPage = () => {
                 error: undefined,
             }));
 
-            const response = await startTranscriptionJob(
-                item.file,
-                sharedOptions,
-            );
+            const response = await startTranscriptionJob({
+                file: item.file,
+                options: sharedOptions,
+                assemblyai_connection_id: assemblyaiConnectionId,
+                use_app_fallback: useAppFallback,
+            });
 
             if (!response?.success || !response.jobId) {
                 throw new Error("Failed to start transcription job.");
@@ -1176,10 +1265,22 @@ export const UploadAudioPage = () => {
                 return;
             }
 
+            /*
+        Freeze the selected connection mode for the full batch to preserve
+        sequential behavior and predictable result ownership.
+        */
+            const frozenConnectionId = selectedAssemblyConnectionId;
+            const frozenUseAppFallback = useExplicitAppFallback;
+
             for (const item of items) {
                 if (item.status !== "queued") continue;
 
-                await runSingleUpload(item, userOptions);
+                await runSingleUpload(
+                    item,
+                    userOptions,
+                    frozenConnectionId,
+                    frozenUseAppFallback,
+                );
             }
         } finally {
             setIsProcessingQueue(false);
@@ -2269,14 +2370,66 @@ export const UploadAudioPage = () => {
                         </AccordionDetails>
                     </Accordion>
 
-                    <Box sx={{ mt: "auto", pt: 1 }}>
+                    <Box
+                        sx={{
+                            mt: "auto",
+                            pt: 1,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 2,
+                        }}
+                    >
+                        <FormControl
+                            fullWidth
+                            disabled={isProcessingQueue || connectionsLoading}
+                        >
+                            <InputLabel id="assembly-connection-select-label">
+                                AssemblyAI Connection
+                            </InputLabel>
+                            <Select
+                                labelId="assembly-connection-select-label"
+                                value={selectedConnectionValue}
+                                label="AssemblyAI Connection"
+                                onChange={(event) =>
+                                    setSelectedConnectionValue(
+                                        String(event.target.value),
+                                    )
+                                }
+                            >
+                                <MenuItem value={APP_FALLBACK_CONNECTION_VALUE}>
+                                    App default key
+                                </MenuItem>
+
+                                {assemblyConnections.map((connection) => (
+                                    <MenuItem
+                                        key={connection.id}
+                                        value={String(connection.id)}
+                                    >
+                                        {connection.label}
+                                        {connection.is_default
+                                            ? " (default)"
+                                            : ""}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+
+                            <FormHelperText>
+                                {connectionsLoading
+                                    ? "Loading your saved connections..."
+                                    : selectedConnectionHelperText}
+                            </FormHelperText>
+                        </FormControl>
+
+                        {connectionsError ? (
+                            <Alert severity="warning">{connectionsError}</Alert>
+                        ) : null}
+
                         <Button
                             variant="contained"
                             fullWidth
                             onClick={processQueueSequentially}
                             disabled={isProcessingQueue || items.length === 0}
                             sx={{
-                                mt: 1,
                                 py: 1.25,
                                 fontWeight: 600,
                                 backgroundColor: colors.greenAccent[500],
