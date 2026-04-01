@@ -39,7 +39,8 @@ export const startGoogleOAuth = (
         | "link"
         | "reauth_email"
         | "reauth_delete"
-        | "reauth_unlink" = "signin",
+        | "reauth_unlink"
+        | "reauth_assembly_connection" = "signin",
 ) => {
     const url = new URL(`${API_BASE_URL}/auth/google`);
     url.searchParams.set("intent", intent);
