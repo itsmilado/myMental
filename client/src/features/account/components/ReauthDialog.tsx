@@ -14,8 +14,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { reauthCurrentUser, startGoogleOAuth } from "../../auth/api";
-
-type GoogleIntent = "link" | "reauth_email" | "reauth_delete" | "reauth_unlink";
+import type { GoogleReauthIntent } from "../../../types/types";
 
 type Props = {
     open: boolean;
@@ -24,7 +23,7 @@ type Props = {
     mode?: "password" | "google";
     title?: string;
     description?: string;
-    googleIntent?: GoogleIntent;
+    googleIntent?: GoogleReauthIntent;
 };
 
 const ReauthDialog = ({
