@@ -55,6 +55,7 @@ const getOAuthIntent = (req) => {
         "reauth_email",
         "reauth_delete",
         "reauth_unlink",
+        "reauth_assembly_connection",
     ]);
 
     return allowed.has(raw) ? raw : "signin";
@@ -136,7 +137,8 @@ const googleOAuthCallback = async (req, res) => {
         const isReauthIntent =
             intent === "reauth_email" ||
             intent === "reauth_delete" ||
-            intent === "reauth_unlink";
+            intent === "reauth_unlink" ||
+            intent === "reauth_assembly_connection";
 
         if (isReauthIntent) {
             const sessionUser = req.session?.user;
@@ -181,7 +183,9 @@ const googleOAuthCallback = async (req, res) => {
                     ? "email"
                     : intent === "reauth_delete"
                       ? "delete"
-                      : "unlink";
+                      : intent === "reauth_unlink"
+                        ? "unlink"
+                        : "reauth_assembly_connection";
 
             return req.session.save(() =>
                 res.redirect(
