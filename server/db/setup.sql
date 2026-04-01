@@ -56,6 +56,9 @@ CREATE TABLE transcriptions (
   transcription TEXT NOT NULL,
   options JSONB NOT NULL,
   file_recorded_at TIMESTAMPTZ NOT NULL,
+  assemblyai_connection_id INTEGER REFERENCES user_api_keys(id) ON DELETE SET NULL,
+  assemblyai_connection_label VARCHAR(255),
+  assemblyai_connection_source VARCHAR(50) NOT NULL DEFAULT 'legacy_unknown',
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -67,5 +70,8 @@ CREATE TABLE transcription_backups (
   user_id INTEGER NOT NULL REFERENCES users(id),
   user_role VARCHAR(50) NOT NULL,
   raw_api_data JSONB NOT NULL,
+  assemblyai_connection_id INTEGER REFERENCES user_api_keys(id) ON DELETE SET NULL,
+  assemblyai_connection_label VARCHAR(255),
+  assemblyai_connection_source VARCHAR(50) NOT NULL DEFAULT 'legacy_unknown',
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
