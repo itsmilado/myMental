@@ -129,6 +129,13 @@ export interface AuthResponse {
     userData: User;
 }
 
+export type GoogleReauthIntent =
+    | "link"
+    | "reauth_email"
+    | "reauth_delete"
+    | "reauth_unlink"
+    | "reauth_assembly_connection";
+
 export type AssemblyAiConnectionStatus = "active" | "invalid";
 
 export interface AssemblyAiConnection {
