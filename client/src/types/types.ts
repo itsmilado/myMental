@@ -228,6 +228,18 @@ export type SortState = {
 /* Transcription Types                                                        */
 /* -------------------------------------------------------------------------- */
 
+export type AssemblyAiConnectionSource =
+    | "selected_connection"
+    | "default_connection"
+    | "app_fallback"
+    | "legacy_unknown";
+
+export type TranscriptionConnectionMetadata = {
+    assemblyai_connection_id?: number | null;
+    assemblyai_connection_label?: string | null;
+    assemblyai_connection_source?: AssemblyAiConnectionSource | null;
+};
+
 export type TranscriptData = {
     id: string; // local DB ID
     user_id: string;
@@ -239,6 +251,9 @@ export type TranscriptData = {
     created_at: string;
     options: TranscriptionOptions;
     utterances?: TranscriptUtterance[] | null;
+    assemblyai_connection_id?: number | null;
+    assemblyai_connection_label?: string | null;
+    assemblyai_connection_source?: AssemblyAiConnectionSource | null;
 };
 
 export type TranscriptUtterance = {
@@ -273,6 +288,13 @@ export type TranscriptionOptions = {
     format_text?: boolean;
     punctuate?: boolean;
     disfluencies?: boolean;
+};
+
+export type StartTranscriptionJobPayload = {
+    file: File;
+    options: Partial<TranscriptionOptions>;
+    assemblyai_connection_id?: number | null;
+    use_app_fallback?: boolean;
 };
 
 export type UploadItemStatus =
