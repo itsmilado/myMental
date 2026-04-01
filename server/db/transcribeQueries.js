@@ -18,6 +18,9 @@ const insertTranscriptionBackupQuery = async ({
     raw_api_data,
     file_name,
     file_recorded_at,
+    assemblyai_connection_id = null,
+    assemblyai_connection_label = null,
+    assemblyai_connection_source = "legacy_unknown",
 }) => {
     try {
         const insertQuery = `
@@ -27,9 +30,12 @@ const insertTranscriptionBackupQuery = async ({
                 user_role,
                 raw_api_data,
                 file_name,
-                file_recorded_at
+                file_recorded_at,
+                assemblyai_connection_id,
+                assemblyai_connection_label,
+                assemblyai_connection_source
             )
-            VALUES ($1, $2, $3, $4, $5, $6)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *;
         `;
         const insertValues = [
@@ -39,6 +45,9 @@ const insertTranscriptionBackupQuery = async ({
             raw_api_data,
             file_name,
             file_recorded_at ?? null,
+            assemblyai_connection_id,
+            assemblyai_connection_label,
+            assemblyai_connection_source,
         ];
         const result = await pool.query(insertQuery, insertValues);
         return result.rows[0];
@@ -68,14 +77,15 @@ const getBackupsByTranscriptIdsQuery = async ({
                    user_id,
                    file_name,
                    file_recorded_at,
-                   raw_api_data
+                   raw_api_data,
+                   assemblyai_connection_id,
+                   assemblyai_connection_label,
+                   assemblyai_connection_source
             FROM transcription_backups
             WHERE transcript_id = ANY($1)
         `;
 
-        // If isAdmin is false, results are filtered to the provided user_id.
         if (!isAdmin) {
-            // enforce user scoping
             params.push(user_id);
             query += ` AND user_id = $${params.length}`;
         }
@@ -95,7 +105,13 @@ const getBackupsByTranscriptIdsQuery = async ({
 const getBackupWithRawByTranscriptIdQuery = async (transcript_id) => {
     try {
         const query = `
-            SELECT transcript_id, file_name, file_recorded_at, raw_api_data
+            SELECT transcript_id,
+                   file_name,
+                   file_recorded_at,
+                   raw_api_data,
+                   assemblyai_connection_id,
+                   assemblyai_connection_label,
+                   assemblyai_connection_source
             FROM transcription_backups
             WHERE transcript_id = $1
             LIMIT 1
@@ -119,10 +135,27 @@ const insertTranscriptionQuery = async ({
     transcription,
     options,
     file_recorded_at,
+    assemblyai_connection_id = null,
+    assemblyai_connection_label = null,
+    assemblyai_connection_source = "legacy_unknown",
 }) => {
     try {
-        const insertQuery =
-            "INSERT INTO transcriptions (user_id, file_name, audio_duration, transcript_id, transcription, options, file_recorded_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *";
+        const insertQuery = `
+            INSERT INTO transcriptions (
+                user_id,
+                file_name,
+                audio_duration,
+                transcript_id,
+                transcription,
+                options,
+                file_recorded_at,
+                assemblyai_connection_id,
+                assemblyai_connection_label,
+                assemblyai_connection_source
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING *;
+        `;
         const insertValues = [
             user_id,
             file_name,
@@ -131,6 +164,9 @@ const insertTranscriptionQuery = async ({
             transcription,
             options,
             file_recorded_at,
+            assemblyai_connection_id,
+            assemblyai_connection_label,
+            assemblyai_connection_source,
         ];
 
         const insertedTranscription = await pool.query(
