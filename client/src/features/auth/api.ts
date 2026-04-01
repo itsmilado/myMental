@@ -2,7 +2,6 @@
 
 import type {
     User,
-    TranscriptionOptions,
     TranscriptData,
     AuthResponse,
     Filters,
@@ -12,6 +11,7 @@ import type {
     AssemblyAiConnection,
     CreateAssemblyAiConnectionPayload,
     UpdateAssemblyAiConnectionPayload,
+    StartTranscriptionJobPayload,
 } from "../../types/types";
 import {
     apiClient,
@@ -447,10 +447,12 @@ export const resetPassword = async (
 };
 
 // SSE-based background job starter
-export const startTranscriptionJob = async (
-    file: File,
-    options: Partial<TranscriptionOptions>,
-): Promise<StartTranscriptionResponse> => {
+export const startTranscriptionJob = async ({
+    file,
+    options,
+    assemblyai_connection_id = null,
+    use_app_fallback = false,
+}: StartTranscriptionJobPayload): Promise<StartTranscriptionResponse> => {
     try {
         const formData = new FormData();
 
@@ -459,9 +461,18 @@ export const startTranscriptionJob = async (
 
         formData.append("fileModifiedDate", fileModifiedDate);
         formData.append("options", JSON.stringify(options));
-        Object.entries(options).forEach(([key, value]) => {
-            formData.append(key, value.toString());
-        });
+
+        if (assemblyai_connection_id != null) {
+            formData.append(
+                "assemblyai_connection_id",
+                String(assemblyai_connection_id),
+            );
+        }
+
+        if (use_app_fallback) {
+            formData.append("use_app_fallback", "true");
+        }
+
         formData.append("audioFile", file);
 
         const { data } = await apiClient.post<StartTranscriptionResponse>(
