@@ -47,6 +47,75 @@ const cardSx: SxProps<Theme> = {
             : "0 8px 30px rgba(15, 23, 42, 0.06)",
 };
 
+const buildPostOAuthRedirect = (
+    params: URLSearchParams,
+): { pathname: string; search?: string } => {
+    const intent = params.get("intent");
+    const message = params.get("message");
+    const linked = params.get("linked");
+
+    const accountParams = new URLSearchParams();
+
+    if (message) {
+        accountParams.set("message", message);
+    }
+
+    if (linked === "1") {
+        accountParams.set("linked", "1");
+    }
+
+    if (intent === "reauth_email") {
+        accountParams.set("reauth", "success");
+        accountParams.set("intent", "email");
+
+        return {
+            pathname: "/dashboard/account",
+            search: `?${accountParams.toString()}`,
+        };
+    }
+
+    if (intent === "reauth_delete") {
+        accountParams.set("reauth", "success");
+        accountParams.set("intent", "delete");
+
+        return {
+            pathname: "/dashboard/account",
+            search: `?${accountParams.toString()}`,
+        };
+    }
+
+    if (intent === "reauth_unlink") {
+        accountParams.set("reauth", "success");
+        accountParams.set("intent", "unlink");
+
+        return {
+            pathname: "/dashboard/account",
+            search: `?${accountParams.toString()}`,
+        };
+    }
+
+    if (intent === "reauth_assembly_connection") {
+        accountParams.set("reauth", "success");
+        accountParams.set("intent", "reauth_assembly_connection");
+
+        return {
+            pathname: "/dashboard/account",
+            search: `?${accountParams.toString()}`,
+        };
+    }
+
+    if (intent === "link" || linked === "1") {
+        return {
+            pathname: "/dashboard/account",
+            search: accountParams.toString()
+                ? `?${accountParams.toString()}`
+                : undefined,
+        };
+    }
+
+    return { pathname: "/dashboard" };
+};
+
 const OAuthCallback = () => {
     const navigate = useNavigate();
     const [params] = useSearchParams();
@@ -101,7 +170,15 @@ const OAuthCallback = () => {
                 setUser(me.userData);
                 setUiState({ status: "success" });
 
-                navigate("/dashboard", { replace: true });
+                const destination = buildPostOAuthRedirect(params);
+
+                navigate(
+                    {
+                        pathname: destination.pathname,
+                        search: destination.search,
+                    },
+                    { replace: true },
+                );
             } catch {
                 setUiState({
                     status: "error",
@@ -168,7 +245,7 @@ const OAuthCallback = () => {
                                 Sign-in successful
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                Redirecting you to your dashboard…
+                                Redirecting you to the right place…
                             </Typography>
                         </Stack>
                     </CardContent>
