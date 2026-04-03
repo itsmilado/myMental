@@ -2,12 +2,12 @@
 
 const axios = require("axios");
 const logger = require("../utils/logger");
+
 const { getBackupsByTranscriptIdsQuery } = require("../db/transcribeQueries");
-const { decryptSecret } = require("../utils/secretCrypto");
+
 const {
-    getUserApiKeysQuery,
-    getUserApiKeyByIdQuery,
-} = require("../db/userApiKeysQueries");
+    resolveAssemblyHistoryWithFallback,
+} = require("../utils/assemblyaiConnectionResolver");
 
 const ASSEMBLY_LIST_URL =
     "https://api.eu.assemblyai.com/v2/transcript?limit=200";
@@ -124,6 +124,13 @@ const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
                     // keep file metadata
                     file_name: backupRow.file_name ?? null,
                     file_recorded_at: backupRow.file_recorded_at ?? null,
+                    assemblyai_connection_id:
+                        backupRow.assemblyai_connection_id ?? null,
+                    assemblyai_connection_label:
+                        backupRow.assemblyai_connection_label ?? null,
+                    assemblyai_connection_source:
+                        backupRow.assemblyai_connection_source ??
+                        "legacy_unknown",
 
                     // avoid stale data
                     audio_duration: formatDurationMMSS(
@@ -164,47 +171,15 @@ const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
 
                 file_name: backupRow.file_name ?? null,
                 file_recorded_at: backupRow.file_recorded_at ?? null,
+                assemblyai_connection_id:
+                    backupRow.assemblyai_connection_id ?? null,
+                assemblyai_connection_label:
+                    backupRow.assemblyai_connection_label ?? null,
+                assemblyai_connection_source:
+                    backupRow.assemblyai_connection_source ?? "legacy_unknown",
             };
         })
         .filter(Boolean);
-};
-
-const resolveAssemblyHistoryApiKey = async ({ user_id }) => {
-    const connections = await getUserApiKeysQuery({ user_id });
-
-    // Try default first, then other active keys.
-
-    const orderedConnections = [
-        ...connections.filter((c) => c.is_default && c.status === "active"),
-        ...connections.filter((c) => !c.is_default && c.status === "active"),
-    ];
-
-    for (const connection of orderedConnections) {
-        try {
-            const full = await getUserApiKeyByIdQuery({
-                id: connection.id,
-                user_id,
-            });
-
-            if (!full?.encrypted_api_key) continue;
-
-            const decrypted = decryptSecret(full.encrypted_api_key);
-
-            // Test the key by attempting to fetch transcript IDs.
-
-            const result = await fetchAssemblyTranscriptIdsWithKey(decrypted);
-
-            return result;
-        } catch (err) {
-            logger.warn(
-                `[assemblyaiHistory] Skipping invalid key ${connection.id}: ${err.message}`,
-            );
-        }
-    }
-
-    // Fallback to app-level key
-
-    return fetchAssemblyTranscriptIdsWithKey(process.env.ASSEMBLYAI_API_KEY);
 };
 
 /**
@@ -220,11 +195,13 @@ const fetchAssemblyHistory = async ({ user }) => {
 
     try {
         /*
-        Resolve transcript list using user-owned keys first,
-        falling back to app-level key if needed.
+        Resolve transcript list using the shared AssemblyAI connection resolver
+        so history probing follows the same deterministic ordering as the rest
+        of the backend.
         */
-        const historyIds = await resolveAssemblyHistoryApiKey({
+        const historyIds = await resolveAssemblyHistoryWithFallback({
             user_id: user.id,
+            fetchWithApiKey: fetchAssemblyTranscriptIdsWithKey,
         });
 
         const transcriptIds = historyIds.map((h) => h.transcript_id);
