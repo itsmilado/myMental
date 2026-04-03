@@ -3,16 +3,19 @@
 // Import required modules and utilities
 const fs = require("fs");
 const path = require("path");
+
 const {
     saveTranscriptionToFile,
     deleteTranscriptionTxtFile,
     deleteAudioFileCopy,
 } = require("../utils/fileProcessor");
 const uploadAudioFile = require("../utils/assemblyaiUploader");
+
 const {
     requestTranscription,
     pollTranscriptionResult,
 } = require("../utils/assemblyaiTranscriber");
+
 const {
     insertTranscriptionBackupQuery,
     insertTranscriptionQuery,
@@ -24,21 +27,16 @@ const {
     getBackupsByTranscriptIdsQuery,
     getBackupWithRawByTranscriptIdQuery,
 } = require("../db/transcribeQueries");
+
 const logger = require("../utils/logger");
-const {
-    assemblyClient,
-    createAssemblyClient,
-} = require("../utils/assemblyaiClient");
 const { fetchAssemblyHistory } = require("../utils/assemblyaiHistory");
 const { exportTranscriptionToFile } = require("../utils/exportService");
 
-const { decryptSecret } = require("../utils/secretCrypto");
 const {
-    getUserApiKeyByIdQuery,
-    getUserApiKeysQuery,
-} = require("../db/userApiKeysQueries");
+    resolveAssemblyClientForRequest,
+    resolveAssemblyClientForStoredTranscript,
+} = require("../utils/assemblyaiConnectionResolver");
 
-const { error, log } = require("winston");
 // imports for SSE + job ids
 const { EventEmitter } = require("events");
 const { randomUUID } = require("crypto");
@@ -75,162 +73,16 @@ const setStepStatus = (steps, stepKey, status, errorMessage = null) => {
 };
 
 /**
- * In-memory job registry (per-process)
- * jobs[jobId] = { steps, emitter, result, error, createdAt }
+ - In-memory job registry (per-process)
+ - jobs[jobId] = { steps, emitter, result, error, createdAt }
  */
 const transcriptionJobs = {};
 
-const resolveAssemblyClientForRequest = async ({
-    user_id,
-    selectedConnectionId = null,
-    useAppFallback = false,
-}) => {
-    /*
-    Existing transcripts must continue to work even when the user
-    has no saved key, so the app-level fallback remains valid.
-    */
-    if (!user_id) {
-        throw new Error("User id is required for AssemblyAI resolution.");
-    }
-
-    if (useAppFallback) {
-        return {
-            client: assemblyClient,
-            apiKey: process.env.ASSEMBLYAI_API_KEY,
-            assemblyai_connection_id: null,
-            assemblyai_connection_label: null,
-            assemblyai_connection_source: "app_fallback",
-        };
-    }
-
-    if (selectedConnectionId != null) {
-        const selectedConnection = await getUserApiKeyByIdQuery({
-            id: selectedConnectionId,
-            user_id,
-        });
-
-        if (!selectedConnection) {
-            throw new Error("Selected AssemblyAI connection was not found.");
-        }
-
-        const decryptedKey = decryptSecret(
-            selectedConnection.encrypted_api_key,
-        );
-
-        return {
-            client: createAssemblyClient(decryptedKey),
-            apiKey: decryptedKey,
-            assemblyai_connection_id: selectedConnection.id,
-            assemblyai_connection_label: selectedConnection.label,
-            assemblyai_connection_source: "selected_connection",
-        };
-    }
-
-    const userConnections = await getUserApiKeysQuery({ user_id });
-    const defaultConnection =
-        userConnections.find(
-            (connection) =>
-                connection.is_default === true &&
-                connection.status === "active",
-        ) ??
-        userConnections.find((connection) => connection.status === "active") ??
-        null;
-
-    if (defaultConnection) {
-        const fullDefaultConnection = await getUserApiKeyByIdQuery({
-            id: defaultConnection.id,
-            user_id,
-        });
-
-        if (!fullDefaultConnection) {
-            throw new Error("Default AssemblyAI connection was not found.");
-        }
-
-        const decryptedKey = decryptSecret(
-            fullDefaultConnection.encrypted_api_key,
-        );
-
-        return {
-            client: createAssemblyClient(decryptedKey),
-            apiKey: decryptedKey,
-            assemblyai_connection_id: fullDefaultConnection.id,
-            assemblyai_connection_label: fullDefaultConnection.label,
-            assemblyai_connection_source: "default_connection",
-        };
-    }
-
-    return {
-        client: assemblyClient,
-        apiKey: process.env.ASSEMBLYAI_API_KEY,
-        assemblyai_connection_id: null,
-        assemblyai_connection_label: null,
-        assemblyai_connection_source: "app_fallback",
-    };
-};
-
-const resolveAssemblyClientForStoredTranscript = async ({
-    user_id,
-    transcription = null,
-    backup = null,
-}) => {
-    const storedConnectionId =
-        transcription?.assemblyai_connection_id ??
-        backup?.assemblyai_connection_id ??
-        null;
-
-    const storedConnectionSource =
-        transcription?.assemblyai_connection_source ??
-        backup?.assemblyai_connection_source ??
-        "legacy_unknown";
-
-    /*
-    Follow-up operations should prefer the originally stored connection
-    and should not silently switch to another user key.
-    */
-    if (storedConnectionId != null) {
-        const storedConnection = await getUserApiKeyByIdQuery({
-            id: storedConnectionId,
-            user_id,
-        });
-
-        if (!storedConnection) {
-            throw new Error(
-                "The AssemblyAI connection used for this transcript is no longer available.",
-            );
-        }
-
-        const decryptedKey = decryptSecret(storedConnection.encrypted_api_key);
-
-        return {
-            client: createAssemblyClient(decryptedKey),
-            assemblyai_connection_id: storedConnection.id,
-            assemblyai_connection_label: storedConnection.label,
-            assemblyai_connection_source: storedConnectionSource,
-        };
-    }
-
-    if (storedConnectionSource === "app_fallback") {
-        return {
-            client: assemblyClient,
-            assemblyai_connection_id: null,
-            assemblyai_connection_label:
-                transcription?.assemblyai_connection_label ??
-                backup?.assemblyai_connection_label ??
-                null,
-            assemblyai_connection_source: "app_fallback",
-        };
-    }
-
-    throw new Error(
-        "No stored AssemblyAI connection context is available for this transcript.",
-    );
-};
-
 /**
- * SSE-enabled entry point:
- *  - expects multipart form with file (field: "audio") + options + fileModifiedDate
- *  - creates a jobId and starts runTranscriptionJob in the background
- *  - returns { jobId } immediately
+ - SSE-enabled entry point:
+   - expects multipart form with file (field: "audio") + options + fileModifiedDate
+   - creates a jobId and starts runTranscriptionJob in the background
+   - returns { jobId } immediately
  */
 const startTranscriptionJob = async (request, response, next) => {
     try {
@@ -264,6 +116,11 @@ outside the transcription options object.
         const rawConnectionId = String(
             request.body.assemblyai_connection_id ?? "",
         ).trim();
+
+        /*
+- Parse connection-routing inputs outside the transcription options payload.
+- This keeps persisted transcript options separate from resolver-only transport metadata.
+*/
         const selectedAssemblyConnectionId =
             rawConnectionId.length > 0 ? Number(rawConnectionId) : null;
         const useAppFallback =
