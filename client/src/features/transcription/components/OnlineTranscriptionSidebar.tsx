@@ -12,15 +12,47 @@ import {
     Divider,
     Stack,
     Chip,
+    Grid,
 } from "@mui/material";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
 import { getAudioStreamUrl } from "../../auth/api";
 import { AudioPlayer } from "./AudioPlayer";
 import { OnlineTranscription } from "../../../types/types";
 import { TranscriptText } from "./TranscriptText";
 import { normalizeOnlineHistoryMetadata } from "../utils/transcriptionHistoryAdapters";
+
+/*
+- Renders one metadata field with a compact card-like presentation
+- Keeps the sidebar metadata readable in a two-column layout
+*/
+const DetailItem = ({ label, value }: { label: string; value: string }) => {
+    return (
+        <Box
+            sx={{
+                height: "100%",
+                px: 1.5,
+                py: 1.25,
+                borderRadius: 2,
+                border: "1px solid",
+                borderColor: "divider",
+                backgroundColor: "background.default",
+            }}
+        >
+            <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mb: 0.5 }}
+            >
+                {label}
+            </Typography>
+            <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                {value}
+            </Typography>
+        </Box>
+    );
+};
 
 type Props = {
     open: boolean;
@@ -41,6 +73,29 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
         : null;
 
     const metadata = normalizeOnlineHistoryMetadata(transcription);
+
+    const getMetadataValue = (
+        value: string | null | undefined,
+        fallback: string,
+    ): string => {
+        const normalized = value?.toString().trim();
+        return normalized ? normalized : fallback;
+    };
+
+    const formatDateTime = (value: string | null | undefined): string => {
+        if (!value) return "Not available";
+
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+
+        return date.toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    };
 
     return (
         <Drawer
@@ -94,7 +149,7 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
                             variant="body2"
                             sx={{ wordBreak: "break-all" }}
                         >
-                            {transcription.file_name || "-"}
+                            {transcription.file_name || "Not available"}
                         </Typography>
 
                         <Stack
@@ -114,29 +169,28 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
 
                             <Chip
                                 size="small"
-                                label={`Status: ${transcription.status}`}
+                                label={`Status: ${getMetadataValue(
+                                    transcription.status,
+                                    "Not available",
+                                )}`}
                             />
-
-                            {transcription.audio_duration ? (
-                                <Chip
-                                    size="small"
-                                    label={`Duration: ${transcription.audio_duration}`}
-                                />
-                            ) : null}
                         </Stack>
                     </Stack>
+
+                    <Divider sx={{ mt: 1, mb: 2 }} />
 
                     <Accordion
                         disableGutters
                         defaultExpanded={false}
                         sx={{
-                            mt: 2,
+                            mb: 1,
                             borderRadius: 2,
                             "&:before": { display: "none" },
                             backgroundColor: "transparent",
                             boxShadow: "none",
                             border: "1px solid",
                             borderColor: "divider",
+                            overflow: "hidden",
                         }}
                     >
                         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -148,60 +202,119 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
                             </Typography>
                         </AccordionSummary>
 
-                        <AccordionDetails>
-                            <Stack spacing={1}>
-                                <Typography variant="body2">
-                                    <strong>Source:</strong>{" "}
-                                    {metadata.sourceLabel}
-                                </Typography>
-                                <Typography variant="body2">
-                                    <strong>Project:</strong>{" "}
-                                    {transcription.project || "-"}
-                                </Typography>
-                                <Typography variant="body2">
-                                    <strong>Connection:</strong>{" "}
-                                    {metadata.connectionLabel || "-"}
-                                </Typography>
-                                <Typography variant="body2">
-                                    <strong>Connection source:</strong>{" "}
-                                    {metadata.connectionSourceLabel || "-"}
-                                </Typography>
-                                <Typography variant="body2">
-                                    <strong>Speech model:</strong>{" "}
-                                    {metadata.speechModelLabel || "-"}
-                                </Typography>
-                                <Typography variant="body2">
-                                    <strong>Language:</strong>{" "}
-                                    {metadata.languageLabel || "-"}
-                                </Typography>
-                                <Typography variant="body2">
-                                    <strong>Speaker mode:</strong>{" "}
-                                    {metadata.speakerModeLabel || "-"}
-                                </Typography>
-
-                                {transcription.features &&
-                                transcription.features.length > 0 ? (
-                                    <Stack
-                                        direction="row"
-                                        spacing={1}
-                                        flexWrap="wrap"
-                                        pt={0.5}
-                                    >
-                                        {transcription.features.map(
-                                            (feature) => (
-                                                <Chip
-                                                    key={feature}
-                                                    label={feature}
-                                                    size="small"
-                                                    variant="outlined"
-                                                />
-                                            ),
+                        <AccordionDetails sx={{ pt: 0.5 }}>
+                            <Grid container spacing={1.25}>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <DetailItem
+                                        label="Project"
+                                        value={getMetadataValue(
+                                            metadata.projectLabel,
+                                            "Not selected",
                                         )}
-                                    </Stack>
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <DetailItem
+                                        label="Project source"
+                                        value={getMetadataValue(
+                                            metadata.projectSourceLabel,
+                                            "Not configured",
+                                        )}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <DetailItem
+                                        label="Speech model"
+                                        value={getMetadataValue(
+                                            metadata.speechModelLabel,
+                                            "Not available",
+                                        )}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <DetailItem
+                                        label="Language"
+                                        value={getMetadataValue(
+                                            metadata.languageLabel,
+                                            "Not available",
+                                        )}
+                                    />
+                                </Grid>
+                                {metadata.speechModelLabel ===
+                                "universal-3-pro" ? (
+                                    <Grid size={{ xs: 12, sm: 6 }}>
+                                        <DetailItem
+                                            label="Prompt"
+                                            value={getMetadataValue(
+                                                metadata.prompt,
+                                                "Not selected",
+                                            )}
+                                        />
+                                    </Grid>
                                 ) : null}
-                            </Stack>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <DetailItem
+                                        label="Speaker mode"
+                                        value={getMetadataValue(
+                                            metadata.speakerModeLabel,
+                                            "Not configured",
+                                        )}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <DetailItem
+                                        label="Known speakers"
+                                        value={
+                                            metadata.knownSpeakerValues.length >
+                                            0
+                                                ? metadata.knownSpeakerValues.join(
+                                                      ", ",
+                                                  )
+                                                : "Not configured"
+                                        }
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <DetailItem
+                                        label="Recorded at"
+                                        value={formatDateTime(
+                                            metadata.recordedAtLabel,
+                                        )}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <DetailItem
+                                        label="Transcribed at"
+                                        value={formatDateTime(
+                                            metadata.transcribedAtLabel,
+                                        )}
+                                    />
+                                </Grid>
+                            </Grid>
                         </AccordionDetails>
                     </Accordion>
+
+                    {transcription.features &&
+                    transcription.features.length > 0 ? (
+                        <>
+                            <Typography
+                                variant="subtitle2"
+                                sx={{ fontWeight: 700, mt: 2 }}
+                            >
+                                Features
+                            </Typography>
+                            <Stack direction="row" spacing={1} flexWrap="wrap">
+                                {transcription.features.map((feature) => (
+                                    <Chip
+                                        key={feature}
+                                        label={feature}
+                                        size="small"
+                                        variant="outlined"
+                                    />
+                                ))}
+                            </Stack>
+                        </>
+                    ) : null}
 
                     <AudioPlayer
                         src={audioSrc || ""}
