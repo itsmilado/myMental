@@ -47,7 +47,7 @@ const OnlineHistoryPage = () => {
         if (!q) return list;
 
         return list.filter((t) =>
-            (t.transcript_id ?? "").toLowerCase().includes(q)
+            (t.transcript_id ?? "").toLowerCase().includes(q),
         );
     }, [list, searchId]);
 
@@ -68,7 +68,7 @@ const OnlineHistoryPage = () => {
             {/* Header */}
             <Box px={2.5} py={2}>
                 <Box fontSize={24} fontWeight={600} mb={2}>
-                    AssemblyAI Transcription History
+                    AssemblyAI History
                 </Box>
 
                 <Box display="flex" alignItems="center" gap={1.5} mb={1}>
