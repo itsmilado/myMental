@@ -1,7 +1,10 @@
-// /features/transcription/components/OnlineTranscriptionSidebar.tsx
+// src/features/transcription/components/OnlineTranscriptionSidebar.tsx
 
 import * as React from "react";
 import {
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
     Drawer,
     Box,
     Typography,
@@ -11,10 +14,13 @@ import {
     Chip,
 } from "@mui/material";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+
 import { getAudioStreamUrl } from "../../auth/api";
 import { AudioPlayer } from "./AudioPlayer";
 import { OnlineTranscription } from "../../../types/types";
 import { TranscriptText } from "./TranscriptText";
+import { normalizeOnlineHistoryMetadata } from "../utils/transcriptionHistoryAdapters";
 
 type Props = {
     open: boolean;
@@ -33,6 +39,8 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
     const audioSrc = transcription.file_name
         ? getAudioStreamUrl(transcription.file_name)
         : null;
+
+    const metadata = normalizeOnlineHistoryMetadata(transcription);
 
     return (
         <Drawer
@@ -68,8 +76,7 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
 
                     <Divider />
 
-                    {/* Core metadata */}
-                    <Stack spacing={1} mb={2}>
+                    <Stack spacing={1.25} mb={2}>
                         <Typography variant="subtitle2" color="text.secondary">
                             Transcript ID
                         </Typography>
@@ -90,84 +97,111 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
                             {transcription.file_name || "-"}
                         </Typography>
 
-                        {/* Metadata chips */}
-                        <Typography variant="subtitle2" color="text.secondary">
-                            Metadata
-                        </Typography>
                         <Stack
                             direction="row"
                             spacing={1}
                             flexWrap="wrap"
-                            mb={1}
+                            mb={0.5}
                         >
-                            {isDeleted && (
+                            {isDeleted ? (
                                 <Chip
                                     size="small"
                                     label="Deleted in AssemblyAI"
                                     color="warning"
                                     variant="outlined"
                                 />
-                            )}
+                            ) : null}
+
                             <Chip
                                 size="small"
                                 label={`Status: ${transcription.status}`}
                             />
 
-                            {transcription.speech_models && (
-                                <Chip
-                                    size="small"
-                                    label={transcription.speech_models}
-                                />
-                            )}
-                            {transcription.language && (
-                                <Chip
-                                    size="small"
-                                    label={transcription.language}
-                                />
-                            )}
-                            {transcription.audio_duration && (
+                            {transcription.audio_duration ? (
                                 <Chip
                                     size="small"
                                     label={`Duration: ${transcription.audio_duration}`}
                                 />
-                            )}
+                            ) : null}
                         </Stack>
+                    </Stack>
 
-                        <Typography variant="subtitle2" color="text.secondary">
-                            Project
-                        </Typography>
-                        <Typography
-                            variant="body2"
-                            sx={{ wordBreak: "break-all" }}
-                        >
-                            {transcription.project || "-"}
-                        </Typography>
+                    <Accordion
+                        disableGutters
+                        defaultExpanded={false}
+                        sx={{
+                            mt: 2,
+                            borderRadius: 2,
+                            "&:before": { display: "none" },
+                            backgroundColor: "transparent",
+                            boxShadow: "none",
+                            border: "1px solid",
+                            borderColor: "divider",
+                        }}
+                    >
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography
+                                variant="subtitle2"
+                                sx={{ fontWeight: 700 }}
+                            >
+                                Metadata
+                            </Typography>
+                        </AccordionSummary>
 
-                        {transcription.features &&
-                            transcription.features.length > 0 && (
-                                <>
-                                    <Typography variant="subtitle2">
-                                        Features
-                                    </Typography>
+                        <AccordionDetails>
+                            <Stack spacing={1}>
+                                <Typography variant="body2">
+                                    <strong>Source:</strong>{" "}
+                                    {metadata.sourceLabel}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Project:</strong>{" "}
+                                    {transcription.project || "-"}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Connection:</strong>{" "}
+                                    {metadata.connectionLabel || "-"}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Connection source:</strong>{" "}
+                                    {metadata.connectionSourceLabel || "-"}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Speech model:</strong>{" "}
+                                    {metadata.speechModelLabel || "-"}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Language:</strong>{" "}
+                                    {metadata.languageLabel || "-"}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Speaker mode:</strong>{" "}
+                                    {metadata.speakerModeLabel || "-"}
+                                </Typography>
+
+                                {transcription.features &&
+                                transcription.features.length > 0 ? (
                                     <Stack
                                         direction="row"
                                         spacing={1}
                                         flexWrap="wrap"
-                                        mb={1}
+                                        pt={0.5}
                                     >
-                                        {transcription.features.map((f) => (
-                                            <Chip
-                                                key={f}
-                                                label={f}
-                                                size="small"
-                                            />
-                                        ))}
+                                        {transcription.features.map(
+                                            (feature) => (
+                                                <Chip
+                                                    key={feature}
+                                                    label={feature}
+                                                    size="small"
+                                                    variant="outlined"
+                                                />
+                                            ),
+                                        )}
                                     </Stack>
-                                </>
-                            )}
-                    </Stack>
-
-                    <Divider sx={{ mt: 2, mb: 2 }} />
+                                ) : null}
+                            </Stack>
+                        </AccordionDetails>
+                    </Accordion>
 
                     <AudioPlayer
                         src={audioSrc || ""}
