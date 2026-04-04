@@ -1,4 +1,9 @@
+// src/features/transcription/components/TranscriptionDetailContent.tsx
+
 import {
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
     Box,
     Divider,
     Typography,
@@ -9,11 +14,14 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+
 import { ExportButton } from "./ExportButton";
 import { DeleteButton } from "./DeleteButton";
 import { getAudioStreamUrl } from "../../auth/api";
 import { AudioPlayer } from "./AudioPlayer";
 import { TranscriptText } from "./TranscriptText";
+import { normalizeOfflineHistoryMetadata } from "../utils/transcriptionHistoryAdapters";
 
 type DeleteArgs = {
     deleteFromAssembly: boolean;
@@ -38,6 +46,8 @@ export const TranscriptionDetailContent = ({
     onOpenFullPage,
 }: Props) => {
     const { options, audio_duration } = transcription ?? {};
+
+    const metadata = normalizeOfflineHistoryMetadata(transcription);
 
     const formatDuration = (dur: any): string => {
         if (!dur) return "-";
@@ -173,59 +183,95 @@ export const TranscriptionDetailContent = ({
                     py: 2,
                 }}
             >
-                {/* Details */}
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                    Details
-                </Typography>
-
-                <Box
+                <Accordion
+                    disableGutters
+                    defaultExpanded={false}
                     sx={{
-                        display: "grid",
-                        gridTemplateColumns: {
-                            xs: "1fr",
-                            md: "1fr 1fr",
-                        },
-                        gap: 1,
                         mb: 2,
+                        borderRadius: 2,
+                        "&:before": { display: "none" },
+                        backgroundColor: "transparent",
+                        boxShadow: "none",
+                        border: "1px solid",
+                        borderColor: "divider",
                     }}
                 >
-                    <DetailRow
-                        label="Recorded at"
-                        value={formatDate(transcription.file_recorded_at)}
-                    />
-                    <DetailRow
-                        label="Speech model"
-                        value={options?.speech_model}
-                    />
-                    <DetailRow
-                        label="Speaker labels"
-                        value={options?.speaker_labels ? "True" : "-"}
-                    />
-                    <DetailRow
-                        label="Speakers expected"
-                        value={options?.speakers_expected}
-                    />
-                    <DetailRow
-                        label="Entity detection"
-                        value={options?.entity_detection ? "True" : "-"}
-                    />
-                    <DetailRow
-                        label="Sentiment analysis"
-                        value={options?.sentiment_analysis ? "True" : "-"}
-                    />
-                    <DetailRow
-                        label="Format text"
-                        value={options?.format_text ? "True" : "-"}
-                    />
-                    <DetailRow
-                        label="Punctuate"
-                        value={options?.punctuate ? "True" : "-"}
-                    />
-                </Box>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography
+                            variant="subtitle2"
+                            sx={{ fontWeight: 700 }}
+                        >
+                            Metadata
+                        </Typography>
+                    </AccordionSummary>
 
-                <Divider sx={{ my: 2 }} />
+                    <AccordionDetails>
+                        <Box
+                            sx={{
+                                display: "grid",
+                                gridTemplateColumns: {
+                                    xs: "1fr",
+                                    md: "1fr 1fr",
+                                },
+                                gap: 1,
+                            }}
+                        >
+                            <DetailRow
+                                label="Source"
+                                value={metadata.sourceLabel}
+                            />
+                            <DetailRow
+                                label="Recorded at"
+                                value={formatDate(
+                                    transcription.file_recorded_at,
+                                )}
+                            />
+                            <DetailRow
+                                label="Connection"
+                                value={metadata.connectionLabel}
+                            />
+                            <DetailRow
+                                label="Connection source"
+                                value={metadata.connectionSourceLabel}
+                            />
+                            <DetailRow
+                                label="Speech model"
+                                value={metadata.speechModelLabel}
+                            />
+                            <DetailRow
+                                label="Language"
+                                value={metadata.languageLabel}
+                            />
+                            <DetailRow
+                                label="Speaker mode"
+                                value={metadata.speakerModeLabel}
+                            />
+                            <DetailRow
+                                label="Speakers expected"
+                                value={metadata.speakersExpected}
+                            />
+                            <DetailRow
+                                label="Known speakers"
+                                value={
+                                    metadata.knownSpeakerValues.length > 0
+                                        ? metadata.knownSpeakerValues.join(", ")
+                                        : "-"
+                                }
+                            />
+                            <DetailRow label="Prompt" value={metadata.prompt} />
+                            <DetailRow
+                                label="Format text"
+                                value={options?.format_text ? "True" : "-"}
+                            />
+                            <DetailRow
+                                label="Punctuate"
+                                value={options?.punctuate ? "True" : "-"}
+                            />
+                        </Box>
+                    </AccordionDetails>
+                </Accordion>
                 {fileName ? (
-                    <Box sx={{ mt: 2, mb: 2 }}>
+                    <Box sx={{ mt: 0.5, mb: 2 }}>
                         <AudioPlayer src={audioSrc} />
                     </Box>
                 ) : null}
