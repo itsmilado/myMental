@@ -13,11 +13,11 @@ const TranscriptionHistoryPage = () => {
     const location = useLocation();
     const tabConfig = [
         {
-            label: "Offline",
+            label: "My Transcriptions",
             path: "offline",
         },
         {
-            label: "Online",
+            label: "AssemblyAI History",
             path: "online",
         },
     ];
@@ -84,8 +84,8 @@ const TranscriptionHistoryPage = () => {
                         },
                     }}
                 >
-                    <Tab label="Offline" {...a11yProps(0)} />
-                    <Tab label="Online" {...a11yProps(1)} />
+                    <Tab label="My Transcriptions" {...a11yProps(0)} />
+                    <Tab label="AssemblyAI History" {...a11yProps(1)} />
                 </Tabs>
             </Box>
             <Outlet />
