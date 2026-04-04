@@ -14,14 +14,15 @@ import type {
 
 export type NormalizedHistoryMetadata = {
     sourceLabel: string;
-    connectionLabel: string | null;
-    connectionSourceLabel: string | null;
+    projectLabel: string | null;
+    projectSourceLabel: string | null;
     speechModelLabel: string | null;
     languageLabel: string | null;
     prompt: string | null;
     speakerModeLabel: string | null;
-    speakersExpected: number | null;
     knownSpeakerValues: string[];
+    recordedAtLabel: string | null;
+    transcribedAtLabel: string | null;
 };
 
 const formatConnectionSource = (
@@ -38,17 +39,23 @@ const formatConnectionSource = (
 };
 
 /*
-- Builds a readable speech model label from mixed online/offline payload shapes
+- Normalizes backend/frontend speech model variants into one display label
+- Maps AssemblyAI online history model naming to the app-facing label
 */
 const getSpeechModelLabel = (
     speechModel?: string | null,
     speechModels?: string[] | null,
 ): string | null => {
-    if (speechModel) return speechModel;
-    if (Array.isArray(speechModels) && speechModels.length > 0) {
-        return speechModels.join(", ");
-    }
-    return null;
+    const rawModel =
+        speechModel ||
+        (Array.isArray(speechModels) && speechModels.length > 0
+            ? speechModels[0]
+            : null);
+
+    if (!rawModel) return null;
+    if (rawModel === "universal-pro-3") return "universal-3-pro";
+
+    return rawModel;
 };
 
 /*
@@ -62,8 +69,8 @@ export const normalizeOfflineHistoryMetadata = (
 
     return {
         sourceLabel: "My Transcription",
-        connectionLabel: transcription.assemblyai_connection_label ?? null,
-        connectionSourceLabel: formatConnectionSource(
+        projectLabel: transcription.assemblyai_connection_label ?? null,
+        projectSourceLabel: formatConnectionSource(
             transcription.assemblyai_connection_source,
         ),
         speechModelLabel: getSpeechModelLabel(
@@ -77,8 +84,9 @@ export const normalizeOfflineHistoryMetadata = (
             : options.speaker_labels
               ? "Speaker labels"
               : null,
-        speakersExpected: options.speakers_expected ?? null,
         knownSpeakerValues: knownValues.filter(Boolean),
+        recordedAtLabel: transcription.file_recorded_at ?? null,
+        transcribedAtLabel: transcription.created_at ?? null,
     };
 };
 
@@ -88,22 +96,25 @@ export const normalizeOfflineHistoryMetadata = (
 export const normalizeOnlineHistoryMetadata = (
     transcription: OnlineTranscription,
 ): NormalizedHistoryMetadata => {
+    const speechModelLabel = getSpeechModelLabel(
+        transcription.speech_model ?? null,
+        transcription.speech_models ?? null,
+    );
+
     return {
         sourceLabel: "AssemblyAI History",
-        connectionLabel: transcription.assemblyai_connection_label ?? null,
-        connectionSourceLabel: formatConnectionSource(
+        projectLabel: transcription.assemblyai_connection_label ?? null,
+        projectSourceLabel: formatConnectionSource(
             transcription.assemblyai_connection_source,
         ),
-        speechModelLabel: getSpeechModelLabel(
-            transcription.speech_model ?? null,
-            transcription.speech_models ?? null,
-        ),
+        speechModelLabel,
         languageLabel: transcription.language ?? null,
-        prompt: null,
+        prompt: speechModelLabel === "universal-3-pro" ? "" : null,
         speakerModeLabel: transcription.utterances?.length
             ? "Speaker labels"
             : null,
-        speakersExpected: null,
         knownSpeakerValues: [],
+        recordedAtLabel: transcription.file_recorded_at ?? null,
+        transcribedAtLabel: transcription.created_at ?? null,
     };
 };
