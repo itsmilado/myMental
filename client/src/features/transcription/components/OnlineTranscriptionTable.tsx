@@ -1,6 +1,6 @@
 // src/features/transcription/components/OnlineTranscriptionTable.tsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     Table,
     TableHead,
@@ -34,8 +34,8 @@ import { useTranscriptionStore } from "../../../store/useTranscriptionStore"; //
 import { useAssemblyTranscriptionStore } from "../../../store/useAssemblyTranscriptionStore";
 import { restoreTranscription } from "../../auth/api";
 import { deleteAssemblyTranscription } from "../../auth/api";
-import { useTheme } from "@mui/material/styles";
-import { tokens } from "../../../theme/theme";
+// import { useTheme } from "@mui/material/styles";
+// import { tokens } from "../../../theme/theme";
 
 type Props = {
     data: OnlineTranscription[];
@@ -44,8 +44,8 @@ type Props = {
 type StatusFilter = "all" | "completed" | "deleted";
 
 export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
-    const theme = useTheme();
-    const colors = tokens(theme.palette.mode);
+    // const theme = useTheme();
+    // const colors = tokens(theme.palette.mode);
     // Offline (restored) list
     const { addTranscription, list: offlineList } = useTranscriptionStore();
     // Online/assembly state
@@ -81,6 +81,11 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
 
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
+    const [copiedTranscriptId, setCopiedTranscriptId] = useState<string | null>(
+        null,
+    );
+    const copyFeedbackTimeoutRef = useRef<number | null>(null);
+
     // Pagination: 20 rows per page
     const [page, setPage] = useState(0);
 
@@ -91,7 +96,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
 
     const paginatedData = filteredData.slice(
         page * rowsPerPage,
-        page * rowsPerPage + rowsPerPage
+        page * rowsPerPage + rowsPerPage,
     );
 
     // Reset page if data length shrinks below current page
@@ -104,6 +109,32 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
     useEffect(() => {
         setPage(0);
     }, [statusFilter]);
+
+    /*
+• Copies transcript ID and shows temporary success feedback on the row icon
+*/
+    const handleCopyTranscriptId = async (
+        transcriptId: string,
+    ): Promise<void> => {
+        await navigator.clipboard.writeText(transcriptId);
+        setCopiedTranscriptId(transcriptId);
+
+        if (copyFeedbackTimeoutRef.current) {
+            window.clearTimeout(copyFeedbackTimeoutRef.current);
+        }
+
+        copyFeedbackTimeoutRef.current = window.setTimeout(() => {
+            setCopiedTranscriptId(null);
+        }, 2000);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (copyFeedbackTimeoutRef.current) {
+                window.clearTimeout(copyFeedbackTimeoutRef.current);
+            }
+        };
+    }, []);
 
     const shorten = (value: string | null | undefined, max: number) => {
         if (!value) return "-";
@@ -173,8 +204,8 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
             // Remove from onlineList
             setOnlineList(
                 onlineList.filter(
-                    (item) => item.transcript_id !== t.transcript_id
-                )
+                    (item) => item.transcript_id !== t.transcript_id,
+                ),
             );
             setSnackbar({ open: true, msg: "Deleted!", error: false });
         } catch (err: any) {
@@ -209,7 +240,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                     value={statusFilter}
                                     onChange={(e) =>
                                         setStatusFilter(
-                                            e.target.value as StatusFilter
+                                            e.target.value as StatusFilter,
                                         )
                                     }
                                     disableUnderline
@@ -293,19 +324,31 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                                 }}
                                             >
                                                 {shortenTranscriptId(
-                                                    t.transcript_id
+                                                    t.transcript_id,
                                                 )}
                                             </Box>
-                                            <Tooltip title="Copy Transcript ID">
+                                            <Tooltip
+                                                title={
+                                                    copiedTranscriptId ===
+                                                    t.transcript_id
+                                                        ? "Copied"
+                                                        : "Copy Transcript ID"
+                                                }
+                                            >
                                                 <IconButton
                                                     size="small"
                                                     onClick={() =>
-                                                        navigator.clipboard.writeText(
-                                                            t.transcript_id
+                                                        handleCopyTranscriptId(
+                                                            t.transcript_id,
                                                         )
                                                     }
                                                 >
-                                                    <ContentCopyIcon fontSize="inherit" />
+                                                    {copiedTranscriptId ===
+                                                    t.transcript_id ? (
+                                                        <CheckCircleIcon fontSize="inherit" />
+                                                    ) : (
+                                                        <ContentCopyIcon fontSize="inherit" />
+                                                    )}
                                                 </IconButton>
                                             </Tooltip>
                                         </Box>
