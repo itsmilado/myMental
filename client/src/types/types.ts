@@ -392,14 +392,15 @@ export type TranscriptionState = {
     removeTranscriptionFromList: (id: string) => void;
 };
 
-export type OnlineTranscription = {
+export type OnlineTranscription = TranscriptionConnectionMetadata & {
     transcript_id: string;
     created_at: string;
     status: string;
     project?: string;
     audio_url: string;
     audio_duration?: string;
-    speech_models: string[];
+    speech_model?: string | null;
+    speech_models?: string[];
     language: string;
     features?: string[];
     transcription: string;
