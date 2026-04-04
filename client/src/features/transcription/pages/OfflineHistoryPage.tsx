@@ -42,7 +42,7 @@ const OfflineHistoryPage = () => {
                 mb={2}
             >
                 <Box fontSize={24} fontWeight={600}>
-                    Offline Transcription History
+                    My Transcriptions
                 </Box>
             </Box>
 
