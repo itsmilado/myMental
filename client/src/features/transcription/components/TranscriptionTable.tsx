@@ -1,6 +1,6 @@
 // src/features/transcription/components/transcriptionTable.tsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     Table,
     TableBody,
@@ -18,6 +18,7 @@ import {
     TablePagination,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { TranscriptData } from "../../../types/types";
@@ -40,7 +41,7 @@ export const TranscriptionTable = ({
 }: Props) => {
     const { sort, setSort } = useTranscriptionStore();
     const removeTranscriptionFromList = useTranscriptionStore(
-        (s) => s.removeTranscriptionFromList
+        (s) => s.removeTranscriptionFromList,
     );
 
     const [snackbar, setSnackbar] = useState<{
@@ -49,6 +50,14 @@ export const TranscriptionTable = ({
         error?: boolean;
     }>({ open: false, message: "" });
 
+    const [copiedTranscriptId, setCopiedTranscriptId] = useState<string | null>(
+        null,
+    );
+    const copyFeedbackTimeoutRef = useRef<number | null>(null);
+
+    /*
+    - Updates offline history sort state for supported columns.
+    */
     const handleSort = (col: string) => {
         if (sort.orderBy === col) {
             setSort({
@@ -60,8 +69,11 @@ export const TranscriptionTable = ({
         }
     };
 
+    /*
+    - Formats audio duration consistently for offline history rows.
+    */
     const formatDuration = (dur: any): string => {
-        if (!dur) return "";
+        if (!dur) return "-";
         if (typeof dur === "string") return dur;
         const h = String(dur.hours ?? 0).padStart(2, "0");
         const m = String(dur.minutes ?? 0).padStart(2, "0");
@@ -69,6 +81,9 @@ export const TranscriptionTable = ({
         return `${h}:${m}:${s}`;
     };
 
+    /*
+    - Shortens long transcript ids to a compact chip-friendly display value.
+    */
     const shortenTranscriptId = (value: string | null | undefined): string => {
         if (!value) return "-";
         if (value.length <= 12) return value;
@@ -78,17 +93,22 @@ export const TranscriptionTable = ({
         return `${start}…${end}`;
     };
 
+    /*
+    - Removes generated transcription suffixes from displayed file names.
+    */
     const cleanFileName = (fileName: string | null | undefined) => {
         if (!fileName) return "-";
 
-        // Remove suffix like: _Transcribed(Date) before the extension
         return fileName.replace(/_Transcribed\([^)]*\)(?=\.)/, "");
     };
 
+    /*
+    - Formats table dates using the same fixed display pattern as online history.
+    */
     const formatDate = (value: string | null | undefined) => {
         if (!value) return "-";
         const d = new Date(value);
-        if (Number.isNaN(d.getTime())) return value; // fallback to raw if invalid
+        if (Number.isNaN(d.getTime())) return value;
 
         const day = String(d.getDate()).padStart(2, "0");
         const month = String(d.getMonth() + 1).padStart(2, "0");
@@ -96,22 +116,67 @@ export const TranscriptionTable = ({
         const hours = String(d.getHours()).padStart(2, "0");
         const minutes = String(d.getMinutes()).padStart(2, "0");
 
-        // dd.MM.yyyy HH:mm
         return `${day}.${month}.${year}_${hours}:${minutes}`;
+    };
+
+    /*
+    - Normalizes Project labels for the offline Project column.
+    */
+    const getProjectLabel = (t: TranscriptData): string => {
+        const trimmedLabel = String(t.assemblyai_connection_label || "").trim();
+
+        if (trimmedLabel) {
+            return trimmedLabel;
+        }
+
+        if (t.assemblyai_connection_source === "default_connection") {
+            return "Default key";
+        }
+
+        if (t.assemblyai_connection_source === "app_fallback") {
+            return "App fallback";
+        }
+
+        return "-";
+    };
+
+    /*
+    - Copies transcript ids and shows temporary row-level visual feedback.
+    */
+    const handleCopyTranscriptId = async (
+        transcriptId: string,
+    ): Promise<void> => {
+        await navigator.clipboard.writeText(transcriptId);
+        setCopiedTranscriptId(transcriptId);
+
+        if (copyFeedbackTimeoutRef.current) {
+            window.clearTimeout(copyFeedbackTimeoutRef.current);
+        }
+
+        copyFeedbackTimeoutRef.current = window.setTimeout(() => {
+            setCopiedTranscriptId(null);
+        }, 2000);
     };
 
     const rowsPerPage = 15;
     const [page, setPage] = useState(0);
 
     useEffect(() => {
-        // If data shrinks (delete), avoid landing on an empty page
         const maxPage = Math.max(0, Math.ceil(data.length / rowsPerPage) - 1);
         if (page > maxPage) setPage(maxPage);
     }, [data.length, page]);
 
+    useEffect(() => {
+        return () => {
+            if (copyFeedbackTimeoutRef.current) {
+                window.clearTimeout(copyFeedbackTimeoutRef.current);
+            }
+        };
+    }, []);
+
     const paginatedData = data.slice(
         page * rowsPerPage,
-        page * rowsPerPage + rowsPerPage
+        page * rowsPerPage + rowsPerPage,
     );
 
     if (loading)
@@ -133,7 +198,7 @@ export const TranscriptionTable = ({
             <Table size="small">
                 <TableHead>
                     <TableRow>
-                        <TableCell>
+                        <TableCell sx={{ width: 90 }}>
                             <TableSortLabel
                                 active={sort.orderBy === "id"}
                                 direction={
@@ -146,7 +211,7 @@ export const TranscriptionTable = ({
                                 ID
                             </TableSortLabel>
                         </TableCell>
-                        <TableCell align="center">
+                        <TableCell align="center" sx={{ minWidth: 160 }}>
                             <TableSortLabel
                                 active={sort.orderBy === "file_recorded_at"}
                                 direction={
@@ -159,12 +224,17 @@ export const TranscriptionTable = ({
                                 Date
                             </TableSortLabel>
                         </TableCell>
-                        <TableCell>File Name</TableCell>
-                        <TableCell align="center">Audio Length</TableCell>
-                        <TableCell align="center">
+                        <TableCell sx={{ minWidth: 260 }}>File Name</TableCell>
+                        <TableCell sx={{ minWidth: 160 }}>Project</TableCell>
+                        <TableCell align="center" sx={{ width: 130 }}>
+                            Audio Length
+                        </TableCell>
+                        <TableCell align="center" sx={{ minWidth: 240 }}>
                             API ID (AssemblyAI)
                         </TableCell>
-                        <TableCell align="center">Actions</TableCell>
+                        <TableCell align="center" sx={{ width: 130 }}>
+                            Actions
+                        </TableCell>
                     </TableRow>
                 </TableHead>
 
@@ -184,7 +254,28 @@ export const TranscriptionTable = ({
                             <TableCell align="center">
                                 {formatDate(t.created_at)}
                             </TableCell>
-                            <TableCell>{cleanFileName(t.file_name)}</TableCell>
+                            <TableCell sx={{ maxWidth: 0 }}>
+                                <Box
+                                    sx={{
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                    }}
+                                >
+                                    {cleanFileName(t.file_name)}
+                                </Box>
+                            </TableCell>
+                            <TableCell>
+                                <Box
+                                    sx={{
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                    }}
+                                >
+                                    {getProjectLabel(t)}
+                                </Box>
+                            </TableCell>
                             <TableCell align="center">
                                 {formatDuration(t.audio_duration)}
                             </TableCell>
@@ -224,19 +315,31 @@ export const TranscriptionTable = ({
                                                 }}
                                             >
                                                 {shortenTranscriptId(
-                                                    t.transcript_id
+                                                    t.transcript_id,
                                                 )}
                                             </Box>
-                                            <Tooltip title="Copy Transcript ID">
+                                            <Tooltip
+                                                title={
+                                                    copiedTranscriptId ===
+                                                    t.transcript_id
+                                                        ? "Copied"
+                                                        : "Copy Transcript ID"
+                                                }
+                                            >
                                                 <IconButton
                                                     size="small"
                                                     onClick={() =>
-                                                        navigator.clipboard.writeText(
-                                                            t.transcript_id
+                                                        handleCopyTranscriptId(
+                                                            t.transcript_id,
                                                         )
                                                     }
                                                 >
-                                                    <ContentCopyIcon fontSize="inherit" />
+                                                    {copiedTranscriptId ===
+                                                    t.transcript_id ? (
+                                                        <CheckCircleIcon fontSize="inherit" />
+                                                    ) : (
+                                                        <ContentCopyIcon fontSize="inherit" />
+                                                    )}
                                                 </IconButton>
                                             </Tooltip>
                                         </Box>
@@ -269,7 +372,7 @@ export const TranscriptionTable = ({
                                                             deleteServerFiles,
                                                         deleteAudioFile:
                                                             deleteServerFiles,
-                                                    }
+                                                    },
                                                 );
                                             removeTranscriptionFromList(t.id);
                                             setSnackbar({
