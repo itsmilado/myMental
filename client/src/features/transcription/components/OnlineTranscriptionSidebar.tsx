@@ -240,18 +240,7 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
                                         )}
                                     />
                                 </Grid>
-                                {metadata.speechModelLabel ===
-                                "universal-3-pro" ? (
-                                    <Grid size={{ xs: 12, sm: 6 }}>
-                                        <DetailItem
-                                            label="Prompt"
-                                            value={getMetadataValue(
-                                                metadata.prompt,
-                                                "Not selected",
-                                            )}
-                                        />
-                                    </Grid>
-                                ) : null}
+
                                 <Grid size={{ xs: 12, sm: 6 }}>
                                     <DetailItem
                                         label="Speaker mode"
@@ -290,6 +279,18 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
                                         )}
                                     />
                                 </Grid>
+                                {metadata.speechModelLabel ===
+                                "universal-3-pro" ? (
+                                    <Grid size={{ xs: 12, sm: 12 }}>
+                                        <DetailItem
+                                            label="Prompt"
+                                            value={getMetadataValue(
+                                                metadata.prompt,
+                                                "Not selected",
+                                            )}
+                                        />
+                                    </Grid>
+                                ) : null}
                             </Grid>
                         </AccordionDetails>
                     </Accordion>
