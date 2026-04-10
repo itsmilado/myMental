@@ -127,21 +127,35 @@ const TranscriptionDetailPage = () => {
 
     return (
         <Box sx={{ py: 2 }}>
-            <TranscriptionDetailContent
-                // mode="page"
-                transcription={transcription}
-                showActions={true}
-                onBack={() => {
-                    setActive(null);
-                    navigate("/dashboard/transcriptions/history/offline");
+            <Box
+                sx={{
+                    height: {
+                        xs: "calc(100dvh - 140px)",
+                        md: "calc(100dvh - 180px)",
+                    },
+                    minHeight: 520,
+                    borderRadius: 3,
+                    overflow: "hidden",
+                    border: "1px solid",
+                    borderColor: "divider",
+                    bgcolor: "background.paper",
                 }}
-                onClose={() => {
-                    setActive(null);
-                    navigate("/dashboard/transcriptions/history/offline");
-                }}
-                onOpenFullPage={undefined}
-                onDelete={handleDelete}
-            />
+            >
+                <TranscriptionDetailContent
+                    transcription={transcription}
+                    showActions={true}
+                    onBack={() => {
+                        setActive(null);
+                        navigate("/dashboard/transcriptions/history/offline");
+                    }}
+                    onClose={() => {
+                        setActive(null);
+                        navigate("/dashboard/transcriptions/history/offline");
+                    }}
+                    onOpenFullPage={undefined}
+                    onDelete={handleDelete}
+                />
+            </Box>
 
             <Snackbar
                 open={snackbar.open}

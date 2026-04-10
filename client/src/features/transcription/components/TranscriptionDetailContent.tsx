@@ -90,11 +90,12 @@ export const TranscriptionDetailContent = ({
                     position: "sticky",
                     top: 0,
                     zIndex: 2,
-                    bgcolor: "transparent",
+                    bgcolor: "background.paper",
                     borderBottom: "1px solid",
                     borderColor: "divider",
                     px: 2.5,
                     py: 2,
+                    boxShadow: 1,
                 }}
             >
                 <Box
