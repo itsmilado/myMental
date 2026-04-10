@@ -221,18 +221,12 @@ export const TranscriptionDetailContent = ({
                                 value={metadata.sourceLabel}
                             />
                             <DetailRow
-                                label="Recorded at"
-                                value={formatDate(
-                                    transcription.file_recorded_at,
-                                )}
+                                label="Project"
+                                value={metadata.projectLabel}
                             />
                             <DetailRow
-                                label="Connection"
-                                value={metadata.connectionLabel}
-                            />
-                            <DetailRow
-                                label="Connection source"
-                                value={metadata.connectionSourceLabel}
+                                label="Project source"
+                                value={metadata.projectSourceLabel}
                             />
                             <DetailRow
                                 label="Speech model"
@@ -247,18 +241,27 @@ export const TranscriptionDetailContent = ({
                                 value={metadata.speakerModeLabel}
                             />
                             <DetailRow
-                                label="Speakers expected"
-                                value={metadata.speakersExpected}
-                            />
-                            <DetailRow
                                 label="Known speakers"
                                 value={
                                     metadata.knownSpeakerValues.length > 0
                                         ? metadata.knownSpeakerValues.join(", ")
-                                        : "-"
+                                        : "Not configured"
                                 }
                             />
-                            <DetailRow label="Prompt" value={metadata.prompt} />
+                            <DetailRow
+                                label="Recorded at"
+                                value={formatDate(metadata.recordedAtLabel)}
+                            />
+                            <DetailRow
+                                label="Transcribed at"
+                                value={formatDate(metadata.transcribedAtLabel)}
+                            />
+                            {metadata.speechModelLabel === "universal-3-pro" ? (
+                                <DetailRow
+                                    label="Prompt"
+                                    value={metadata.prompt || "Not selected"}
+                                />
+                            ) : null}
                             <DetailRow
                                 label="Format text"
                                 value={options?.format_text ? "True" : "-"}
