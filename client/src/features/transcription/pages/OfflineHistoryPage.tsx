@@ -1,20 +1,22 @@
 // src/features/transcription/pages/OfflineHistoryPage.tsx
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Paper, CircularProgress, Alert, Typography } from "@mui/material";
 
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { useTranscriptionList } from "../hooks/useTranscriptionList";
 import { TranscriptionTable } from "../components/TranscriptionTable";
-import FilterControls from "../components/FilterControls";
+import { OfflineFilterControls } from "../components/FilterControls";
 import { OfflineTranscriptionModal } from "../components/OfflineTranscriptionModal";
+import type { TranscriptData } from "../../../types/types";
 
 const OfflineHistoryPage = () => {
     const { list, loading, error, setActive, filters, sort } =
         useTranscriptionStore();
     const { loadTranscriptions } = useTranscriptionList();
 
-    const [selected, setSelected] = useState<any | null>(null);
+    const [selected, setSelected] = useState<TranscriptData | null>(null);
+    const [appliedProject, setAppliedProject] = useState("all");
 
     // Trigger initial data load when the page mounts
     useEffect(() => {
@@ -33,6 +35,74 @@ const OfflineHistoryPage = () => {
         loadTranscriptions();
     }, [filters, sort, loadTranscriptions]);
 
+    /*
+- Normalizes a local transcript row into the Project label used by filters and the table.
+- Inputs: one offline transcription row.
+- Outputs: one display-safe Project label.
+- Important behavior: preserves default/app fallback labels when no custom label was stored.
+*/
+    const getProjectLabel = (item: TranscriptData): string | null => {
+        const trimmedLabel = String(
+            item.assemblyai_connection_label || "",
+        ).trim();
+
+        if (trimmedLabel) {
+            return trimmedLabel;
+        }
+
+        if (item.assemblyai_connection_source === "default_connection") {
+            return "Default key";
+        }
+
+        if (item.assemblyai_connection_source === "app_fallback") {
+            return "App fallback";
+        }
+
+        return null;
+    };
+
+    /*
+- Builds the offline Project filter options from currently loaded rows.
+- Inputs: current offline history list.
+- Outputs: deduplicated Project labels for the offline filter popover.
+- Important behavior: stays client-side to avoid backend/API scope changes in Issue #118.
+*/
+    const projectOptions = useMemo(() => {
+        return Array.from(
+            new Set(
+                list
+                    .map((item) => getProjectLabel(item))
+                    .filter((value): value is string => Boolean(value)),
+            ),
+        );
+    }, [list]);
+
+    const filteredList = useMemo(() => {
+        if (appliedProject === "all") {
+            return list;
+        }
+
+        return list.filter((item) => getProjectLabel(item) === appliedProject);
+    }, [list, appliedProject]);
+
+    /*
+- Closes the offline detail modal if the selected row is filtered out locally.
+- Inputs: selected transcript and filtered list.
+- Outputs: none.
+- Important behavior: keeps modal state aligned with current offline filters.
+*/
+    useEffect(() => {
+        if (!selected) return;
+
+        const stillVisible = filteredList.some(
+            (item) => item.id === selected.id,
+        );
+
+        if (!stillVisible) {
+            setSelected(null);
+        }
+    }, [filteredList, selected]);
+
     return (
         <Paper sx={{ p: 3, borderRadius: 3, position: "relative" }}>
             <Box
@@ -46,7 +116,11 @@ const OfflineHistoryPage = () => {
                 </Box>
             </Box>
 
-            <FilterControls />
+            <OfflineFilterControls
+                project={appliedProject}
+                projects={projectOptions}
+                onProjectApply={setAppliedProject}
+            />
 
             {loading ? (
                 <Box display="flex" justifyContent="center" py={5}>
@@ -54,16 +128,22 @@ const OfflineHistoryPage = () => {
                 </Box>
             ) : error ? (
                 <Alert severity="error">{error}</Alert>
-            ) : list.length === 0 ? (
+            ) : filteredList.length === 0 ? (
                 <Typography
                     color="text.secondary"
                     sx={{ py: 6, textAlign: "center" }}
                 >
-                    No offline transcriptions found.
+                    {filters.file_name ||
+                    filters.transcript_id ||
+                    filters.date_from ||
+                    filters.date_to ||
+                    appliedProject !== "all"
+                        ? "No transcriptions match the current filters."
+                        : "No offline transcriptions found."}
                 </Typography>
             ) : (
                 <TranscriptionTable
-                    data={list}
+                    data={filteredList}
                     loading={loading}
                     error={error}
                     onRowClick={(t) => {
