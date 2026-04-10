@@ -178,16 +178,20 @@ export const TranscriptionDetailContent = ({
             <Box
                 sx={{
                     flex: 1,
-                    overflow: "auto",
+                    minHeight: 0,
+                    display: "flex",
+                    flexDirection: "column",
                     px: 2.5,
                     py: 2,
+                    gap: 2,
+                    overflowY: "auto",
+                    overflowX: "hidden",
                 }}
             >
                 <Accordion
                     disableGutters
                     defaultExpanded={false}
                     sx={{
-                        mb: 2,
                         borderRadius: 2,
                         "&:before": { display: "none" },
                         backgroundColor: "transparent",
@@ -274,38 +278,50 @@ export const TranscriptionDetailContent = ({
                     </AccordionDetails>
                 </Accordion>
                 {fileName ? (
-                    <Box sx={{ mt: 0.5, mb: 2 }}>
+                    <Box>
                         <AudioPlayer src={audioSrc} />
                     </Box>
                 ) : null}
 
-                <Divider sx={{ my: 2 }} />
+                <Divider />
 
                 {/* Transcript */}
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                    Transcription
-                </Typography>
-
-                <Paper
-                    variant="outlined"
+                <Box
                     sx={{
-                        mt: 1.5,
-                        px: 2,
-                        py: 1.5,
-                        borderRadius: 2,
-                        bgcolor: "action.hover",
-                        whiteSpace: "pre-wrap",
-                        lineHeight: 1.7,
-                        maxHeight: { xs: "none", md: 500 },
-                        overflow: "auto",
+                        display: "flex",
+                        flexDirection: "column",
+                        minHeight: { xs: 320, md: 360 },
+                        flex: 1,
                     }}
                 >
-                    <TranscriptText
-                        text={transcription.transcription}
-                        utterances={transcription.utterances}
-                        maxHeight={420}
-                    />
-                </Paper>
+                    <Typography
+                        variant="subtitle2"
+                        sx={{ fontWeight: 700, mb: 1, flexShrink: 0 }}
+                    >
+                        Transcription
+                    </Typography>
+
+                    <Paper
+                        variant="outlined"
+                        sx={{
+                            px: 2,
+                            py: 1.5,
+                            borderRadius: 2,
+                            bgcolor: "action.hover",
+                            display: "flex",
+                            flexDirection: "column",
+                            flex: 1,
+                            minHeight: 0,
+                            overflow: "hidden",
+                        }}
+                    >
+                        <TranscriptText
+                            text={transcription.transcription}
+                            utterances={transcription.utterances}
+                            disableInternalScroll
+                        />
+                    </Paper>
+                </Box>
             </Box>
         </Box>
     );

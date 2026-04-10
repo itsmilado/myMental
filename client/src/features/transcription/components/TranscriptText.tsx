@@ -27,6 +27,7 @@ type Props = {
     defaultShowSpeakers?: boolean;
     defaultShowTimestamps?: boolean;
     maxHeight?: number | string;
+    disableInternalScroll?: boolean;
 };
 
 const formatMs = (ms: number): string => {
@@ -137,6 +138,7 @@ export const TranscriptText: React.FC<Props> = ({
     defaultShowSpeakers = true,
     defaultShowTimestamps = false,
     maxHeight = 420,
+    disableInternalScroll = false,
 }) => {
     const [showSpeakers, setShowSpeakers] =
         React.useState<boolean>(defaultShowSpeakers);
@@ -170,11 +172,20 @@ export const TranscriptText: React.FC<Props> = ({
         <Box
             sx={{
                 pr: 1,
-                overflow: "hidden",
                 minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                flex: 1,
+                overflow: "hidden",
             }}
         >
-            <Stack direction="row" spacing={2} mb={1} flexWrap="wrap">
+            <Stack
+                direction="row"
+                spacing={2}
+                mb={1}
+                flexWrap="wrap"
+                sx={{ flexShrink: 0 }}
+            >
                 <FormControlLabel
                     control={
                         <Switch
@@ -200,7 +211,24 @@ export const TranscriptText: React.FC<Props> = ({
                 />
             </Stack>
 
-            <Box sx={{ maxHeight, overflowY: "auto", overflowX: "hidden" }}>
+            <Box
+                sx={
+                    disableInternalScroll
+                        ? {
+                              flex: 1,
+                              minHeight: 0,
+                              overflowY: "auto",
+                              overflowX: "hidden",
+                          }
+                        : {
+                              flex: 1,
+                              minHeight: 0,
+                              maxHeight,
+                              overflowY: "auto",
+                              overflowX: "hidden",
+                          }
+                }
+            >
                 <Stack spacing={1.25}>
                     {blocks.map((b, idx) => (
                         <Paper
