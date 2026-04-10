@@ -400,8 +400,9 @@ export type OnlineTranscription = TranscriptionConnectionMetadata & {
     audio_url: string;
     audio_duration?: string;
     speech_model?: string | null;
-    speech_models?: string[];
-    language: string;
+    speech_models?: string[] | null;
+    prompt?: string | null;
+    language: string | null;
     features?: string[];
     transcription: string;
     file_name?: string | null;
