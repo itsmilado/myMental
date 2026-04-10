@@ -9,7 +9,11 @@ import { useAssemblyTranscriptionStore } from "../../../store/useAssemblyTranscr
 import { OnlineFilterControls } from "../components/FilterControls";
 import { OnlineTranscriptionTable } from "../components/OnlineTranscriptionTable";
 import { OnlineTranscriptionSidebar } from "../components/OnlineTranscriptionSidebar";
-import { OnlineTranscription } from "../../../types/types";
+import { fetchMyAssemblyConnections } from "../../auth/api";
+import {
+    OnlineTranscription,
+    AssemblyAiConnection,
+} from "../../../types/types";
 
 const OnlineHistoryPage = () => {
     const { loadAssemblyTranscriptions } = useAssemblyTranscriptionList();
@@ -21,6 +25,9 @@ const OnlineHistoryPage = () => {
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const [appliedProject, setAppliedProject] = useState("all");
+    const [connectionOptions, setConnectionOptions] = useState<
+        AssemblyAiConnection[]
+    >([]);
 
     useEffect(() => {
         loadAssemblyTranscriptions();
@@ -28,32 +35,73 @@ const OnlineHistoryPage = () => {
     }, []);
 
     /*
-- Build Project options from loaded AssemblyAI history rows
-- Keeps filter values aligned with actually available history data
+- Loads saved AssemblyAI connections so the Project filter reflects all user API keys.
+- Inputs: none.
+- Outputs: stored connection options for the Project filter.
+- Important behavior: history loading remains independent if connection loading fails.
 */
-    const projectOptions = useMemo(() => {
-        const labels = Array.from(
-            new Set(
-                list
-                    .map(
-                        (item) =>
-                            item.assemblyai_connection_label?.trim() || "",
-                    )
-                    .filter(Boolean),
-            ),
-        );
+    useEffect(() => {
+        const loadConnections = async (): Promise<void> => {
+            try {
+                const connections = await fetchMyAssemblyConnections();
+                setConnectionOptions(connections);
+            } catch {
+                setConnectionOptions([]);
+            }
+        };
 
-        const hasDefaultKey = list.some(
-            (item) =>
-                item.assemblyai_connection_source === "default_connection" &&
-                !item.assemblyai_connection_label,
-        );
-
-        return hasDefaultKey ? [...labels, "Default key"] : labels;
-    }, [list]);
+        void loadConnections();
+    }, []);
 
     /*
-- Normalize a row date for inclusive date-range filtering
+- Normalizes a history row into the Project label used by filters and metadata.
+- Inputs: one online transcription row.
+- Outputs: one display-safe Project label.
+- Important behavior: preserves fallback labels for default and app-owned access.
+*/
+    const getProjectLabel = (item: OnlineTranscription): string | null => {
+        const trimmedLabel = String(
+            item.assemblyai_connection_label || "",
+        ).trim();
+
+        if (trimmedLabel) {
+            return trimmedLabel;
+        }
+
+        if (item.assemblyai_connection_source === "default_connection") {
+            return "Default key";
+        }
+
+        if (item.assemblyai_connection_source === "app_fallback") {
+            return "App fallback";
+        }
+
+        return null;
+    };
+
+    /*
+- Builds Project options from saved user connections first, then merges history-only labels.
+- Inputs: saved connection rows and current history rows.
+- Outputs: stable Project filter options covering all API keys.
+- Important behavior: preserves legacy/default/app fallback labels when they appear in history.
+*/
+    const projectOptions = useMemo(() => {
+        const savedLabels = connectionOptions
+            .map((connection) => String(connection.label || "").trim())
+            .filter(Boolean);
+
+        const historyLabels = list
+            .map((item) => getProjectLabel(item))
+            .filter((value): value is string => Boolean(value));
+
+        return Array.from(new Set([...savedLabels, ...historyLabels]));
+    }, [connectionOptions, list]);
+
+    /*
+- Normalize a row date for inclusive date-range filtering.
+- Inputs: raw created_at value.
+- Outputs: YYYY-MM-DD string or null.
+- Important behavior: ignores invalid dates safely.
 */
     const getCreatedDateOnly = (value: string): string | null => {
         if (!value) return null;
@@ -72,13 +120,7 @@ const OnlineHistoryPage = () => {
                 ? (t.transcript_id ?? "").toLowerCase().includes(q)
                 : true;
 
-            const projectLabel = t.assemblyai_connection_label?.trim() || "";
-            const normalizedProject =
-                !projectLabel &&
-                t.assemblyai_connection_source === "default_connection"
-                    ? "Default key"
-                    : projectLabel;
-
+            const normalizedProject = getProjectLabel(t);
             const matchesProject =
                 appliedProject === "all"
                     ? true
@@ -104,6 +146,24 @@ const OnlineHistoryPage = () => {
             );
         });
     }, [list, searchId, appliedProject, dateFrom, dateTo]);
+
+    /*
+- Closes the sidebar if the selected row is filtered out of the visible list.
+- Inputs: selected row and filtered list.
+- Outputs: none.
+- Important behavior: prevents stale detail state after Project/date/search changes.
+*/
+    useEffect(() => {
+        if (!selected) return;
+
+        const stillVisible = filteredList.some(
+            (item) => item.transcript_id === selected.transcript_id,
+        );
+
+        if (!stillVisible) {
+            setSelected(null);
+        }
+    }, [filteredList, selected]);
 
     return (
         <Paper sx={{ p: 3, borderRadius: 3, position: "relative" }}>
