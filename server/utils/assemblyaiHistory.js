@@ -32,6 +32,47 @@ const formatDurationMMSS = (seconds) => {
     return `${m}:${String(s).padStart(2, "0")}`;
 };
 
+/*
+- Resolves one speech model label from an AssemblyAI transcript object.
+- Inputs: parsed transcript object from backup raw data.
+- Outputs: first speech model string or legacy fallback value.
+- Important behavior: prefers array-based speech_models to match current app storage.
+*/
+const getSpeechModelFromTranscript = (transcriptObject) => {
+    if (!transcriptObject || typeof transcriptObject !== "object") {
+        return null;
+    }
+
+    if (
+        Array.isArray(transcriptObject.speech_models) &&
+        transcriptObject.speech_models.length > 0
+    ) {
+        const firstModel = String(
+            transcriptObject.speech_models[0] || "",
+        ).trim();
+
+        return firstModel || null;
+    }
+
+    const legacyModel = String(transcriptObject.speech_model || "").trim();
+    return legacyModel || null;
+};
+
+/*
+- Resolves a normalized prompt value from an AssemblyAI transcript object.
+- Inputs: parsed transcript object from backup raw data.
+- Outputs: trimmed prompt string or null.
+- Important behavior: keeps prompt available for universal-3-pro metadata rendering.
+*/
+const getPromptFromTranscript = (transcriptObject) => {
+    if (!transcriptObject || typeof transcriptObject !== "object") {
+        return null;
+    }
+
+    const prompt = String(transcriptObject.prompt || "").trim();
+    return prompt || null;
+};
+
 // Normalize utterances so the frontend can render speaker blocks + timestamps reliably
 const extractUtterances = (transcriptObject) => {
     const utterances = transcriptObject?.utterances;
@@ -99,10 +140,16 @@ const fetchAssemblyTranscriptIdsWithKey = async (apiKey) => {
         .filter(Boolean);
 };
 
+/*
+- Builds the online history payload from AssemblyAI ids plus local backup rows.
+- Inputs: AssemblyAI history ids/statuses and matched local backups.
+- Outputs: sidebar-ready online history rows for the frontend.
+- Important behavior: backup raw_api_data is the metadata source of truth for
+  speech model, prompt, utterances, and local file metadata.
+*/
 const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
     const backupMap = new Map(backups.map((b) => [b.transcript_id, b]));
 
-    // Exclude anything not present in backups (prevents incomplete rows + enforces local availability)
     return historyIds
         .map((h) => {
             const backupRow = backupMap.get(h.transcript_id);
@@ -136,8 +183,17 @@ const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
                     audio_duration: formatDurationMMSS(
                         transcriptObject?.audio_duration,
                     ),
-                    speech_model: null,
-                    language: null,
+                    speech_model:
+                        getSpeechModelFromTranscript(transcriptObject),
+                    speech_models:
+                        Array.isArray(transcriptObject?.speech_models) &&
+                        transcriptObject.speech_models.length > 0
+                            ? transcriptObject.speech_models
+                            : getSpeechModelFromTranscript(transcriptObject)
+                              ? [getSpeechModelFromTranscript(transcriptObject)]
+                              : null,
+                    prompt: getPromptFromTranscript(transcriptObject),
+                    language: transcriptObject?.language_code ?? null,
                     transcription: "",
                     utterances: null,
                 };
@@ -163,7 +219,15 @@ const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
                     transcriptObject?.audio_duration,
                 ),
 
-                speech_model: transcriptObject?.speech_model ?? null,
+                speech_model: getSpeechModelFromTranscript(transcriptObject),
+                speech_models:
+                    Array.isArray(transcriptObject?.speech_models) &&
+                    transcriptObject.speech_models.length > 0
+                        ? transcriptObject.speech_models
+                        : getSpeechModelFromTranscript(transcriptObject)
+                          ? [getSpeechModelFromTranscript(transcriptObject)]
+                          : null,
+                prompt: getPromptFromTranscript(transcriptObject),
                 language: transcriptObject?.language_code ?? null,
 
                 transcription: transcriptionText,
@@ -183,10 +247,10 @@ const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
 };
 
 /**
- * Fetch AssemblyAI history for the logged in user:
- * - 1x AssemblyAI list (ids)
- * - 1x DB lookup (scoped)
- * - returns hydrated objects (from raw_api_data)
+ - Fetch AssemblyAI history for the logged in user:
+ - 1x AssemblyAI list (ids)
+ - 1x DB lookup (scoped)
+ - returns hydrated objects (from raw_api_data)
  */
 const fetchAssemblyHistory = async ({ user }) => {
     if (!user?.id) {
