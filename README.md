@@ -1,141 +1,331 @@
-# 🧠 MyMental
+# MyMental
 
-**MyMental** is a privacy-first productivity and mental wellness app.<br>
-It helps to keep track of mental health notes, important documents, tasks, and appointments, all in one place. Some features use AI, but you’re always in control of your data.<br>
-This is my personal project to learn, experiment, and show what I can build with a modern full-stack setup (Node.js, React, PostgreSQL, and more). Everything here is open source and a work in progress.<br><br>
-### Currently, I’m working on:<br>
-feat/transcribe branch - feel free to peek or open an issue.
+A privacy-first productivity and transcription platform with AI-powered insights.
 
----
+## Table of Contents
 
-## 🚀 Tech Stack
+- [TL;DR](#tldr)
+- [Getting Started](#getting-started)
+- [Why This Project Matters](#why-this-project-matters)
+- [Engineering Highlights](#engineering-highlights)
+- [Features](#features)
+- [Architecture Overview](#architecture-overview)
+- [Tech Stack](#tech-stack)
+- [System Design](#system-design)
+- [Project Status \& Roadmap](#project-status--roadmap)
+- [Project Structure](#project-structure)
+- [Database Overview](#database-overview)
+- [Development Approach](#development-approach)
+- [Motivation](#motivation)
+- [Current Focus](#current-focus)
+- [Notes](#notes)
 
-### 🖥️ Frontend
+## TL;DR
 
--   React (with TypeScript)
--   Tailwind CSS for layout
--   Material UI (MUI) for complex components
--   Zustand or Context API _(planned)_ for state management
+- Full-stack app built with **React, Node.js, and PostgreSQL**
+- Real-time transcription pipeline using **AssemblyAI + SSE**
+- Secure **session-based authentication with CSRF protection**
+- Consistent API key handling across all transcription flows
+- Currently in **Phase 2 (AI integration)**
 
-### ⚙️ Backend
+Built as a portfolio project focused on learning how real-world systems are designed and behave.
 
--   Node.js + Express
--   PostgreSQL (with `pg`)
--   Session-based authentication with `express-session`
--   Winston for structured logging
--   AssemblyAI for audio transcription
--   Modular middleware and route structure
+## Getting Started
 
-### 🧠 AI & Data Intelligence
+### 1. Clone the repository
 
--   Google Gemini 1.5 for assistant reasoning and Q&A
--   Local LLMs via Ollama _(planned for privacy-sensitive preprocessing)_
--   `pgvector` for document semantic search _(planned)_
+```bash
+git clone https://github.com/itsmilado/myMental.git
+cd myMental
+```
 
----
+### 2. Set up PostgreSQL
 
-## 📁 Project Structure
+Create a PostgreSQL database for the project.
 
-<pre lang="md">
-myMental/
-├── client/ # React frontend
-│ ├── src/
-│ │ ├── components/
-│ │ │ ├──global/
-│ │ │ ├──profile/
-│ │ ├── App.css
-│ │ ├── App.tsx
-│ │ ├── index.css  
-│ │ ├── index.tsx
-│ │ ├── theme.ts
-│ │ └── types.tsx
-│ ├── .env
-│ └── tailwind.config.js
-├── server/ # Node/Express backend
-│ ├── db/
-│ ├── logs/
-│ ├── middlewares/
-│ ├── models/
-│ ├── routes/
-│ ├── tests/
-│ ├── transcriptions/
-│ ├── uploads/
-│ ├── utils/
-│ └── server.js
-└── README.md
-</pre>
----
+Example:
 
-## 🌿 Git Workflow
+```bash
+createdb mymental
+```
 
-### 🔧 Branching Strategy
+Or create it from `psql`:
 
--   `main` - production-ready code
--   `dev` - integration of tested features
--   `feature/*` - specific features (e.g., `feature/auth-ui`)
--   `bugfix/*` - specific fixes
--   `hotfix/*` - urgent fixes to production
+```sql
+CREATE DATABASE mymental;
+```
 
-### 🧾 Commit Format (Conventional Commits)
+### 3. Initialize the database schema
 
--   `feat:` - new features
--   `fix:` - bug fixes
--   `refactor:` - internal code refactors
--   `docs:` - documentation updates
--   `style:` - formatting only
--   `test:` - test-related updates
+From the project root or the `server` folder, run the schema file located at:
 
----
+- `server/db/setup.sql`
 
-## 🛣️ Roadmap
+Example:
 
-### ✅ Phase 1 - MVP
+```bash
+psql -d mymental -f server/db/setup.sql
+```
 
--   Audio transcription upload (AssemblyAI)
--   Session-based login/register
--   Sidebar navigation layout
--   Transcription viewer with download/search
--   Profile management
+This will create the core tables used by the app:
 
-### 🧠 Phase 2 - AI Integration
+- `users`
+- `user_api_keys`
+- `transcriptions`
+- `transcription_backups` :contentReference[oaicite:3]{index=3}
 
--   Legal document viewer + OCR & translation
--   Task + calendar manager (CRUD + reminders)
--   AI assistant (Gemini 1.5)
--   Summary generation for transcripts
--   Persona-based assistant (coach, legal advisor)
+### 4. Install backend dependencies
 
-### 🌐 Phase 3 - Polish & Performance
+```bash
+cd server
+npm install
+```
 
--   RAG search (`pgvector` + Ollama fallback)
--   Multilingual UI (i18next)
--   Accessibility & responsiveness
--   Production deployment & GitHub Actions
+### 5. Configure environment variables
 
----
+Create your environment files before starting the app.
 
-## 📦 Getting Started
+Create a `.env` file in both `server/` and `client/` based on:
+
+- `server/.env.example`
+- `client/.env.example`
+
+Fill in the required values before running the app.
+
+### 6. Start the backend
+
+```bash
+npm run dev
+```
+
+### 7. Install frontend dependencies
+
+Open a new terminal:
+
+```bash
+cd client
+npm install
+```
+
+### 8. Start the frontend
+
+```bash
+npm start
+```
+
+### 9. Open the app
+
+Once both servers are running, open the frontend in your browser using the local address provided by the React app.
+
+## Why This Project Matters
+
+Most transcription apps focus on converting audio to text.
+
+In this project, my focus is on understanding how such a system behaves under real conditions while building it from scratch:
+
+- handling long-running async jobs reliably
+- integrating external AI services without inconsistent results
+- designing secure and predictable backend workflows
+
+This project is part of my learning journey focused on backend architecture and system design.
+
+My goal was not just to make features work, but to understand how to build systems that behave **consistently and predictably** as they grow.
+
+## Engineering Highlights
+
+- Built an **SSE-based job pipeline** for handling long-running tasks
+- Implemented a **deterministic API key resolution system** (`selected → default → fallback`)
+- Designed **session-based authentication with CSRF protection**
+- Structured the frontend using a **feature-based architecture**
+- Focused on making async workflows predictable and consistent
+
+## Features
+
+### Core System
+
+- Session-based authentication
+- Role-based access control
+- User preferences system
+
+### Transcription
+
+- Multi-file upload with queue processing
+- Real-time progress tracking (SSE)
+- AssemblyAI integration (diarization + identification)
+- Unified transcription history
+- Export functionality
+
+### System Design
+
+- Deterministic API key resolution
+- SSE job pipeline
+- Metadata-driven persistence
+
+### Security
+
+- CSRF protection
+- HTTP-only cookies
+- Encrypted API keys
+- No client-side secrets
+
+## Architecture Overview
 
 ### Backend
 
-```bash
-Copy
-cd server
-npm install
-npm run dev
+- Node.js + Express
+- PostgreSQL
+- Session-based authentication
+- Modular middleware structure
+- Winston logging
 
-```
+Key ideas:
+
+- Centralized API connection resolver
+- SSE-based job handling
+- Predictable data flow
 
 ### Frontend
 
-```bash
-Copy
-cd client
-npm install
-npm start
+- React + TypeScript
+- Feature-based structure
+- Zustand state management
+- Material UI
 
+Each feature manages its own logic, API calls, and state.
+
+## Tech Stack
+
+### Frontend
+
+- React (TypeScript)
+- Zustand
+- Material UI
+
+### Backend
+
+- Node.js
+- Express
+
+### Database
+
+- PostgreSQL
+
+### AI / External
+
+- AssemblyAI
+- Gemini 1.5 _(planned)_
+
+## System Design
+
+### Transcription Flow
+
+1. Upload audio files
+2. Create background jobs
+3. Resolve API connection
+4. Request transcription
+5. Stream progress (SSE)
+6. Store results
+7. Update UI
+
+### API Key Resolution
+
+1. User-selected
+2. Default
+3. Fallback
+
+Each transcription stores the connection used to ensure consistent behavior across future actions.
+
+## Project Status & Roadmap
+
+### Phase 1 — MVP (Completed)
+
+- Audio Transcription pipeline(AssemblyAI)
+- Authentication system
+- Core UI
+- Export and history
+
+### Phase 2 — AI Integration (In Progress)
+
+- Transcript summaries
+- AI assistant integration
+- Persona-based workflows
+- Legal document viewer + OCR & translation (planned)
+- Task & calendar system (planned)
+
+### Phase 3 — Polish (Planned)
+
+- RAG search
+- Multilingual UI (i18n)
+- Accessibility & responsiveness improvements
+- CI/CD setup
+
+## Project Structure
+
+```plaintext
+server/
+├── db/
+├── middlewares/
+├── routes/
+└── utils/
+
+client/src/
+├── features/
+├── components/
+├── store/
+└── api/
 ```
 
--   React will run on localhost:3001 (or configured port).
+## Database Overview
 
--   Express backend runs on localhost:5000.
+The database is designed around four main tables: :contentReference[oaicite:1]{index=1}
+
+- `users`
+    - stores account identity, authentication provider, role, preferences, and email/password recovery fields
+
+- `user_api_keys`
+    - stores encrypted third-party API keys for user-managed integrations such as AssemblyAI
+    - supports one default key per provider per user
+
+- `transcriptions`
+    - stores local transcription records, selected options, file metadata, and the AssemblyAI connection context used for the request
+
+- `transcription_backups`
+    - stores raw API transcript data and backup metadata for history, recovery, and follow-up operations
+
+This structure supports secure authentication, connection-aware transcription workflows, and consistent persistence of both normalized and raw transcript data. :contentReference[oaicite:2]{index=2}
+
+## Development Approach
+
+- Issue-driven workflow
+- Small, focused development sessions
+- Continuous refinement
+
+Focus:
+
+- predictable system behavior
+- clear architecture
+- maintainability
+
+## Motivation
+
+I built this project to move beyond typical CRUD applications and explore more realistic system challenges, such as:
+
+- async job processing using SSE
+- reliable integration with external AI services
+- secure session-based authentication and data handling
+
+This project reflects my ongoing learning process in full-stack development, with a strong focus on backend architecture and system design.
+
+Rather than aiming for completeness, the goal is to iteratively improve the system while learning how real-world applications are designed and evolved.
+
+## Current Focus
+
+- Improving upload UX
+- Better SSE error handling
+- Queue interaction refinement
+- API cleanup
+
+## Notes
+
+- I'm actively working and evolving the Project, it's work in progress
+- I prioritized Architecture over rapid feature building
