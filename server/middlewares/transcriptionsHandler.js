@@ -1154,30 +1154,52 @@ const sanitizeSpeakerIdentificationForStorage = (speakerIdentification) => {
     };
 };
 
-/**
-- Normalizes and sanitizes incoming transcription options from client
-- Removes unsupported fields and enforces API-required constraints
+/*
+- Normalizes and sanitizes incoming transcription options from the client.
+- Inputs: raw request options object.
+- Outputs: backend-safe transcription options object.
+- Important behavior: removes schema combinations that AssemblyAI rejects, including `speakers_expected` during speaker identification mode.
 */
 const sanitizeIncomingTranscriptionOptions = (rawOptions = {}) => {
     const userOptions =
         rawOptions && typeof rawOptions === "object" ? { ...rawOptions } : {};
 
-    // legacy schema must not reach AssemblyAI
     delete userOptions.speaker_options;
 
-    // Speaker identification depends on diarization in AssemblyAI
-    // UI enforces exclusivity, backend enforces API requirements
-
     if (userOptions.speaker_identification?.enabled) {
+        const knownValues = Array.isArray(
+            userOptions.speaker_identification.known_values,
+        )
+            ? userOptions.speaker_identification.known_values
+                  .map((value) => String(value).trim())
+                  .filter(Boolean)
+            : [];
+
         userOptions.speaker_labels = true;
+        delete userOptions.speakers_expected;
+
+        userOptions.speaker_identification = {
+            enabled: true,
+            speaker_type:
+                userOptions.speaker_identification.speaker_type ?? "name",
+            ...(knownValues.length > 0 ? { known_values: knownValues } : {}),
+        };
+    } else if (userOptions.speaker_labels) {
+        const parsedSpeakersExpected = Number(userOptions.speakers_expected);
 
         if (
-            userOptions.speakers_expected !== undefined &&
-            (!Number.isFinite(Number(userOptions.speakers_expected)) ||
-                Number(userOptions.speakers_expected) < 1)
+            Number.isFinite(parsedSpeakersExpected) &&
+            parsedSpeakersExpected >= 1
         ) {
+            userOptions.speakers_expected = Math.max(
+                1,
+                Math.trunc(parsedSpeakersExpected),
+            );
+        } else {
             delete userOptions.speakers_expected;
         }
+    } else {
+        delete userOptions.speakers_expected;
     }
 
     return userOptions;
@@ -1203,6 +1225,8 @@ const buildStoredTranscriptionOptions = ({
     const diarizationEnabled =
         transcript.speaker_labels ?? userOptions.speaker_labels ?? false;
 
+    const identificationEnabled = Boolean(normalizedSpeakerIdentification);
+
     const normalizedOptions = {
         language_code: normalizeLanguageCodeForStorage({
             transcript,
@@ -1222,11 +1246,12 @@ const buildStoredTranscriptionOptions = ({
 
         speaker_labels: diarizationEnabled,
 
-        speakers_expected: diarizationEnabled
-            ? (transcript.speakers_expected ??
-              userOptions.speakers_expected ??
-              1)
-            : undefined,
+        speakers_expected:
+            diarizationEnabled && !identificationEnabled
+                ? (transcript.speakers_expected ??
+                  userOptions.speakers_expected ??
+                  1)
+                : undefined,
 
         speaker_identification: normalizedSpeakerIdentification,
 
