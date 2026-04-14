@@ -671,8 +671,21 @@ export const UploadAudioPage = () => {
         return labelForStepKey(TRANSCRIPTION_STEP_ORDER[safeIndex]);
     }, [activeStepIndex]);
 
+    /*
+- Builds the aggregate status summary for the current upload batch.
+- Inputs: current queue items.
+- Outputs: count totals for each visible queue status.
+- Important behavior: keeps the middle-panel summary chips aligned with the actual queue item statuses.
+*/
     const batchSummary = useMemo(() => {
         const total = items.length;
+        const queued = items.filter((item) => item.status === "queued").length;
+        const uploading = items.filter(
+            (item) => item.status === "uploading",
+        ).length;
+        const processing = items.filter(
+            (item) => item.status === "processing",
+        ).length;
         const completed = items.filter(
             (item) => item.status === "completed",
         ).length;
@@ -680,6 +693,9 @@ export const UploadAudioPage = () => {
 
         return {
             total,
+            queued,
+            uploading,
+            processing,
             completed,
             failed,
         };
@@ -691,10 +707,10 @@ export const UploadAudioPage = () => {
           ? "Processing… this panel updates automatically."
           : "Select files and start transcription to see results here.";
 
-    const failedItems = useMemo(
-        () => items.filter((item) => item.status === "failed"),
-        [items],
-    );
+    // const failedItems = useMemo(
+    //     () => items.filter((item) => item.status === "failed"),
+    //     [items],
+    // );
 
     const useExplicitAppFallback =
         selectedConnectionValue === APP_FALLBACK_CONNECTION_VALUE;
@@ -1078,9 +1094,164 @@ export const UploadAudioPage = () => {
         }));
     };
 
-    /**
-- Handles full lifecycle for a single file
-- SSE progress uses credentialed requests and named event listeners
+    /*
+- Attaches the SSE progress stream for one queued upload item.
+- Inputs: queue item id and backend job id.
+- Outputs: resolves when tracking reaches a terminal event or the stream disconnects.
+- Important behavior: treats browser-side SSE loss as recoverable tracking failure, not proof that the backend job itself failed.
+*/
+    const attachProgressStream = useCallback(
+        async (itemId: string, jobId: string): Promise<void> => {
+            const progressUrl = getTranscriptionProgressUrl(jobId);
+            const eventSource = new EventSource(progressUrl, {
+                withCredentials: true,
+            });
+
+            eventSourceRef.current = eventSource;
+
+            await new Promise<void>((resolve) => {
+                let settled = false;
+
+                const finish = () => {
+                    if (settled) return;
+                    settled = true;
+                    eventSource.close();
+
+                    if (eventSourceRef.current === eventSource) {
+                        eventSourceRef.current = null;
+                    }
+
+                    resolve();
+                };
+
+                const handleStep = (event: MessageEvent) => {
+                    try {
+                        const payload = JSON.parse(
+                            event.data,
+                        ) as StepEventPayload;
+
+                        updateUploadItem(itemId, (prev) => {
+                            const updatedSteps = {
+                                ...prev.stepsState,
+                                ...payload.steps,
+                            };
+
+                            return {
+                                ...prev,
+                                stepsState: updatedSteps,
+                                status: getUploadItemStatusFromSteps(
+                                    updatedSteps,
+                                ),
+                                error: undefined,
+                            };
+                        });
+                    } catch {
+                        updateUploadItem(itemId, (prev) => ({
+                            ...prev,
+                            status: "failed",
+                            error: "Invalid progress response.",
+                        }));
+
+                        finish();
+                    }
+                };
+
+                const handleCompleted = (event: MessageEvent) => {
+                    try {
+                        const payload = JSON.parse(
+                            event.data,
+                        ) as CompletedEventPayload;
+
+                        updateUploadItem(itemId, (prev) => ({
+                            ...prev,
+                            status: "completed",
+                            result: payload.transcriptData,
+                            stepsState: payload.steps,
+                            error: undefined,
+                        }));
+
+                        finish();
+                    } catch {
+                        updateUploadItem(itemId, (prev) => ({
+                            ...prev,
+                            status: "failed",
+                            error: "Invalid completed response.",
+                        }));
+
+                        finish();
+                    }
+                };
+
+                const handleErrorEvent = (event: MessageEvent) => {
+                    try {
+                        const payload = JSON.parse(
+                            event.data,
+                        ) as ErrorEventPayload;
+
+                        updateUploadItem(itemId, (prev) => ({
+                            ...prev,
+                            status: "failed",
+                            stepsState: payload.steps ?? prev.stepsState,
+                            error:
+                                payload.message ||
+                                payload.error ||
+                                "This transcription failed.",
+                        }));
+                    } catch {
+                        updateUploadItem(itemId, (prev) => ({
+                            ...prev,
+                            status: "failed",
+                            error: "Invalid error response.",
+                        }));
+                    }
+
+                    finish();
+                };
+
+                eventSource.addEventListener(
+                    "step",
+                    handleStep as EventListener,
+                );
+                eventSource.addEventListener(
+                    "completed",
+                    handleCompleted as EventListener,
+                );
+                eventSource.addEventListener(
+                    "error",
+                    handleErrorEvent as EventListener,
+                );
+
+                eventSource.onerror = () => {
+                    updateUploadItem(itemId, (prev) => {
+                        const derivedStatus = getUploadItemStatusFromSteps(
+                            prev.stepsState,
+                        );
+
+                        return {
+                            ...prev,
+                            status:
+                                derivedStatus === "completed"
+                                    ? "completed"
+                                    : "failed",
+                            error:
+                                derivedStatus === "completed"
+                                    ? prev.error
+                                    : "Live progress tracking was interrupted. The transcription may still finish in the background. Retry tracking to reconnect.",
+                        };
+                    });
+
+                    finish();
+                };
+            });
+        },
+        [updateUploadItem],
+    );
+
+    /*
+- Handles the full lifecycle for a single queued file.
+- Inputs: queue item plus frozen batch request options and connection mode.
+- Outputs: resolves after the item finishes or tracking stops.
+- Important behavior: delegates SSE tracking to a shared helper so retry-tracking uses the same event parsing path.
 */
     const runSingleUpload = async (
         item: UploadItem,
@@ -1107,132 +1278,12 @@ export const UploadAudioPage = () => {
                 throw new Error("Failed to start transcription job.");
             }
 
-            const jobId = response.jobId;
-
             updateUploadItem(item.id, (prev) => ({
                 ...prev,
-                jobId,
+                jobId: response.jobId,
             }));
 
-            const progressUrl = getTranscriptionProgressUrl(jobId);
-            const eventSource = new EventSource(progressUrl, {
-                withCredentials: true,
-            });
-            eventSourceRef.current = eventSource;
-
-            await new Promise<void>((resolve) => {
-                let settled = false;
-
-                const finish = () => {
-                    if (settled) return;
-                    settled = true;
-                    eventSource.close();
-                    resolve();
-                };
-
-                const handleStep = (event: MessageEvent) => {
-                    try {
-                        const payload = JSON.parse(
-                            event.data,
-                        ) as StepEventPayload;
-
-                        updateUploadItem(item.id, (prev) => {
-                            const updatedSteps = {
-                                ...prev.stepsState,
-                                ...payload.steps,
-                            };
-
-                            return {
-                                ...prev,
-                                stepsState: updatedSteps,
-                                status: getUploadItemStatusFromSteps(
-                                    updatedSteps,
-                                ),
-                            };
-                        });
-                    } catch {
-                        updateUploadItem(item.id, (prev) => ({
-                            ...prev,
-                            status: "failed",
-                            error: "Invalid progress response.",
-                        }));
-
-                        finish();
-                    }
-                };
-
-                const handleCompleted = (event: MessageEvent) => {
-                    try {
-                        const payload = JSON.parse(
-                            event.data,
-                        ) as CompletedEventPayload;
-
-                        updateUploadItem(item.id, (prev) => ({
-                            ...prev,
-                            status: "completed",
-                            result: payload.transcriptData,
-                            stepsState: payload.steps,
-                            error: undefined,
-                        }));
-
-                        finish();
-                    } catch {
-                        updateUploadItem(item.id, (prev) => ({
-                            ...prev,
-                            status: "failed",
-                            error: "Invalid completed response.",
-                        }));
-
-                        finish();
-                    }
-                };
-
-                const handleErrorEvent = (event: MessageEvent) => {
-                    try {
-                        const payload = JSON.parse(
-                            event.data,
-                        ) as ErrorEventPayload;
-
-                        updateUploadItem(item.id, (prev) => ({
-                            ...prev,
-                            status: "failed",
-                            error: payload.error || payload.message,
-                            stepsState: payload.steps ?? prev.stepsState,
-                        }));
-                    } catch {
-                        updateUploadItem(item.id, (prev) => ({
-                            ...prev,
-                            status: "failed",
-                            error: "Invalid error response.",
-                        }));
-                    }
-
-                    finish();
-                };
-
-                eventSource.addEventListener(
-                    "step",
-                    handleStep as EventListener,
-                );
-                eventSource.addEventListener(
-                    "completed",
-                    handleCompleted as EventListener,
-                );
-                eventSource.addEventListener(
-                    "error",
-                    handleErrorEvent as EventListener,
-                );
-
-                eventSource.onerror = () => {
-                    updateUploadItem(item.id, (prev) => ({
-                        ...prev,
-                        status: "failed",
-                        error: "Connection lost.",
-                    }));
-
-                    finish();
-                };
-            });
+            await attachProgressStream(item.id, response.jobId);
         } catch (error: any) {
             updateUploadItem(item.id, (prev) => ({
                 ...prev,
@@ -1367,6 +1418,24 @@ export const UploadAudioPage = () => {
 
             return nextItems;
         });
+    };
+
+    /*
+- Retries SSE tracking for an existing backend job.
+- Inputs: queue item that already has a job id.
+- Outputs: reconnects the right-side status/result view to the in-flight job when possible.
+- Important behavior: does not create a new transcription job; it only reconnects to the existing job stream.
+*/
+    const handleRetryTracking = (item: UploadItem): void => {
+        if (!item.jobId) return;
+
+        updateUploadItem(item.id, (prev) => ({
+            ...prev,
+            error: undefined,
+            status: getUploadItemStatusFromSteps(prev.stepsState),
+        }));
+
+        void attachProgressStream(item.id, item.jobId);
     };
 
     const renderModelButton = (model: SpeechModel) => {
@@ -1507,26 +1576,28 @@ export const UploadAudioPage = () => {
             <Box
                 sx={{
                     display: "flex",
-                    flexDirection: { xs: "column", md: "row" },
+                    flexDirection: { xs: "column", xl: "row" },
                     gap: 3,
-                    alignItems: { xs: "flex-start", md: "stretch" },
+                    alignItems: { xs: "stretch", xl: "stretch" },
                 }}
             >
+                {/* LEFT PANEL — upload controls / transcription options / start action */}
                 <Paper
                     sx={{
                         p: 3,
-                        width: { xs: "100%", md: 460 },
-                        flex: { md: "0 0 460px" },
+                        width: { xs: "100%", xl: 460 },
+                        flex: { xl: "0 0 460px" },
+                        minWidth: 0,
                         borderRadius: 3,
                         border: `1px solid ${theme.palette.divider}`,
                         display: "flex",
                         flexDirection: "column",
                         gap: 2,
-                        // minHeight: { md: "calc(100vh - 180px)" },
                         transition: "box-shadow 150ms ease",
                         "&:hover": { boxShadow: 2 },
                     }}
                 >
+                    {/* LEFT PANEL HEADER — title / batch status / top-level feedback       */}
                     <Box>
                         <Typography variant="h5">Transcribe Audio</Typography>
 
@@ -1613,6 +1684,7 @@ export const UploadAudioPage = () => {
                             </Box>
                         ) : null}
 
+                        {/* LEFT PANEL BATCH ERROR — batch-level validation or request errors   */}
                         {batchError ? (
                             <Box mt={2}>
                                 <Alert severity="error" variant="outlined">
@@ -1624,6 +1696,7 @@ export const UploadAudioPage = () => {
 
                     <Divider sx={{ borderColor: theme.palette.divider }} />
 
+                    {/* LEFT PANEL UPLOAD AREA — drag/drop + choose files                   */}
                     <Box
                         onDrop={handleDrop}
                         onDragOver={handleDragOver}
@@ -1688,226 +1761,9 @@ export const UploadAudioPage = () => {
                         </FormHelperText>
                     </Box>
 
-                    <Box
-                        sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 1.25,
-                        }}
-                    >
-                        <Box
-                            sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                gap: 1,
-                            }}
-                        >
-                            <Typography
-                                variant="subtitle2"
-                                sx={{ color: "text.secondary" }}
-                            >
-                                Upload queue
-                            </Typography>
-
-                            {(batchSummary.completed > 0 ||
-                                batchSummary.failed > 0) && (
-                                <Button
-                                    size="small"
-                                    onClick={handleClearCompletedItems}
-                                    disabled={isProcessingQueue}
-                                    sx={{ textTransform: "none" }}
-                                >
-                                    Clear processed
-                                </Button>
-                            )}
-                        </Box>
-
-                        {items.length === 0 ? (
-                            <Typography
-                                variant="body2"
-                                sx={{ color: "text.secondary" }}
-                            >
-                                No files added yet.
-                            </Typography>
-                        ) : (
-                            <Box
-                                sx={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: 1,
-                                }}
-                            >
-                                {items.map((item) => {
-                                    const itemActiveStepIndex =
-                                        getActiveStepIndexFromSteps(
-                                            item.stepsState,
-                                        );
-                                    const itemStepLabel = labelForStepKey(
-                                        TRANSCRIPTION_STEP_ORDER[
-                                            itemActiveStepIndex
-                                        ],
-                                    );
-
-                                    return (
-                                        <Paper
-                                            key={item.id}
-                                            variant="outlined"
-                                            onClick={() =>
-                                                handleSelectResultItem(item.id)
-                                            }
-                                            sx={{
-                                                p: 1.5,
-                                                borderRadius: 2,
-                                                cursor: "pointer",
-                                                borderColor:
-                                                    selectedResultItemId ===
-                                                    item.id
-                                                        ? colors
-                                                              .greenAccent[500]
-                                                        : theme.palette.divider,
-                                                backgroundColor:
-                                                    selectedResultItemId ===
-                                                    item.id
-                                                        ? theme.palette.action
-                                                              .hover
-                                                        : "transparent",
-                                            }}
-                                        >
-                                            <Box
-                                                sx={{
-                                                    display: "flex",
-                                                    alignItems: "flex-start",
-                                                    justifyContent:
-                                                        "space-between",
-                                                    gap: 1,
-                                                }}
-                                            >
-                                                <Box
-                                                    sx={{
-                                                        minWidth: 0,
-                                                        flex: 1,
-                                                    }}
-                                                >
-                                                    <Typography
-                                                        variant="body2"
-                                                        sx={{
-                                                            fontWeight: 600,
-                                                            wordBreak:
-                                                                "break-word",
-                                                        }}
-                                                    >
-                                                        {item.file.name}
-                                                    </Typography>
-
-                                                    <Typography
-                                                        variant="caption"
-                                                        sx={{
-                                                            color: "text.secondary",
-                                                            display: "block",
-                                                            mt: 0.5,
-                                                        }}
-                                                    >
-                                                        {Math.round(
-                                                            item.file.size /
-                                                                1024,
-                                                        )}{" "}
-                                                        KB
-                                                    </Typography>
-
-                                                    {(item.status ===
-                                                        "uploading" ||
-                                                        item.status ===
-                                                            "processing") && (
-                                                        <Typography
-                                                            variant="caption"
-                                                            sx={{
-                                                                color: "text.secondary",
-                                                                display:
-                                                                    "block",
-                                                                mt: 0.5,
-                                                            }}
-                                                        >
-                                                            Step:{" "}
-                                                            {itemStepLabel}
-                                                        </Typography>
-                                                    )}
-
-                                                    {item.error ? (
-                                                        <Typography
-                                                            variant="caption"
-                                                            sx={{
-                                                                color: theme
-                                                                    .palette
-                                                                    .error.main,
-                                                                display:
-                                                                    "block",
-                                                                mt: 0.5,
-                                                            }}
-                                                        >
-                                                            {item.error}
-                                                        </Typography>
-                                                    ) : null}
-                                                </Box>
-
-                                                <Box
-                                                    sx={{
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: 1,
-                                                    }}
-                                                >
-                                                    <Chip
-                                                        size="small"
-                                                        label={getStatusLabel(
-                                                            item.status,
-                                                        )}
-                                                        color={getStatusChipColor(
-                                                            item.status,
-                                                        )}
-                                                        variant={
-                                                            item.status ===
-                                                            "queued"
-                                                                ? "outlined"
-                                                                : "filled"
-                                                        }
-                                                    />
-
-                                                    {!isProcessingQueue ||
-                                                    item.status === "queued" ||
-                                                    item.status ===
-                                                        "completed" ||
-                                                    item.status === "failed" ? (
-                                                        <Button
-                                                            size="small"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleRemoveQueueItem(
-                                                                    item.id,
-                                                                );
-                                                            }}
-                                                            sx={{
-                                                                minWidth:
-                                                                    "auto",
-                                                                px: 1,
-                                                                textTransform:
-                                                                    "none",
-                                                            }}
-                                                        >
-                                                            Remove
-                                                        </Button>
-                                                    ) : null}
-                                                </Box>
-                                            </Box>
-                                        </Paper>
-                                    );
-                                })}
-                            </Box>
-                        )}
-                    </Box>
-
                     <Divider sx={{ borderColor: theme.palette.divider }} />
 
+                    {/* LEFT PANEL OPTIONS — speech model / language / speaker / format     */}
                     <Box
                         sx={{
                             display: "flex",
@@ -2181,7 +2037,6 @@ export const UploadAudioPage = () => {
                                             checked={
                                                 speakerIdentificationEnabled
                                             }
-                                            disabled={!diarizationEnabled}
                                             onChange={(e) =>
                                                 handleSpeakerIdentificationToggle(
                                                     e.target.checked,
@@ -2192,13 +2047,17 @@ export const UploadAudioPage = () => {
                                     label={
                                         <InfoLabel
                                             label="Speaker ID"
-                                            tooltip="Guides identification with known names or roles when speaker labels are enabled."
+                                            tooltip="Uses known names or roles to guide speaker identification. This mode keeps speaker labels on but does not send an expected-speaker count to AssemblyAI."
                                         />
                                     }
                                 />
                             </Box>
                             <TextField
-                                label="Speakers expected"
+                                label={
+                                    speakerIdentificationEnabled
+                                        ? "Known speakers"
+                                        : "Speakers expected"
+                                }
                                 type="number"
                                 value={options.speakers_expected ?? 1}
                                 onChange={(e) =>
@@ -2214,10 +2073,10 @@ export const UploadAudioPage = () => {
                                 }
                                 helperText={
                                     speakerIdentificationEnabled
-                                        ? "Controls how many known speaker inputs are shown."
+                                        ? "Used only to size the known-speaker input list. It is not sent in the identification request."
                                         : diarizationEnabled
                                           ? "Used to improve speaker labeling."
-                                          : "Enable Speaker Label to configure speaker handling."
+                                          : "Enable Speaker Label or Speaker ID to configure speaker handling."
                                 }
                             />
 
@@ -2451,6 +2310,265 @@ export const UploadAudioPage = () => {
                                 : "Start Transcription Batch"}
                         </Button>
                     </Box>
+                </Paper>
+
+                {/* MIDDLE PANEL — upload queue / failed items / batch summary */}
+                <Paper
+                    sx={{
+                        p: 3,
+                        width: "100%",
+                        flex: { xl: "0 0 340px" },
+                        minWidth: 0,
+                        borderRadius: 3,
+                        border: `1px solid ${theme.palette.divider}`,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
+                        minHeight: { xl: "calc(100vh - 180px)" },
+                        overflow: "hidden",
+                        transition: "box-shadow 150ms ease",
+                        "&:hover": { boxShadow: 2 },
+                    }}
+                >
+                    {/* MIDDLE PANEL HEADER — queue title + processed action*/}
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 2,
+                        }}
+                    >
+                        <Typography variant="subtitle1" fontWeight={700}>
+                            Upload queue
+                        </Typography>
+
+                        {(batchSummary.completed > 0 ||
+                            batchSummary.failed > 0) && (
+                            <Button
+                                size="small"
+                                onClick={handleClearCompletedItems}
+                                disabled={isProcessingQueue}
+                                sx={{ textTransform: "none" }}
+                            >
+                                Clear processed
+                            </Button>
+                        )}
+                    </Box>
+
+                    {/* MIDDLE PANEL QUEUE LIST — scrollable queue items */}
+                    <Box
+                        sx={{
+                            flex: 1,
+                            minHeight: 0,
+                            overflowY: "auto",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 1,
+                            pr: 0.5,
+                        }}
+                    >
+                        {items.length === 0 ? (
+                            <Typography
+                                variant="body2"
+                                sx={{ color: "text.secondary" }}
+                            >
+                                No files added yet.
+                            </Typography>
+                        ) : (
+                            items.map((item) => {
+                                const itemActiveStepIndex =
+                                    getActiveStepIndexFromSteps(
+                                        item.stepsState,
+                                    );
+                                const itemStepLabel = labelForStepKey(
+                                    TRANSCRIPTION_STEP_ORDER[
+                                        itemActiveStepIndex
+                                    ],
+                                );
+
+                                return (
+                                    <Paper
+                                        key={item.id}
+                                        variant="outlined"
+                                        onClick={() =>
+                                            handleSelectResultItem(item.id)
+                                        }
+                                        sx={{
+                                            p: 1.5,
+                                            borderRadius: 2,
+                                            cursor: "pointer",
+                                            borderColor:
+                                                selectedResultItemId === item.id
+                                                    ? colors.greenAccent[500]
+                                                    : theme.palette.divider,
+                                            backgroundColor:
+                                                selectedResultItemId === item.id
+                                                    ? theme.palette.action.hover
+                                                    : "transparent",
+                                        }}
+                                    >
+                                        {/* QUEUE ITEM ROW — file info + status/actions */}
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "flex-start",
+                                                justifyContent: "space-between",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            {/* QUEUE ITEM LEFT — file name / size / errors */}
+                                            <Box
+                                                sx={{
+                                                    minWidth: 0,
+                                                    flex: 1,
+                                                }}
+                                            >
+                                                <Typography
+                                                    variant="body2"
+                                                    sx={{
+                                                        fontWeight: 600,
+                                                        wordBreak: "break-word",
+                                                    }}
+                                                >
+                                                    {item.file.name}
+                                                </Typography>
+
+                                                <Typography
+                                                    variant="caption"
+                                                    sx={{
+                                                        color: "text.secondary",
+                                                        display: "block",
+                                                        mt: 0.5,
+                                                    }}
+                                                >
+                                                    {Math.round(
+                                                        item.file.size / 1024,
+                                                    )}{" "}
+                                                    KB
+                                                </Typography>
+
+                                                {(item.status === "uploading" ||
+                                                    item.status ===
+                                                        "processing") && (
+                                                    <Typography
+                                                        variant="caption"
+                                                        sx={{
+                                                            color: "text.secondary",
+                                                            display: "block",
+                                                            mt: 0.5,
+                                                        }}
+                                                    >
+                                                        Step: {itemStepLabel}
+                                                    </Typography>
+                                                )}
+
+                                                {item.error ? (
+                                                    <Typography
+                                                        variant="caption"
+                                                        sx={{
+                                                            color: theme.palette
+                                                                .error.main,
+                                                            display: "block",
+                                                            mt: 0.5,
+                                                        }}
+                                                    >
+                                                        {item.error}
+                                                    </Typography>
+                                                ) : null}
+                                            </Box>
+
+                                            {/* QUEUE ITEM RIGHT — status / remove / retry */}
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    alignItems: "flex-end",
+                                                    gap: 1,
+                                                }}
+                                            >
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 1,
+                                                        flexWrap: "wrap",
+                                                        justifyContent:
+                                                            "flex-end",
+                                                    }}
+                                                >
+                                                    <Chip
+                                                        size="small"
+                                                        label={getStatusLabel(
+                                                            item.status,
+                                                        )}
+                                                        color={getStatusChipColor(
+                                                            item.status,
+                                                        )}
+                                                        variant={
+                                                            item.status ===
+                                                            "queued"
+                                                                ? "outlined"
+                                                                : "filled"
+                                                        }
+                                                    />
+
+                                                    {!isProcessingQueue ||
+                                                    item.status === "queued" ||
+                                                    item.status ===
+                                                        "completed" ||
+                                                    item.status === "failed" ? (
+                                                        <Button
+                                                            size="small"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleRemoveQueueItem(
+                                                                    item.id,
+                                                                );
+                                                            }}
+                                                            sx={{
+                                                                minWidth:
+                                                                    "auto",
+                                                                px: 1,
+                                                                textTransform:
+                                                                    "none",
+                                                            }}
+                                                        >
+                                                            Remove
+                                                        </Button>
+                                                    ) : null}
+                                                </Box>
+
+                                                {/* QUEUE ITEM RETRY — reconnect SSE tracking  */}
+                                                {item.jobId &&
+                                                item.status === "failed" ? (
+                                                    <Button
+                                                        size="small"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRetryTracking(
+                                                                item,
+                                                            );
+                                                        }}
+                                                        sx={{
+                                                            textTransform:
+                                                                "none",
+                                                        }}
+                                                    >
+                                                        Retry tracking
+                                                    </Button>
+                                                ) : null}
+                                            </Box>
+                                        </Box>
+                                    </Paper>
+                                );
+                            })
+                        )}
+                    </Box>
+
+                    <Divider />
+
+                    {/* MIDDLE PANEL FOOTER — batch summary section  */}
                     <Box
                         sx={{
                             display: "flex",
@@ -2473,11 +2591,33 @@ export const UploadAudioPage = () => {
                             }}
                         >
                             <Chip
-                                label={`Total: ${batchSummary.total}`}
+                                size="small"
+                                label={`Queued: ${batchSummary.queued}`}
                                 variant="outlined"
                             />
                             <Chip
-                                label={`Success: ${batchSummary.completed}`}
+                                size="small"
+                                label={`Uploading: ${batchSummary.uploading}`}
+                                color="info"
+                                variant={
+                                    batchSummary.uploading > 0
+                                        ? "filled"
+                                        : "outlined"
+                                }
+                            />
+                            <Chip
+                                size="small"
+                                label={`Processing: ${batchSummary.processing}`}
+                                color="warning"
+                                variant={
+                                    batchSummary.processing > 0
+                                        ? "filled"
+                                        : "outlined"
+                                }
+                            />
+                            <Chip
+                                size="small"
+                                label={`Completed: ${batchSummary.completed}`}
                                 color="success"
                                 variant={
                                     batchSummary.completed > 0
@@ -2486,6 +2626,7 @@ export const UploadAudioPage = () => {
                                 }
                             />
                             <Chip
+                                size="small"
                                 label={`Failed: ${batchSummary.failed}`}
                                 color="error"
                                 variant={
@@ -2495,42 +2636,22 @@ export const UploadAudioPage = () => {
                                 }
                             />
                         </Box>
-
-                        {failedItems.length > 0 ? (
-                            <Box
-                                sx={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: 0.5,
-                                }}
-                            >
-                                {failedItems.map((item) => (
-                                    <Typography
-                                        key={item.id}
-                                        variant="caption"
-                                        sx={{ color: theme.palette.error.main }}
-                                    >
-                                        {item.file.name}:{" "}
-                                        {item.error ?? "Unknown error"}
-                                    </Typography>
-                                ))}
-                            </Box>
-                        ) : null}
                     </Box>
                 </Paper>
 
+                {/* RIGHT PANEL — selected result / status / transcript rendering  */}
                 <Paper
                     sx={{
                         p: 3,
                         width: "100%",
-                        flex: { md: "1.2 1 0" },
+                        flex: { xl: "1 1 0" },
                         minWidth: 0,
                         borderRadius: 3,
                         border: `1px solid ${theme.palette.divider}`,
                         display: "flex",
                         flexDirection: "column",
-                        // minHeight: { md: "calc(100vh - 200px)" },
-                        // height: { md: "calc(140vh - 100px)" },
+                        minHeight: { xl: "calc(100vh - 180px)" },
+                        overflow: "hidden",
                         transition: "box-shadow 150ms ease",
                         "&:hover": { boxShadow: 2 },
                     }}
@@ -2740,7 +2861,29 @@ export const UploadAudioPage = () => {
                         )}
 
                         {selectedResultItem?.status === "failed" && (
-                            <Alert severity="error" variant="outlined">
+                            <Alert
+                                severity={
+                                    selectedResultItem.jobId
+                                        ? "warning"
+                                        : "error"
+                                }
+                                variant="outlined"
+                                action={
+                                    selectedResultItem.jobId ? (
+                                        <Button
+                                            color="inherit"
+                                            size="small"
+                                            onClick={() =>
+                                                handleRetryTracking(
+                                                    selectedResultItem,
+                                                )
+                                            }
+                                        >
+                                            Retry tracking
+                                        </Button>
+                                    ) : null
+                                }
+                            >
                                 {selectedResultItem.error ||
                                     "This transcription failed."}
                             </Alert>
