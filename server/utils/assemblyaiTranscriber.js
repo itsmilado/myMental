@@ -3,21 +3,18 @@
 const logger = require("./logger");
 const { assemblyClient } = require("../utils/assemblyaiClient");
 
-/**
-- Builds AssemblyAI-compatible transcription request
-- Maps internal speaker_identification schema to speech_understanding structure
+/*
+- Builds the final AssemblyAI transcription request.
+- Inputs: normalized app-level transcription options.
+- Outputs: AssemblyAI-compatible request payload.
+- Important behavior: strips fields that are valid in local UI state but invalid in the final identification request schema.
 */
 const buildAssemblyAiTranscriptionRequest = (transcriptionOptions = {}) => {
     const request = {
         ...transcriptionOptions,
     };
 
-    // speaker_identification is not a top-level AssemblyAI field
     delete request.speaker_identification;
-
-    //AssemblyAI Speaker Identification requires diarization (speaker_labels)
-    //speech_understanding is ignored if speaker_labels is false
-    //known_values replaces legacy speakers array
 
     if (transcriptionOptions?.speaker_identification?.enabled) {
         const knownValues = Array.isArray(
@@ -28,8 +25,8 @@ const buildAssemblyAiTranscriptionRequest = (transcriptionOptions = {}) => {
                   .filter(Boolean)
             : undefined;
 
-        // API requirement: identification depends on diarization
         request.speaker_labels = true;
+        delete request.speakers_expected;
 
         request.speech_understanding = {
             request: {
