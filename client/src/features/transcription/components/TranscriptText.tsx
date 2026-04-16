@@ -173,62 +173,69 @@ export const TranscriptText: React.FC<Props> = ({
             sx={{
                 pr: 1,
                 minHeight: 0,
+                height: "100%",
                 display: "flex",
                 flexDirection: "column",
                 flex: 1,
                 overflow: "hidden",
             }}
         >
-            <Stack
-                direction="row"
-                spacing={2}
-                mb={1}
-                flexWrap="wrap"
-                sx={{ flexShrink: 0 }}
-            >
-                <FormControlLabel
-                    control={
-                        <Switch
-                            checked={showSpeakers}
-                            onChange={(e) => setShowSpeakers(e.target.checked)}
-                            size="small"
-                        />
-                    }
-                    label="Speakers"
-                />
-
-                <FormControlLabel
-                    control={
-                        <Switch
-                            checked={showTimestamps}
-                            onChange={(e) =>
-                                setShowTimestamps(e.target.checked)
-                            }
-                            size="small"
-                        />
-                    }
-                    label="Timestamps"
-                />
-            </Stack>
-
             <Box
-                sx={
-                    disableInternalScroll
-                        ? {
-                              flex: 1,
-                              minHeight: 0,
-                              overflowY: "auto",
-                              overflowX: "hidden",
-                          }
-                        : {
-                              flex: 1,
-                              minHeight: 0,
-                              maxHeight,
-                              overflowY: "auto",
-                              overflowX: "hidden",
-                          }
-                }
+                sx={{
+                    flex: 1,
+                    minHeight: 0,
+                    height: "100%",
+                    overflowY: "auto",
+                    overflowX: "hidden",
+                    ...(disableInternalScroll ? {} : { maxHeight }),
+                }}
             >
+                <Box
+                    sx={{
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 3,
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 2,
+                        alignItems: "center",
+                        px: 0.25,
+                        py: 0.75,
+                        mb: 1,
+                        bgcolor: "background.paper",
+                        borderBottom: 1,
+                        borderColor: "divider",
+                    }}
+                >
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={showSpeakers}
+                                onChange={(e) =>
+                                    setShowSpeakers(e.target.checked)
+                                }
+                                size="small"
+                            />
+                        }
+                        label="Speakers"
+                        sx={{ m: 0 }}
+                    />
+
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={showTimestamps}
+                                onChange={(e) =>
+                                    setShowTimestamps(e.target.checked)
+                                }
+                                size="small"
+                            />
+                        }
+                        label="Timestamps"
+                        sx={{ m: 0 }}
+                    />
+                </Box>
+
                 <Stack spacing={1.25}>
                     {blocks.map((b, idx) => (
                         <Paper
@@ -270,7 +277,10 @@ export const TranscriptText: React.FC<Props> = ({
 
                             <Typography
                                 variant="body2"
-                                sx={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}
+                                sx={{
+                                    whiteSpace: "pre-wrap",
+                                    lineHeight: 1.7,
+                                }}
                             >
                                 {b.lines.join("\n")}
                             </Typography>
