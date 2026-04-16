@@ -1404,40 +1404,24 @@ const runTranscriptionJob = async ({
             )}`,
         );
 
-        const transcriptResponse =
-            await resolvedAssembly.client.transcripts.submit(
-                transcriptionOptions,
-            );
+        const transcriptResponse = await requestTranscription(
+            transcriptionOptions,
+            resolvedAssembly.client,
+        );
         const transcriptId = transcriptResponse?.id;
 
         if (!transcriptId) {
             throw new Error("AssemblyAI did not return a transcript id.");
         }
 
-        let transcript = null;
-
-        for (;;) {
-            transcript =
-                await resolvedAssembly.client.transcripts.get(transcriptId);
-
-            if (!transcript?.status || transcript.status === "completed") {
-                break;
-            }
-
-            if (transcript.status === "error") {
-                throw new Error(
-                    transcript.error || "AssemblyAI transcription failed.",
-                );
-            }
-
-            await new Promise((resolve) => {
-                setTimeout(resolve, 3000);
-            });
-        }
+        const transcript = await pollTranscriptionResult(
+            transcriptId,
+            resolvedAssembly.client,
+        );
 
         emitStep(TRANSCRIPTION_STEPS.TRANSCRIBE, "success");
 
-        // ----------------- SAVE_DB -----------------
+        //  SAVE_DB
         emitStep(TRANSCRIPTION_STEPS.SAVE_DB, "in_progress");
 
         const createBackup = await insertTranscriptionBackupQuery({
