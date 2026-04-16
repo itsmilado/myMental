@@ -249,10 +249,6 @@ const buildUploadRequestOptions = ({
 
     if (options.speaker_identification?.enabled) {
         userOptions.speaker_labels = true;
-        userOptions.speakers_expected = Math.max(
-            1,
-            options.speakers_expected ?? 1,
-        );
 
         userOptions.speaker_identification = {
             enabled: true,
@@ -1300,6 +1296,11 @@ export const UploadAudioPage = () => {
     const processQueueSequentially = async () => {
         if (isProcessingQueue) return;
 
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth",
+        });
+
         setIsProcessingQueue(true);
         setBatchError(null);
 
@@ -1567,26 +1568,37 @@ export const UploadAudioPage = () => {
     return (
         <Box
             sx={{
-                maxWidth: 1320,
+                maxWidth: 1660,
                 mx: "auto",
-                px: { xs: 2, md: 3 },
-                py: 3,
+                px: { xs: 1, md: 1 },
+                py: 1,
             }}
         >
             <Box
                 sx={{
-                    display: "flex",
-                    flexDirection: { xs: "column", xl: "row" },
-                    gap: 3,
-                    alignItems: { xs: "stretch", xl: "stretch" },
+                    display: "grid",
+                    columnGap: {
+                        xs: 2,
+                        sm: 2.5,
+                        md: 3,
+                        lg: 4,
+                        xl: 5,
+                    },
+                    rowGap: 3,
+                    gridTemplateColumns: {
+                        xs: "1fr",
+                        xl: "540px 420px 520px",
+                    },
+                    justifyContent: "center",
+                    alignItems: "start",
                 }}
             >
                 {/* LEFT PANEL — upload controls / transcription options / start action */}
                 <Paper
                     sx={{
                         p: 3,
-                        width: { xs: "100%", xl: 460 },
-                        flex: { xl: "0 0 460px" },
+                        width: { xs: "100%", xl: 560 },
+                        flex: { xl: "0 0 520px" },
                         minWidth: 0,
                         borderRadius: 3,
                         border: `1px solid ${theme.palette.divider}`,
@@ -1704,6 +1716,7 @@ export const UploadAudioPage = () => {
                         sx={{
                             display: "flex",
                             flexDirection: "column",
+                            alignItems: "center",
                             gap: 1.5,
                             p: 2,
                             borderRadius: 2,
@@ -1723,9 +1736,10 @@ export const UploadAudioPage = () => {
                             variant="outlined"
                             component="label"
                             startIcon={<UploadFileOutlinedIcon />}
-                            fullWidth
                             disabled={isProcessingQueue}
                             sx={{
+                                width: "fit-content",
+                                alignSelf: "center",
                                 color: colors.grey[100],
                                 borderColor: colors.grey[300],
                                 "&:hover": {
@@ -1768,241 +1782,19 @@ export const UploadAudioPage = () => {
                         sx={{
                             display: "flex",
                             flexDirection: "column",
-                            gap: 1,
+                            gap: 2,
                         }}
                     >
-                        <Typography
-                            variant="subtitle2"
-                            sx={{ color: "text.secondary" }}
-                        >
-                            Speech model
-                        </Typography>
-
-                        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                            {renderModelButton("universal-3-pro")}
-                            {renderModelButton("universal-2")}
-                        </Box>
-                    </Box>
-
-                    <Divider sx={{ borderColor: theme.palette.divider }} />
-
-                    <Box
-                        sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 1.25,
-                        }}
-                    >
-                        <InfoLabel
-                            label="Language"
-                            tooltip="Choose a language manually, or use automatic language detection to let AssemblyAI choose the best supported model for the audio."
-                        />
-
-                        <FormControl
-                            size="small"
-                            fullWidth
+                        {/* ROW 2 — speech model + language */}
+                        <Box
                             sx={{
-                                "& .MuiOutlinedInput-notchedOutline": {
-                                    borderColor: colors.grey[300],
+                                display: "grid",
+                                gridTemplateColumns: {
+                                    xs: "1fr",
+                                    md: "1fr 1fr",
                                 },
-                                "&:hover .MuiOutlinedInput-notchedOutline": {
-                                    borderColor: colors.grey[200],
-                                },
-                                "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
-                                    {
-                                        borderColor: colors.greenAccent[500],
-                                    },
-                            }}
-                        >
-                            <InputLabel id="language-label">
-                                Language
-                            </InputLabel>
-                            <Select
-                                labelId="language-label"
-                                label="Language"
-                                value={
-                                    autoLanguageEnabled
-                                        ? AUTO_LANGUAGE_CODE
-                                        : options.language_code
-                                }
-                                disabled={languageSelectionDisabled}
-                                onChange={(e) =>
-                                    handleLanguageChange(String(e.target.value))
-                                }
-                            >
-                                <MenuItem value={AUTO_LANGUAGE_CODE}>
-                                    {getLanguageLabel(AUTO_LANGUAGE_CODE)}
-                                </MenuItem>
-
-                                {currentModelLanguages.map((lang) => (
-                                    <MenuItem key={lang} value={lang}>
-                                        {getLanguageLabel(lang)}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-
-                        <FormControlLabel
-                            sx={{ ml: 0 }}
-                            control={
-                                <Switch
-                                    checked={codeSwitchingEnabled}
-                                    disabled={!codeSwitchingSupported}
-                                    onChange={(e) =>
-                                        handleCodeSwitchingToggle(
-                                            e.target.checked,
-                                        )
-                                    }
-                                    sx={{
-                                        "& .MuiSwitch-switchBase.Mui-checked": {
-                                            color: colors.greenAccent[500],
-                                        },
-                                        "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
-                                            {
-                                                backgroundColor:
-                                                    colors.greenAccent[500],
-                                            },
-                                    }}
-                                />
-                            }
-                            label={
-                                <InfoLabel
-                                    label="Code Switching"
-                                    tooltip="Transcribes speech that naturally switches between multiple languages in the same conversation. When enabled, the request uses automatic language detection instead of a fixed language."
-                                />
-                            }
-                        />
-                    </Box>
-
-                    {isUniversal3Pro && (
-                        <>
-                            <Divider
-                                sx={{ borderColor: theme.palette.divider }}
-                            />
-
-                            <Box
-                                sx={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: 1.25,
-                                }}
-                            >
-                                <InfoLabel
-                                    label="Prompt"
-                                    tooltip="For best results, start without a prompt first. When you need more control, pick a recommended prompt and then edit it to fit your audio."
-                                />
-
-                                <FormControl component="fieldset">
-                                    <RadioGroup
-                                        value={selectedPromptPreset}
-                                        onChange={(e) =>
-                                            handlePromptPresetChange(
-                                                e.target
-                                                    .value as PromptPresetKey,
-                                            )
-                                        }
-                                    >
-                                        {(
-                                            Object.entries(
-                                                PROMPT_PRESETS,
-                                            ) as Array<
-                                                [
-                                                    Exclude<
-                                                        PromptPresetKey,
-                                                        "custom"
-                                                    >,
-                                                    (typeof PROMPT_PRESETS)[Exclude<
-                                                        PromptPresetKey,
-                                                        "custom"
-                                                    >],
-                                                ]
-                                            >
-                                        ).map(([key, preset]) => (
-                                            <Box
-                                                key={key}
-                                                sx={{
-                                                    border: `1px solid ${theme.palette.divider}`,
-                                                    borderRadius: 2,
-                                                    px: 1.25,
-                                                    py: 0.9,
-                                                    mb: 1,
-                                                }}
-                                            >
-                                                <FormControlLabel
-                                                    value={key}
-                                                    control={<Radio />}
-                                                    label={
-                                                        <Box>
-                                                            <Typography
-                                                                variant="body2"
-                                                                sx={{
-                                                                    fontWeight: 600,
-                                                                }}
-                                                            >
-                                                                {preset.label}
-                                                            </Typography>
-                                                            <Typography
-                                                                variant="caption"
-                                                                color="text.secondary"
-                                                            >
-                                                                {preset.helper}
-                                                            </Typography>
-                                                        </Box>
-                                                    }
-                                                />
-                                            </Box>
-                                        ))}
-
-                                        <FormControlLabel
-                                            value="custom"
-                                            control={<Radio />}
-                                            label="Custom prompt"
-                                        />
-                                    </RadioGroup>
-                                </FormControl>
-
-                                <TextField
-                                    label="Prompt input"
-                                    value={options.prompt ?? ""}
-                                    onChange={(e) =>
-                                        handlePromptInputChange(e.target.value)
-                                    }
-                                    size="small"
-                                    multiline
-                                    minRows={4}
-                                    placeholder="e.g. Preserve mixed-language speech, keep filler words, and do not normalize false starts."
-                                    helperText="You can pick a recommended prompt, then edit it here."
-                                />
-                            </Box>
-                        </>
-                    )}
-
-                    <Divider sx={{ borderColor: theme.palette.divider }} />
-
-                    <Accordion
-                        disableGutters
-                        elevation={0}
-                        expanded={speakerSectionOpen}
-                        onChange={() => setSpeakerSectionOpen((prev) => !prev)}
-                        sx={{
-                            borderRadius: 2,
-                            border: `1px solid ${theme.palette.divider}`,
-                            backgroundColor: "transparent",
-                            "&:before": { display: "none" },
-                            "&.Mui-expanded": { margin: 0 },
-                        }}
-                    >
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                            <Typography variant="subtitle2">
-                                Speaker Handling
-                            </Typography>
-                        </AccordionSummary>
-
-                        <AccordionDetails
-                            sx={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 1.25,
+                                gap: 2,
+                                alignItems: "stretch",
                             }}
                         >
                             <Box
@@ -2010,102 +1802,344 @@ export const UploadAudioPage = () => {
                                     display: "flex",
                                     flexDirection: "column",
                                     gap: 1,
+                                    p: 2,
+                                    height: "100%",
+                                    borderRadius: 2,
+                                    border: `1px solid ${theme.palette.divider}`,
                                 }}
                             >
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={diarizationEnabled}
-                                            onChange={(e) =>
-                                                handleSpeakerLabelsToggle(
-                                                    e.target.checked,
-                                                )
-                                            }
-                                        />
-                                    }
-                                    label={
-                                        <InfoLabel
-                                            label="Speaker Label"
-                                            tooltip="Separates the transcript into speaker turns."
-                                        />
-                                    }
+                                <Typography
+                                    variant="subtitle2"
+                                    sx={{ color: "text.secondary" }}
+                                >
+                                    Speech model
+                                </Typography>
+
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        gap: 1,
+                                        flexWrap: "wrap",
+                                    }}
+                                >
+                                    {renderModelButton("universal-3-pro")}
+                                    {renderModelButton("universal-2")}
+                                </Box>
+                            </Box>
+
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 1.25,
+                                    p: 2,
+                                    height: "100%",
+                                    borderRadius: 2,
+                                    border: `1px solid ${theme.palette.divider}`,
+                                }}
+                            >
+                                <InfoLabel
+                                    label="Language"
+                                    tooltip="Choose a language manually, or use automatic language detection to let AssemblyAI choose the best supported model for the audio."
                                 />
 
+                                <FormControl
+                                    size="small"
+                                    fullWidth
+                                    sx={{
+                                        "& .MuiOutlinedInput-notchedOutline": {
+                                            borderColor: colors.grey[300],
+                                        },
+                                        "&:hover .MuiOutlinedInput-notchedOutline":
+                                            {
+                                                borderColor: colors.grey[200],
+                                            },
+                                        "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
+                                            {
+                                                borderColor:
+                                                    colors.greenAccent[500],
+                                            },
+                                    }}
+                                >
+                                    <InputLabel id="language-label">
+                                        Language
+                                    </InputLabel>
+                                    <Select
+                                        labelId="language-label"
+                                        label="Language"
+                                        value={
+                                            autoLanguageEnabled
+                                                ? AUTO_LANGUAGE_CODE
+                                                : options.language_code
+                                        }
+                                        disabled={languageSelectionDisabled}
+                                        onChange={(e) =>
+                                            handleLanguageChange(
+                                                String(e.target.value),
+                                            )
+                                        }
+                                    >
+                                        <MenuItem value={AUTO_LANGUAGE_CODE}>
+                                            {getLanguageLabel(
+                                                AUTO_LANGUAGE_CODE,
+                                            )}
+                                        </MenuItem>
+
+                                        {currentModelLanguages.map((lang) => (
+                                            <MenuItem key={lang} value={lang}>
+                                                {getLanguageLabel(lang)}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+
                                 <FormControlLabel
+                                    sx={{ ml: 0 }}
                                     control={
                                         <Switch
-                                            checked={
-                                                speakerIdentificationEnabled
-                                            }
+                                            checked={codeSwitchingEnabled}
+                                            disabled={!codeSwitchingSupported}
                                             onChange={(e) =>
-                                                handleSpeakerIdentificationToggle(
+                                                handleCodeSwitchingToggle(
                                                     e.target.checked,
                                                 )
                                             }
+                                            sx={{
+                                                "& .MuiSwitch-switchBase.Mui-checked":
+                                                    {
+                                                        color: colors
+                                                            .greenAccent[500],
+                                                    },
+                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
+                                                    {
+                                                        backgroundColor:
+                                                            colors
+                                                                .greenAccent[500],
+                                                    },
+                                            }}
                                         />
                                     }
                                     label={
                                         <InfoLabel
-                                            label="Speaker ID"
-                                            tooltip="Uses known names or roles to guide speaker identification. This mode keeps speaker labels on but does not send an expected-speaker count to AssemblyAI."
+                                            label="Code Switching"
+                                            tooltip="Transcribes speech that naturally switches between multiple languages in the same conversation. When enabled, the request uses automatic language detection instead of a fixed language."
                                         />
                                     }
                                 />
                             </Box>
-                            <TextField
-                                label={
-                                    speakerIdentificationEnabled
-                                        ? "Known speakers"
-                                        : "Speakers expected"
-                                }
-                                type="number"
-                                value={options.speakers_expected ?? 1}
-                                onChange={(e) =>
-                                    handleSpeakersExpectedChange(e.target.value)
-                                }
-                                slotProps={{
-                                    htmlInput: { min: 1, max: 20 },
-                                }}
-                                size="small"
-                                disabled={
-                                    !diarizationEnabled &&
-                                    !speakerIdentificationEnabled
-                                }
-                                helperText={
-                                    speakerIdentificationEnabled
-                                        ? "Used only to size the known-speaker input list. It is not sent in the identification request."
-                                        : diarizationEnabled
-                                          ? "Used to improve speaker labeling."
-                                          : "Enable Speaker Label or Speaker ID to configure speaker handling."
-                                }
-                            />
+                        </Box>
 
-                            {speakerIdentificationEnabled && (
-                                <>
-                                    <FormControl size="small" fullWidth>
-                                        <InputLabel id="speaker-type-label">
-                                            Speaker type
-                                        </InputLabel>
-                                        <Select
-                                            labelId="speaker-type-label"
-                                            label="Speaker type"
-                                            value={currentSpeakerType}
+                        {/* ROW 3 — prompt + custom prompt */}
+                        {isUniversal3Pro ? (
+                            <Box
+                                sx={{
+                                    display: "grid",
+                                    gridTemplateColumns: {
+                                        xs: "1fr",
+                                        md: "1fr 1fr",
+                                    },
+                                    gap: 2,
+                                    alignItems: "stretch",
+                                }}
+                            >
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 1.25,
+                                        p: 2,
+                                        height: "100%",
+                                        borderRadius: 2,
+                                        border: `1px solid ${theme.palette.divider}`,
+                                    }}
+                                >
+                                    <InfoLabel
+                                        label="Prompt"
+                                        tooltip="For best results, start without a prompt first. When you need more control, pick a recommended prompt and then edit it to fit your audio."
+                                    />
+
+                                    <FormControl component="fieldset">
+                                        <RadioGroup
+                                            value={selectedPromptPreset}
                                             onChange={(e) =>
-                                                handleSpeakerTypeChange(
+                                                handlePromptPresetChange(
                                                     e.target
-                                                        .value as SpeakerType,
+                                                        .value as PromptPresetKey,
                                                 )
                                             }
                                         >
-                                            <MenuItem value="name">
-                                                Name
-                                            </MenuItem>
-                                            <MenuItem value="role">
-                                                Role
-                                            </MenuItem>
-                                        </Select>
-                                    </FormControl>
+                                            {(
+                                                Object.entries(
+                                                    PROMPT_PRESETS,
+                                                ) as Array<
+                                                    [
+                                                        Exclude<
+                                                            PromptPresetKey,
+                                                            "custom"
+                                                        >,
+                                                        (typeof PROMPT_PRESETS)[Exclude<
+                                                            PromptPresetKey,
+                                                            "custom"
+                                                        >],
+                                                    ]
+                                                >
+                                            ).map(([key, preset]) => (
+                                                <Box
+                                                    key={key}
+                                                    sx={{
+                                                        border: `1px solid ${theme.palette.divider}`,
+                                                        borderRadius: 2,
+                                                        px: 1.25,
+                                                        py: 0.9,
+                                                        mb: 1,
+                                                    }}
+                                                >
+                                                    <FormControlLabel
+                                                        value={key}
+                                                        control={<Radio />}
+                                                        label={
+                                                            <Box
+                                                                sx={{
+                                                                    display:
+                                                                        "flex",
+                                                                    alignItems:
+                                                                        "center",
+                                                                    gap: 0.75,
+                                                                }}
+                                                            >
+                                                                <Typography
+                                                                    variant="body2"
+                                                                    sx={{
+                                                                        fontWeight: 600,
+                                                                    }}
+                                                                >
+                                                                    {
+                                                                        preset.label
+                                                                    }
+                                                                </Typography>
 
+                                                                <Tooltip
+                                                                    title={
+                                                                        preset.helper
+                                                                    }
+                                                                    arrow
+                                                                    slotProps={{
+                                                                        tooltip:
+                                                                            {
+                                                                                sx: TOOLTIP_SX,
+                                                                            },
+                                                                    }}
+                                                                >
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        onClick={(
+                                                                            e,
+                                                                        ) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
+                                                                        }}
+                                                                        sx={{
+                                                                            p: 0.25,
+                                                                            color: "text.secondary",
+                                                                        }}
+                                                                    >
+                                                                        <InfoOutlinedIcon fontSize="inherit" />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                            </Box>
+                                                        }
+                                                    />
+                                                </Box>
+                                            ))}
+
+                                            <FormControlLabel
+                                                value="custom"
+                                                control={<Radio />}
+                                                label="Custom prompt"
+                                            />
+                                        </RadioGroup>
+                                    </FormControl>
+                                </Box>
+
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 1.25,
+                                        p: 2,
+                                        height: "100%",
+                                        borderRadius: 2,
+                                        border: `1px solid ${theme.palette.divider}`,
+                                    }}
+                                >
+                                    <Typography
+                                        variant="subtitle2"
+                                        sx={{ color: "text.secondary" }}
+                                    >
+                                        Custom prompt
+                                    </Typography>
+
+                                    <TextField
+                                        label="Prompt input"
+                                        value={options.prompt ?? ""}
+                                        onChange={(e) =>
+                                            handlePromptInputChange(
+                                                e.target.value,
+                                            )
+                                        }
+                                        size="small"
+                                        multiline
+                                        minRows={8}
+                                        placeholder="e.g. Preserve mixed-language speech, keep filler words, and do not normalize false starts."
+                                        helperText="You can pick a recommended prompt, then edit it here."
+                                    />
+                                </Box>
+                            </Box>
+                        ) : null}
+
+                        {/* ROW 4 — speaker handling + format transcript */}
+                        <Box
+                            sx={{
+                                display: "grid",
+                                gridTemplateColumns: {
+                                    xs: "1fr",
+                                    md: "1fr 1fr",
+                                },
+                                gap: 2,
+                                alignItems: "start",
+                            }}
+                        >
+                            <Accordion
+                                disableGutters
+                                elevation={0}
+                                expanded={speakerSectionOpen}
+                                onChange={() =>
+                                    setSpeakerSectionOpen((prev) => !prev)
+                                }
+                                sx={{
+                                    borderRadius: 2,
+                                    border: `1px solid ${theme.palette.divider}`,
+                                    backgroundColor: "transparent",
+                                    "&:before": { display: "none" },
+                                    "&.Mui-expanded": { margin: 0 },
+                                    alignSelf: "start",
+                                }}
+                            >
+                                <AccordionSummary
+                                    expandIcon={<ExpandMoreIcon />}
+                                >
+                                    <Typography variant="subtitle2">
+                                        Speaker Handling
+                                    </Typography>
+                                </AccordionSummary>
+
+                                <AccordionDetails
+                                    sx={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 1.25,
+                                    }}
+                                >
                                     <Box
                                         sx={{
                                             display: "flex",
@@ -2113,202 +2147,353 @@ export const UploadAudioPage = () => {
                                             gap: 1,
                                         }}
                                     >
-                                        <InfoLabel
-                                            label={
-                                                currentSpeakerType === "role"
-                                                    ? "Known values (required)"
-                                                    : "Known values (optional)"
-                                            }
-                                            tooltip={
-                                                currentSpeakerType === "role"
-                                                    ? "Provide all expected roles. Role-based identification requires known values."
-                                                    : "Add names you expect in the recording."
-                                            }
-                                        />
-
-                                        {knownSpeakerInputs.map(
-                                            (value, index) => (
-                                                <TextField
-                                                    key={index}
-                                                    size="small"
-                                                    label={`Known value ${index + 1}`}
-                                                    value={value}
-                                                    placeholder={
-                                                        knownValuePlaceholder
-                                                    }
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    checked={diarizationEnabled}
                                                     onChange={(e) =>
-                                                        handleKnownSpeakerChange(
-                                                            index,
-                                                            e.target.value,
+                                                        handleSpeakerLabelsToggle(
+                                                            e.target.checked,
                                                         )
                                                     }
                                                 />
-                                            ),
-                                        )}
+                                            }
+                                            label={
+                                                <InfoLabel
+                                                    label="Speaker Label"
+                                                    tooltip="Separates the transcript into speaker turns."
+                                                />
+                                            }
+                                        />
 
-                                        <Button
-                                            variant="text"
-                                            startIcon={<AddCircleOutlineIcon />}
-                                            onClick={handleAddKnownValueField}
-                                            sx={{
-                                                justifyContent: "flex-start",
-                                                width: "fit-content",
-                                                textTransform: "none",
-                                                px: 0,
-                                            }}
-                                        >
-                                            Add another known value
-                                        </Button>
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    checked={
+                                                        speakerIdentificationEnabled
+                                                    }
+                                                    onChange={(e) =>
+                                                        handleSpeakerIdentificationToggle(
+                                                            e.target.checked,
+                                                        )
+                                                    }
+                                                />
+                                            }
+                                            label={
+                                                <InfoLabel
+                                                    label="Speaker ID"
+                                                    tooltip="Uses known names or roles to guide speaker identification. This mode keeps speaker labels on but does not send an expected-speaker count to AssemblyAI."
+                                                />
+                                            }
+                                        />
                                     </Box>
-                                </>
-                            )}
-                        </AccordionDetails>
-                    </Accordion>
 
-                    <Accordion
-                        disableGutters
-                        elevation={0}
-                        expanded={formatSectionOpen}
-                        onChange={() => setFormatSectionOpen((prev) => !prev)}
-                        sx={{
-                            borderRadius: 2,
-                            border: `1px solid ${theme.palette.divider}`,
-                            backgroundColor: "transparent",
-                            "&:before": { display: "none" },
-                            "&.Mui-expanded": { margin: 0 },
-                        }}
-                    >
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                            <Typography variant="subtitle2">
-                                Format Transcript
-                            </Typography>
-                        </AccordionSummary>
+                                    <TextField
+                                        label={
+                                            speakerIdentificationEnabled
+                                                ? "Known speakers"
+                                                : "Speakers expected"
+                                        }
+                                        type="number"
+                                        value={options.speakers_expected ?? 1}
+                                        onChange={(e) =>
+                                            handleSpeakersExpectedChange(
+                                                e.target.value,
+                                            )
+                                        }
+                                        slotProps={{
+                                            htmlInput: { min: 1, max: 20 },
+                                        }}
+                                        size="small"
+                                        disabled={
+                                            !diarizationEnabled &&
+                                            !speakerIdentificationEnabled
+                                        }
+                                        helperText={
+                                            speakerIdentificationEnabled
+                                                ? "Used only to size the known-speaker input list. It is not sent in the identification request."
+                                                : diarizationEnabled
+                                                  ? "Used to improve speaker labeling."
+                                                  : "Enable Speaker Label or Speaker ID to configure speaker handling."
+                                        }
+                                    />
 
-                        <AccordionDetails
+                                    {speakerIdentificationEnabled ? (
+                                        <>
+                                            <FormControl size="small" fullWidth>
+                                                <InputLabel id="speaker-type-label">
+                                                    Speaker type
+                                                </InputLabel>
+                                                <Select
+                                                    labelId="speaker-type-label"
+                                                    label="Speaker type"
+                                                    value={currentSpeakerType}
+                                                    onChange={(e) =>
+                                                        handleSpeakerTypeChange(
+                                                            e.target
+                                                                .value as SpeakerType,
+                                                        )
+                                                    }
+                                                >
+                                                    <MenuItem value="name">
+                                                        Name
+                                                    </MenuItem>
+                                                    <MenuItem value="role">
+                                                        Role
+                                                    </MenuItem>
+                                                </Select>
+                                            </FormControl>
+
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    gap: 1,
+                                                }}
+                                            >
+                                                <InfoLabel
+                                                    label={
+                                                        currentSpeakerType ===
+                                                        "role"
+                                                            ? "Known values (required)"
+                                                            : "Known values (optional)"
+                                                    }
+                                                    tooltip={
+                                                        currentSpeakerType ===
+                                                        "role"
+                                                            ? "Provide all expected roles. Role-based identification requires known values."
+                                                            : "Add names you expect in the recording."
+                                                    }
+                                                />
+
+                                                {knownSpeakerInputs.map(
+                                                    (value, index) => (
+                                                        <TextField
+                                                            key={index}
+                                                            size="small"
+                                                            label={`Known value ${index + 1}`}
+                                                            value={value}
+                                                            placeholder={
+                                                                knownValuePlaceholder
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleKnownSpeakerChange(
+                                                                    index,
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                        />
+                                                    ),
+                                                )}
+
+                                                <Button
+                                                    variant="text"
+                                                    startIcon={
+                                                        <AddCircleOutlineIcon />
+                                                    }
+                                                    onClick={
+                                                        handleAddKnownValueField
+                                                    }
+                                                    sx={{
+                                                        justifyContent:
+                                                            "flex-start",
+                                                        width: "fit-content",
+                                                        textTransform: "none",
+                                                        px: 0,
+                                                    }}
+                                                >
+                                                    Add another known value
+                                                </Button>
+                                            </Box>
+                                        </>
+                                    ) : null}
+                                </AccordionDetails>
+                            </Accordion>
+
+                            <Accordion
+                                disableGutters
+                                elevation={0}
+                                expanded={formatSectionOpen}
+                                onChange={() =>
+                                    setFormatSectionOpen((prev) => !prev)
+                                }
+                                sx={{
+                                    borderRadius: 2,
+                                    border: `1px solid ${theme.palette.divider}`,
+                                    backgroundColor: "transparent",
+                                    "&:before": { display: "none" },
+                                    "&.Mui-expanded": { margin: 0 },
+                                    alignSelf: "start",
+                                }}
+                            >
+                                <AccordionSummary
+                                    expandIcon={<ExpandMoreIcon />}
+                                >
+                                    <Typography variant="subtitle2">
+                                        Format Transcript
+                                    </Typography>
+                                </AccordionSummary>
+
+                                <AccordionDetails
+                                    sx={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 0.25,
+                                    }}
+                                >
+                                    {renderFormattingSwitch({
+                                        checked: Boolean(options.punctuate),
+                                        label: "Auto Punctuation",
+                                        tooltip:
+                                            "Adds punctuation automatically to improve readability.",
+                                        onChange: (checked) =>
+                                            setOptions((prev) => ({
+                                                ...prev,
+                                                punctuate: checked,
+                                            })),
+                                    })}
+
+                                    {renderFormattingSwitch({
+                                        checked: Boolean(options.format_text),
+                                        label: "Text Formatting",
+                                        tooltip:
+                                            "Applies transcript formatting for cleaner readable output.",
+                                        onChange: (checked) =>
+                                            setOptions((prev) => ({
+                                                ...prev,
+                                                format_text: checked,
+                                            })),
+                                    })}
+
+                                    {renderFormattingSwitch({
+                                        checked: Boolean(options.disfluencies),
+                                        label: "Filler Words",
+                                        tooltip:
+                                            "Keeps words like um, uh, hesitations, and false starts.",
+                                        onChange: (checked) =>
+                                            setOptions((prev) => ({
+                                                ...prev,
+                                                disfluencies: checked,
+                                            })),
+                                    })}
+                                </AccordionDetails>
+                            </Accordion>
+                        </Box>
+
+                        {/* ROW 5 — Project (AssemblyAI Key) */}
+                        <Box
                             sx={{
                                 display: "flex",
                                 flexDirection: "column",
-                                gap: 0.25,
+                                alignItems: "center",
+                                gap: 1.25,
+                                pt: 0.5,
                             }}
                         >
-                            {renderFormattingSwitch({
-                                checked: Boolean(options.punctuate),
-                                label: "Auto Punctuation",
-                                tooltip:
-                                    "Adds punctuation automatically to improve readability.",
-                                onChange: (checked) =>
-                                    setOptions((prev) => ({
-                                        ...prev,
-                                        punctuate: checked,
-                                    })),
-                            })}
-
-                            {renderFormattingSwitch({
-                                checked: Boolean(options.format_text),
-                                label: "Text Formatting",
-                                tooltip:
-                                    "Applies transcript formatting for cleaner readable output.",
-                                onChange: (checked) =>
-                                    setOptions((prev) => ({
-                                        ...prev,
-                                        format_text: checked,
-                                    })),
-                            })}
-
-                            {renderFormattingSwitch({
-                                checked: Boolean(options.disfluencies),
-                                label: "Filler Words",
-                                tooltip:
-                                    "Keeps words like um, uh, hesitations, and false starts.",
-                                onChange: (checked) =>
-                                    setOptions((prev) => ({
-                                        ...prev,
-                                        disfluencies: checked,
-                                    })),
-                            })}
-                        </AccordionDetails>
-                    </Accordion>
-
-                    <Box
-                        sx={{
-                            mt: "auto",
-                            pt: 1,
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 2,
-                        }}
-                    >
-                        <FormControl
-                            fullWidth
-                            disabled={isProcessingQueue || connectionsLoading}
-                        >
-                            <InputLabel id="assembly-connection-select-label">
-                                AssemblyAI Connection
-                            </InputLabel>
-                            <Select
-                                labelId="assembly-connection-select-label"
-                                value={selectedConnectionValue}
-                                label="AssemblyAI Connection"
-                                onChange={(event) =>
-                                    setSelectedConnectionValue(
-                                        String(event.target.value),
-                                    )
+                            <FormControl
+                                disabled={
+                                    isProcessingQueue || connectionsLoading
                                 }
+                                sx={{
+                                    width: "fit-content",
+                                    minWidth: { xs: "100%", md: 260 },
+                                    maxWidth: "100%",
+                                }}
                             >
-                                <MenuItem value={APP_FALLBACK_CONNECTION_VALUE}>
-                                    App default key
-                                </MenuItem>
-
-                                {assemblyConnections.map((connection) => (
+                                <InputLabel id="assembly-connection-select-label">
+                                    Project (AssemblyAI Key)
+                                </InputLabel>
+                                <Select
+                                    labelId="assembly-connection-select-label"
+                                    value={selectedConnectionValue}
+                                    label="Project (AssemblyAI Key)"
+                                    onChange={(event) =>
+                                        setSelectedConnectionValue(
+                                            String(event.target.value),
+                                        )
+                                    }
+                                >
                                     <MenuItem
-                                        key={connection.id}
-                                        value={String(connection.id)}
+                                        value={APP_FALLBACK_CONNECTION_VALUE}
                                     >
-                                        {connection.label}
-                                        {connection.is_default
-                                            ? " (default)"
-                                            : ""}
+                                        App default key
                                     </MenuItem>
-                                ))}
-                            </Select>
 
-                            <FormHelperText>
-                                {connectionsLoading
-                                    ? "Loading your saved connections..."
-                                    : selectedConnectionHelperText}
-                            </FormHelperText>
-                        </FormControl>
+                                    {assemblyConnections.map((connection) => (
+                                        <MenuItem
+                                            key={connection.id}
+                                            value={String(connection.id)}
+                                        >
+                                            {connection.label}
+                                            {connection.is_default
+                                                ? " (default)"
+                                                : ""}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
 
-                        {connectionsError ? (
-                            <Alert severity="warning">{connectionsError}</Alert>
-                        ) : null}
+                                <FormHelperText>
+                                    {connectionsLoading
+                                        ? "Loading your saved connections..."
+                                        : selectedConnectionHelperText}
+                                </FormHelperText>
+                            </FormControl>
 
-                        <Button
-                            variant="contained"
-                            fullWidth
-                            onClick={processQueueSequentially}
-                            disabled={isProcessingQueue || items.length === 0}
+                            {connectionsError ? (
+                                <Alert
+                                    severity="warning"
+                                    sx={{
+                                        width: "fit-content",
+                                        minWidth: { xs: "100%", md: 260 },
+                                        maxWidth: "100%",
+                                    }}
+                                >
+                                    {connectionsError}
+                                </Alert>
+                            ) : null}
+                        </Box>
+
+                        {/* ROW 6 — start button */}
+                        <Box
                             sx={{
-                                py: 1.25,
-                                fontWeight: 600,
-                                backgroundColor: colors.greenAccent[500],
-                                color: theme.palette.getContrastText(
-                                    colors.greenAccent[500],
-                                ),
-                                "&:hover": {
-                                    backgroundColor: colors.greenAccent[600],
-                                },
-                                "&.Mui-disabled": {
-                                    backgroundColor:
-                                        theme.palette.action.disabledBackground,
-                                    color: theme.palette.action.disabled,
-                                },
+                                display: "flex",
+                                justifyContent: "center",
+                                pt: 0.5,
                             }}
                         >
-                            {isProcessingQueue
-                                ? "Processing Batch..."
-                                : "Start Transcription Batch"}
-                        </Button>
+                            <Button
+                                variant="contained"
+                                onClick={processQueueSequentially}
+                                disabled={
+                                    isProcessingQueue || items.length === 0
+                                }
+                                sx={{
+                                    width: "fit-content",
+                                    px: 2.5,
+                                    py: 1.25,
+                                    fontWeight: 600,
+                                    backgroundColor: colors.greenAccent[500],
+                                    color: theme.palette.getContrastText(
+                                        colors.greenAccent[500],
+                                    ),
+                                    "&:hover": {
+                                        backgroundColor:
+                                            colors.greenAccent[600],
+                                    },
+                                    "&.Mui-disabled": {
+                                        backgroundColor:
+                                            theme.palette.action
+                                                .disabledBackground,
+                                        color: theme.palette.action.disabled,
+                                    },
+                                }}
+                            >
+                                {isProcessingQueue
+                                    ? "Processing Batch..."
+                                    : "Start Transcription Batch"}
+                            </Button>
+                        </Box>
                     </Box>
                 </Paper>
 
@@ -2316,16 +2501,18 @@ export const UploadAudioPage = () => {
                 <Paper
                     sx={{
                         p: 3,
-                        width: "100%",
-                        flex: { xl: "0 0 340px" },
+                        width: { xs: "100%", xl: 430 },
                         minWidth: 0,
                         borderRadius: 3,
                         border: `1px solid ${theme.palette.divider}`,
                         display: "flex",
                         flexDirection: "column",
                         gap: 2,
-                        minHeight: { xl: "calc(100vh - 180px)" },
+                        height: "auto",
+                        minHeight: 0,
+                        maxHeight: { xl: "min(120vh, 1200px)" },
                         overflow: "hidden",
+                        alignSelf: "start",
                         transition: "box-shadow 150ms ease",
                         "&:hover": { boxShadow: 2 },
                     }}
@@ -2356,25 +2543,32 @@ export const UploadAudioPage = () => {
                         )}
                     </Box>
 
-                    {/* MIDDLE PANEL QUEUE LIST — scrollable queue items */}
+                    {/* MIDDLE PANEL QUEUE LIST*/}
                     <Box
                         sx={{
-                            flex: 1,
-                            minHeight: 0,
-                            overflowY: "auto",
                             display: "flex",
                             flexDirection: "column",
                             gap: 1,
                             pr: 0.5,
+                            overflowY: "auto",
+                            maxHeight: { xl: "min(92vh, 920px)" },
                         }}
                     >
                         {items.length === 0 ? (
-                            <Typography
-                                variant="body2"
-                                sx={{ color: "text.secondary" }}
+                            <Box
+                                sx={{
+                                    minHeight: 120,
+                                    display: "flex",
+                                    alignItems: "center",
+                                }}
                             >
-                                No files added yet.
-                            </Typography>
+                                <Typography
+                                    variant="body2"
+                                    sx={{ color: "text.secondary" }}
+                                >
+                                    No files added yet.
+                                </Typography>
+                            </Box>
                         ) : (
                             items.map((item) => {
                                 const itemActiveStepIndex =
@@ -2473,7 +2667,10 @@ export const UploadAudioPage = () => {
                                                             mt: 0.5,
                                                         }}
                                                     >
-                                                        {item.error}
+                                                        {item.jobId &&
+                                                        item.status === "failed"
+                                                            ? "Tracking interrupted. Retry to reconnect."
+                                                            : item.error}
                                                     </Typography>
                                                 ) : null}
                                             </Box>
@@ -2482,62 +2679,49 @@ export const UploadAudioPage = () => {
                                             <Box
                                                 sx={{
                                                     display: "flex",
-                                                    flexDirection: "column",
-                                                    alignItems: "flex-end",
+                                                    alignItems: "center",
                                                     gap: 1,
+                                                    flexWrap: "wrap",
+                                                    justifyContent: "flex-end",
                                                 }}
                                             >
-                                                <Box
-                                                    sx={{
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: 1,
-                                                        flexWrap: "wrap",
-                                                        justifyContent:
-                                                            "flex-end",
-                                                    }}
-                                                >
-                                                    <Chip
-                                                        size="small"
-                                                        label={getStatusLabel(
-                                                            item.status,
-                                                        )}
-                                                        color={getStatusChipColor(
-                                                            item.status,
-                                                        )}
-                                                        variant={
-                                                            item.status ===
-                                                            "queued"
-                                                                ? "outlined"
-                                                                : "filled"
-                                                        }
-                                                    />
+                                                <Chip
+                                                    size="small"
+                                                    label={getStatusLabel(
+                                                        item.status,
+                                                    )}
+                                                    color={getStatusChipColor(
+                                                        item.status,
+                                                    )}
+                                                    variant={
+                                                        item.status === "queued"
+                                                            ? "outlined"
+                                                            : "filled"
+                                                    }
+                                                />
 
-                                                    {!isProcessingQueue ||
-                                                    item.status === "queued" ||
-                                                    item.status ===
-                                                        "completed" ||
-                                                    item.status === "failed" ? (
-                                                        <Button
-                                                            size="small"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleRemoveQueueItem(
-                                                                    item.id,
-                                                                );
-                                                            }}
-                                                            sx={{
-                                                                minWidth:
-                                                                    "auto",
-                                                                px: 1,
-                                                                textTransform:
-                                                                    "none",
-                                                            }}
-                                                        >
-                                                            Remove
-                                                        </Button>
-                                                    ) : null}
-                                                </Box>
+                                                {!isProcessingQueue ||
+                                                item.status === "queued" ||
+                                                item.status === "completed" ||
+                                                item.status === "failed" ? (
+                                                    <Button
+                                                        size="small"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRemoveQueueItem(
+                                                                item.id,
+                                                            );
+                                                        }}
+                                                        sx={{
+                                                            minWidth: "auto",
+                                                            px: 1,
+                                                            textTransform:
+                                                                "none",
+                                                        }}
+                                                    >
+                                                        Remove
+                                                    </Button>
+                                                ) : null}
 
                                                 {/* QUEUE ITEM RETRY — reconnect SSE tracking  */}
                                                 {item.jobId &&
@@ -2551,6 +2735,8 @@ export const UploadAudioPage = () => {
                                                             );
                                                         }}
                                                         sx={{
+                                                            minWidth: "auto",
+                                                            px: 1,
                                                             textTransform:
                                                                 "none",
                                                         }}
@@ -2643,15 +2829,27 @@ export const UploadAudioPage = () => {
                 <Paper
                     sx={{
                         p: 3,
-                        width: "100%",
-                        flex: { xl: "1 1 0" },
+                        width: { xs: "100%", xl: 540 },
                         minWidth: 0,
+                        justifySelf: "center",
                         borderRadius: 3,
                         border: `1px solid ${theme.palette.divider}`,
                         display: "flex",
                         flexDirection: "column",
-                        minHeight: { xl: "calc(100vh - 180px)" },
+                        height: {
+                            xs: "auto",
+                            xl: "calc(100vh - 125px)",
+                        },
+                        minHeight: {
+                            xs: 260,
+                            xl: 0,
+                        },
+                        maxHeight: {
+                            xs: "none",
+                            xl: "calc(100vh - 110px)",
+                        },
                         overflow: "hidden",
+                        alignSelf: "start",
                         transition: "box-shadow 150ms ease",
                         "&:hover": { boxShadow: 2 },
                     }}
@@ -2795,10 +2993,9 @@ export const UploadAudioPage = () => {
 
                     <Box
                         sx={{
-                            flex: 1,
-                            minHeight: 0,
                             display: "flex",
                             flexDirection: "column",
+                            minHeight: 0,
                             overflow: "hidden",
                             transition: "opacity 180ms ease",
                             opacity: selectedResultItem?.result ? 1 : 0.98,
@@ -2811,7 +3008,7 @@ export const UploadAudioPage = () => {
                                     borderRadius: 2,
                                     p: 3,
                                     textAlign: "center",
-                                    height: "100%",
+                                    minHeight: 140,
                                     display: "flex",
                                     flexDirection: "column",
                                     alignItems: "center",
@@ -2895,7 +3092,6 @@ export const UploadAudioPage = () => {
                                     display: "flex",
                                     flexDirection: "column",
                                     gap: 1.5,
-                                    flex: 1,
                                     minHeight: 0,
                                     overflow: "hidden",
                                     animation: "fadeIn 180ms ease",
@@ -2947,7 +3143,7 @@ export const UploadAudioPage = () => {
                                     sx={{
                                         flex: 1,
                                         minHeight: 0,
-                                        overflowY: "auto",
+                                        overflowY: "hidden",
                                     }}
                                 >
                                     <TranscriptText
