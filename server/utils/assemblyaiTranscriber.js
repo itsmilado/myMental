@@ -4,6 +4,29 @@ const logger = require("./logger");
 const { assemblyClient } = require("../utils/assemblyaiClient");
 
 /*
+ - Removes undefined properties from an object so the final request
+ - stays minimal and matches the documented AssemblyAI schema.
+ */
+const removeUndefinedEntries = (value = {}) => {
+    return Object.fromEntries(
+        Object.entries(value).filter(
+            ([, entryValue]) => entryValue !== undefined,
+        ),
+    );
+};
+
+/*
+ - Normalizes known speaker values used for speaker identification.
+ */
+const sanitizeKnownValues = (knownValues) => {
+    if (!Array.isArray(knownValues)) {
+        return [];
+    }
+
+    return knownValues.map((value) => String(value).trim()).filter(Boolean);
+};
+
+/*
 - Builds the final AssemblyAI transcription request.
 - Inputs: normalized app-level transcription options.
 - Outputs: AssemblyAI-compatible request payload.
@@ -14,85 +37,92 @@ const buildAssemblyAiTranscriptionRequest = (transcriptionOptions = {}) => {
         ...transcriptionOptions,
     };
 
+    const speakerIdentification = transcriptionOptions?.speaker_identification;
+    const identificationEnabled = Boolean(speakerIdentification?.enabled);
+
+    // Remove app-only / invalid top-level fields before building final payload
     delete request.speaker_identification;
 
-    if (transcriptionOptions?.speaker_identification?.enabled) {
-        const knownValues = Array.isArray(
-            transcriptionOptions.speaker_identification.known_values,
-        )
-            ? transcriptionOptions.speaker_identification.known_values
-                  .map((value) => String(value).trim())
-                  .filter(Boolean)
-            : undefined;
+    if (identificationEnabled) {
+        const knownValues = sanitizeKnownValues(
+            speakerIdentification.known_values,
+        );
 
         request.speaker_labels = true;
+
+        // Important: do NOT send speakers_expected when speaker identification is enabled
         delete request.speakers_expected;
 
         request.speech_understanding = {
             request: {
-                speaker_identification: {
-                    speaker_type:
-                        transcriptionOptions.speaker_identification
-                            .speaker_type ?? "name",
-                    ...(knownValues && knownValues.length > 0
-                        ? { known_values: knownValues }
-                        : {}),
-                },
+                speaker_identification: removeUndefinedEntries({
+                    speaker_type: speakerIdentification.speaker_type || "name",
+                    known_values:
+                        knownValues.length > 0 ? knownValues : undefined,
+                }),
             },
         };
     }
 
-    return request;
+    return removeUndefinedEntries(request);
 };
 
 /**
 - Sends transcription request to AssemblyAI and returns transcript ID
 */
-const requestTranscription = async (transcriptionOptions) => {
+const requestTranscription = async (
+    transcriptionOptions,
+    client = assemblyClient,
+) => {
     try {
         const assemblyRequest =
             buildAssemblyAiTranscriptionRequest(transcriptionOptions);
 
         logger.info(
-            `[requestTranscription] => AssemblyAI request: ${JSON.stringify({
-                ...assemblyRequest,
-                audio_url: assemblyRequest.audio_url ? "[redacted]" : undefined,
-            })}`,
+            `[assemblyaiTranscriber.requestTranscription] => submitting transcript request: ${JSON.stringify(
+                {
+                    ...assemblyRequest,
+                    audio_url: assemblyRequest.audio_url
+                        ? "[redacted]"
+                        : undefined,
+                },
+            )}`,
         );
 
-        const transcript =
-            await assemblyClient.transcripts.transcribe(assemblyRequest);
+        const transcript = await client.transcripts.submit(assemblyRequest);
 
-        if (!transcript || !transcript.id) {
-            throw new Error("Error requesting transcription");
-        }
-
-        logger.info(
-            `[requestTranscription] => Transcription requested successfully, ID: ${transcript.id}`,
-        );
-
-        return transcript.id;
+        return transcript;
     } catch (error) {
-        logger.error(`[requestTranscription] => Error: ${error.message}`);
+        logger.error(
+            `[assemblyaiTranscriber.requestTranscription] => failed to submit transcript: ${error.message}`,
+        );
         throw error;
     }
 };
 
 // Poll for transcription result
-const pollTranscriptionResult = async (transcriptId) => {
+const pollTranscriptionResult = async (
+    transcriptId,
+    client = assemblyClient,
+    intervalMs = 3000,
+) => {
     try {
         let transcript;
         while (true) {
-            transcript = await assemblyClient.transcripts.get(transcriptId);
+            transcript = await client.transcripts.get(transcriptId);
             if (transcript.status === "completed") {
                 logger.info(
                     `[pollTranscriptionResult] => Transcription completed and fetched`,
                 );
                 return transcript;
-            } else if (transcript.status === "failed") {
-                throw new Error("Transcription failed");
             }
-            await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5s before polling again
+            if (transcript.status === "error") {
+                throw new Error(
+                    transcript.error || "AssemblyAI transcription failed.",
+                );
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, intervalMs));
         }
     } catch (error) {
         logger.error(
