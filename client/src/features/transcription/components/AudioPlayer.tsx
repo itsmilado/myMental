@@ -1,3 +1,5 @@
+//src/features/transcription/components/AudioPlayer.tsx
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
     Box,
@@ -20,6 +22,9 @@ type Props = {
     src: string; // fully qualified URL
     disabled?: boolean;
     disabledMessage?: string;
+    onTimeChange?: (currentTimeSeconds: number) => void;
+    onSeek?: (currentTimeSeconds: number) => void;
+    onEnded?: () => void;
 };
 
 const formatTime = (sec: number) => {
@@ -33,7 +38,14 @@ const formatTime = (sec: number) => {
     return h > 0 ? `${pad(h)}:${pad(m)}:${pad(r)}` : `${pad(m)}:${pad(r)}`;
 };
 
-export const AudioPlayer = ({ src, disabled, disabledMessage }: Props) => {
+export const AudioPlayer = ({
+    src,
+    disabled,
+    disabledMessage,
+    onTimeChange,
+    onSeek,
+    onEnded,
+}: Props) => {
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
     const [exists, setExists] = useState<boolean | null>(null);
@@ -46,18 +58,31 @@ export const AudioPlayer = ({ src, disabled, disabledMessage }: Props) => {
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     const effectiveDisabled = disabled || exists === false;
+    const isObjectUrl = src.startsWith("blob:");
 
     const effectiveMessage = useMemo(() => {
         if (disabled && disabledMessage) return disabledMessage;
-        if (exists === false) return "Audio file missing or deleted.";
+        if (!isObjectUrl && exists === false)
+            return "Audio file missing or deleted.";
         if (errorMsg) return errorMsg;
         return null;
-    }, [disabled, disabledMessage, exists, errorMsg]);
+    }, [disabled, disabledMessage, exists, errorMsg, isObjectUrl]);
 
-    // Existence check (HEAD). If server doesn’t support HEAD properly, it’ll still
-    // typically work because Express handles HEAD for GET routes.
+    /*
+    - purpose: verify that the current audio source is available before enabling playback
+    - inputs: source URL and current disabled state
+    - outputs: existence state and user-facing audio availability errors
+    - important behavior: resets playback state and highlight timing when the source changes
+    */
+
     useEffect(() => {
         let cancelled = false;
+
+        setCurrentTime(0);
+        setDuration(0);
+        setIsPlaying(false);
+        setIsSeeking(false);
+        onTimeChange?.(0);
 
         const check = async () => {
             setExists(null);
@@ -82,14 +107,26 @@ export const AudioPlayer = ({ src, disabled, disabledMessage }: Props) => {
             return;
         }
 
+        if (isObjectUrl) {
+            setExists(true);
+            return;
+        }
+
         check();
 
         return () => {
             cancelled = true;
         };
-    }, [src, disabled]);
+    }, [src, disabled, onTimeChange, isObjectUrl]);
 
-    // Wire audio element events
+    /*
+    - purpose: verify that the current audio source is available before enabling playback
+    - inputs: source URL and current disabled state
+    - outputs: existence state and user-facing audio availability errors
+    - important behavior: skips network existence checks for browser blob URLs because
+      upload-result playback uses local object URLs rather than server endpoints
+    */
+
     useEffect(() => {
         const el = audioRef.current;
         if (!el) return;
@@ -97,12 +134,22 @@ export const AudioPlayer = ({ src, disabled, disabledMessage }: Props) => {
         const onLoaded = () => {
             setDuration(el.duration || 0);
         };
+
         const onTime = () => {
-            if (!isSeeking) setCurrentTime(el.currentTime || 0);
+            const nextTime = el.currentTime || 0;
+
+            if (!isSeeking) {
+                setCurrentTime(nextTime);
+            }
+
+            onTimeChange?.(nextTime);
         };
-        const onEnded = () => {
+
+        const handleEnded = () => {
             setIsPlaying(false);
+            onEnded?.();
         };
+
         const onError = () => {
             setIsPlaying(false);
             setErrorMsg("Audio failed to load.");
@@ -111,18 +158,24 @@ export const AudioPlayer = ({ src, disabled, disabledMessage }: Props) => {
 
         el.addEventListener("loadedmetadata", onLoaded);
         el.addEventListener("timeupdate", onTime);
-        el.addEventListener("ended", onEnded);
+        el.addEventListener("ended", handleEnded);
         el.addEventListener("error", onError);
 
         return () => {
             el.removeEventListener("loadedmetadata", onLoaded);
             el.removeEventListener("timeupdate", onTime);
-            el.removeEventListener("ended", onEnded);
+            el.removeEventListener("ended", handleEnded);
             el.removeEventListener("error", onError);
         };
-    }, [isSeeking]);
+    }, [isSeeking, onEnded, onTimeChange]);
 
-    // stop when unmount / src changes
+    /*
+    - purpose: stop active playback when the component unmounts or switches sources
+    - inputs: current audio source lifecycle
+    - outputs: paused audio element during teardown
+    - important behavior: prevents stale playback from continuing across transcript switches
+    */
+
     useEffect(() => {
         const el = audioRef.current;
         return () => {
@@ -150,16 +203,28 @@ export const AudioPlayer = ({ src, disabled, disabledMessage }: Props) => {
         }
     };
 
+    /*
+    - purpose: move playback backward or forward by a fixed number of seconds
+    - inputs: signed delta in seconds relative to the current playback position
+    - outputs: updated audio currentTime and synced transcript timing callbacks
+    - important behavior: clamps the next position to valid media bounds
+    */
+
     const skip = (delta: number) => {
         if (effectiveDisabled) return;
+
         const el = audioRef.current;
         if (!el) return;
-        const next = Math.max(
+
+        const nextTime = Math.max(
             0,
-            Math.min(el.currentTime + delta, duration || 0)
+            Math.min(el.currentTime + delta, duration || 0),
         );
-        el.currentTime = next;
-        setCurrentTime(next);
+
+        el.currentTime = nextTime;
+        setCurrentTime(nextTime);
+        onSeek?.(nextTime);
+        onTimeChange?.(nextTime);
     };
 
     const toggleMute = () => {
@@ -268,15 +333,22 @@ export const AudioPlayer = ({ src, disabled, disabledMessage }: Props) => {
                         step={0.25}
                         disabled={effectiveDisabled}
                         onChange={(_, v) => {
-                            const next = Array.isArray(v) ? v[0] : v;
+                            const nextTime = Array.isArray(v) ? v[0] : v;
                             setIsSeeking(true);
-                            setCurrentTime(next);
+                            setCurrentTime(nextTime);
                         }}
                         onChangeCommitted={(_, v) => {
-                            const next = Array.isArray(v) ? v[0] : v;
+                            const nextTime = Array.isArray(v) ? v[0] : v;
                             const el = audioRef.current;
-                            if (el) el.currentTime = next;
+
+                            if (el) {
+                                el.currentTime = nextTime;
+                            }
+
+                            setCurrentTime(nextTime);
                             setIsSeeking(false);
+                            onSeek?.(nextTime);
+                            onTimeChange?.(nextTime);
                         }}
                     />
 
