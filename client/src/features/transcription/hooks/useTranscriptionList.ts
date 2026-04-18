@@ -8,7 +8,13 @@ export const useTranscriptionList = () => {
     const { setList, setLoading, setError, filters, sort } =
         useTranscriptionStore();
 
-    // Fetch transcriptions using the current filter and sort state
+    /*
+    - purpose: load offline transcription history using the current store-owned query state
+    - inputs: active filter and sort values from the transcription store
+    - outputs: updated offline history list, loading state, and error state
+    - important behavior: keeps fetch timing under page control so callers decide when history should refresh
+    */
+
     const loadTranscriptions = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -23,6 +29,6 @@ export const useTranscriptionList = () => {
         }
     }, [filters, sort, setList, setLoading, setError]);
 
-    // Fetch timing is controlled by the consuming page
+    // avoids hidden fetch side effects during mount and filter changes
     return { loadTranscriptions };
 };
