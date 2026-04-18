@@ -11,6 +11,9 @@ import type {
     TranscriptData,
     TranscriptionConnectionMetadata,
     TranscriptionOptions,
+    NormalizedTranscriptTiming,
+    NormalizedTranscriptWord,
+    TranscriptUtterance,
 } from "../../../types/types";
 
 export type NormalizedHistoryMetadata = {
@@ -213,5 +216,130 @@ export const normalizeOnlineHistoryMetadata = (
         knownSpeakerValues: [],
         recordedAtLabel: transcription.file_recorded_at ?? null,
         transcribedAtLabel: transcription.created_at ?? null,
+    };
+};
+
+/*
+- Normalizes word-level timing entries from mixed backend payload shapes.
+- Inputs: unknown word timing array from online transcript history data.
+- Outputs: cleaned word timing array or null when unavailable.
+- Important behavior: drops incomplete timing entries so playback sync only
+  works with valid timed words.
+*/
+const normalizeTranscriptWords = (
+    words: unknown,
+): NormalizedTranscriptWord[] | null => {
+    if (!Array.isArray(words) || words.length === 0) {
+        return null;
+    }
+
+    const normalizedWords = words
+        .map((word): NormalizedTranscriptWord | null => {
+            if (!word || typeof word !== "object") {
+                return null;
+            }
+
+            const candidate = word as {
+                text?: unknown;
+                start?: unknown;
+                end?: unknown;
+                confidence?: unknown;
+                speaker?: unknown;
+            };
+
+            const text = String(candidate.text ?? "").trim();
+            const start =
+                typeof candidate.start === "number" ? candidate.start : null;
+            const end =
+                typeof candidate.end === "number" ? candidate.end : null;
+
+            if (!text || start === null || end === null) {
+                return null;
+            }
+
+            return {
+                text,
+                start,
+                end,
+                confidence:
+                    typeof candidate.confidence === "number"
+                        ? candidate.confidence
+                        : null,
+                speaker:
+                    candidate.speaker == null
+                        ? null
+                        : String(candidate.speaker),
+            };
+        })
+        .filter((word): word is NormalizedTranscriptWord => word !== null);
+
+    return normalizedWords.length > 0 ? normalizedWords : null;
+};
+
+/*
+- Normalizes utterance timing entries from mixed backend/frontend transcript shapes.
+- Inputs: unknown utterance array from offline or online transcript data.
+- Outputs: cleaned utterance timing array or null when unavailable.
+- Important behavior: preserves nullable timing bounds so rendering can still
+  show speaker blocks even when some legacy timing fields are missing.
+*/
+const normalizeTranscriptUtterances = (
+    utterances: unknown,
+): TranscriptUtterance[] | null => {
+    if (!Array.isArray(utterances) || utterances.length === 0) {
+        return null;
+    }
+
+    const normalizedUtterances = utterances
+        .map((utterance) => {
+            if (!utterance || typeof utterance !== "object") {
+                return null;
+            }
+
+            const candidate = utterance as {
+                speaker?: unknown;
+                text?: unknown;
+                start?: unknown;
+                end?: unknown;
+            };
+
+            return {
+                speaker:
+                    candidate.speaker == null
+                        ? null
+                        : typeof candidate.speaker === "number"
+                          ? candidate.speaker
+                          : String(candidate.speaker),
+                text: String(candidate.text ?? ""),
+                start:
+                    typeof candidate.start === "number"
+                        ? candidate.start
+                        : null,
+                end: typeof candidate.end === "number" ? candidate.end : null,
+            };
+        })
+        .filter((utterance): utterance is TranscriptUtterance =>
+            Boolean(utterance),
+        );
+
+    return normalizedUtterances.length > 0 ? normalizedUtterances : null;
+};
+
+/*
+- Normalizes transcript timing payloads into one shared frontend shape.
+- Inputs: transcript-like object with optional words and utterances.
+- Outputs: timing object with nullable word and utterance arrays.
+- Important behavior: keeps playback-highlighting consumers independent from
+  source-specific history payload differences.
+*/
+export const normalizeTranscriptTiming = (
+    transcription: OnlineTranscription & {
+        words?: unknown;
+        utterances?: unknown;
+    },
+): NormalizedTranscriptTiming => {
+    return {
+        words: normalizeTranscriptWords(transcription.words),
+        utterances: normalizeTranscriptUtterances(transcription.utterances),
     };
 };
