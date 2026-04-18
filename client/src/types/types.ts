@@ -251,6 +251,7 @@ export type TranscriptData = {
     created_at: string;
     options: TranscriptionOptions;
     utterances?: TranscriptUtterance[] | null;
+    words?: NormalizedTranscriptWord[] | null;
     assemblyai_connection_id?: number | null;
     assemblyai_connection_label?: string | null;
     assemblyai_connection_source?: AssemblyAiConnectionSource | null;
@@ -261,6 +262,19 @@ export type TranscriptUtterance = {
     text: string;
     start: number | null; // ms
     end: number | null; // ms
+};
+
+export type NormalizedTranscriptWord = {
+    text: string;
+    start: number;
+    end: number;
+    confidence?: number | null;
+    speaker?: string | null;
+};
+
+export type NormalizedTranscriptTiming = {
+    words: NormalizedTranscriptWord[] | null;
+    utterances: TranscriptUtterance[] | null;
 };
 
 export type SpeakerIdentification = {
@@ -408,6 +422,7 @@ export type OnlineTranscription = TranscriptionConnectionMetadata & {
     file_name?: string | null;
     file_recorded_at?: string | null;
     utterances?: TranscriptUtterance[] | null;
+    words?: NormalizedTranscriptWord[] | null;
 };
 
 export type AssemblyTranscriptionState = {
