@@ -47,6 +47,9 @@ import {
 import { usePreferencesStore } from "../../../store/usePreferencesStore";
 import { mapPreferencesToUploadOptions } from "../../preferences/utils/mapPreferencesToUploadOptions";
 
+import { useTranscriptPlaybackSync } from "../hooks/useTranscriptPlaybackSync";
+import { AudioPlayer } from "../components/AudioPlayer";
+
 import { DeleteButton } from "../components/DeleteButton";
 import { ExportButton } from "../components/ExportButton";
 
@@ -544,6 +547,60 @@ export const UploadAudioPage = () => {
         },
         [],
     );
+    const selectedResultItem = useMemo(
+        () => items.find((item) => item.id === selectedResultItemId) ?? null,
+        [items, selectedResultItemId],
+    );
+
+    const selectedTranscript = selectedResultItem?.result;
+    const selectedTranscriptItemId = selectedResultItem?.id ?? null;
+
+    const [currentTimeSeconds, setCurrentTimeSeconds] = useState(0);
+
+    const timing = useMemo(() => {
+        if (!selectedResultItem?.result) {
+            return { words: null, utterances: null };
+        }
+
+        return {
+            words: selectedResultItem.result.words ?? null,
+            utterances: selectedResultItem.result.utterances ?? null,
+        };
+    }, [selectedResultItem]);
+
+    /*
+    - purpose: keep a stable object URL for playback of the selected upload result
+    - inputs: the currently selected uploaded file
+    - outputs: memoized blob URL for the shared audio player
+    - important behavior: prevents playback from resetting on every render by avoiding
+      a new object URL on each state update
+    */
+
+    const selectedResultAudioSrc = useMemo(() => {
+        if (!selectedResultItem?.file) {
+            return "";
+        }
+
+        return URL.createObjectURL(selectedResultItem.file);
+    }, [selectedResultItem?.file]);
+
+    useEffect(() => {
+        return () => {
+            if (selectedResultAudioSrc) {
+                URL.revokeObjectURL(selectedResultAudioSrc);
+            }
+        };
+    }, [selectedResultAudioSrc]);
+
+    const {
+        activeWordIndex,
+        activeUtteranceIndex,
+        hasWordTiming,
+        hasUtteranceTiming,
+    } = useTranscriptPlaybackSync({
+        currentTimeSeconds,
+        timing,
+    });
 
     useEffect(() => {
         if (!preferences && !preferencesLoading) {
@@ -630,16 +687,6 @@ export const UploadAudioPage = () => {
             }
         };
     }, []);
-
-    //const transcriptMaxHeight = "100%";
-
-    const selectedResultItem = useMemo(
-        () => items.find((item) => item.id === selectedResultItemId) ?? null,
-        [items, selectedResultItemId],
-    );
-
-    const selectedTranscript = selectedResultItem?.result;
-    const selectedTranscriptItemId = selectedResultItem?.id ?? null;
 
     const activeQueueItem = useMemo(
         () =>
@@ -3146,13 +3193,26 @@ export const UploadAudioPage = () => {
                                         overflowY: "hidden",
                                     }}
                                 >
+                                    <AudioPlayer
+                                        src={selectedResultAudioSrc}
+                                        onTimeChange={setCurrentTimeSeconds}
+                                        onSeek={setCurrentTimeSeconds}
+                                        onEnded={() => setCurrentTimeSeconds(0)}
+                                    />
                                     <TranscriptText
                                         text={
                                             selectedResultItem.result
                                                 .transcription
                                         }
-                                        utterances={
-                                            selectedResultItem.result.utterances
+                                        utterances={timing.utterances}
+                                        words={timing.words}
+                                        activeWordIndex={activeWordIndex}
+                                        activeUtteranceIndex={
+                                            activeUtteranceIndex
+                                        }
+                                        highlightActiveWord={hasWordTiming}
+                                        highlightActiveSpeakerBlock={
+                                            hasUtteranceTiming
                                         }
                                         maxHeight="100%"
                                     />
