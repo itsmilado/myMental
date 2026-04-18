@@ -352,10 +352,15 @@ const fetchFilteredTranscriptions = async (request, response, next) => {
             backups.map((b) => [b.transcript_id, b.raw_api_data]),
         );
 
-        const hydrated = transcriptions.map((t) => ({
-            ...t,
-            utterances: extractUtterances(backupMap.get(t.transcript_id)),
-        }));
+        const hydrated = transcriptions.map((t) => {
+            const raw = backupMap.get(t.transcript_id);
+
+            return {
+                ...t,
+                utterances: extractUtterances(raw),
+                words: extractWords(raw),
+            };
+        });
 
         response.status(200).json({
             success: true,
@@ -422,6 +427,7 @@ const fetchTranscriptionById = async (request, response, next) => {
             data: {
                 ...transcription,
                 utterances: extractUtterances(rawApiData),
+                words: extractWords(rawApiData),
             },
         });
     } catch (error) {
@@ -487,6 +493,7 @@ const fetchTranscriptionByApiId = async (request, response, next) => {
             data: {
                 ...transcription,
                 utterances: extractUtterances(rawApiData),
+                words: extractWords(rawApiData),
             },
         });
     } catch (error) {
@@ -1284,6 +1291,29 @@ const extractUtterances = (rawApiData) => {
     }));
 };
 
+/*
+- purpose: extract word-level timing data from AssemblyAI raw response
+- inputs: raw_api_data from transcription_backups
+- outputs: normalized word array for frontend playback sync
+- important behavior: returns only fields needed for highlighting
+*/
+
+const extractWords = (rawApiData) => {
+    const raw = safeParseRaw(rawApiData);
+    const transcriptObject = raw?.transcript ?? raw;
+    const words = transcriptObject?.words;
+
+    if (!Array.isArray(words) || words.length === 0) return null;
+
+    return words.map((w) => ({
+        text: w?.text ?? "",
+        start: w?.start ?? null,
+        end: w?.end ?? null,
+        confidence: typeof w?.confidence === "number" ? w.confidence : null,
+        speaker: w?.speaker ?? null,
+    }));
+};
+
 /**
  - Internal worker that runs the full transcription pipeline for one jobId.
  - Emits step events via job.emitter for SSE clients.
@@ -1323,7 +1353,7 @@ const runTranscriptionJob = async ({
         const loggedUserId = user.id;
         const userRole = user.role;
 
-        // ----------------- INIT -----------------
+        //  INIT
         emitStep(TRANSCRIPTION_STEPS.INIT, "in_progress");
 
         if (!loggedUserId) {
@@ -1380,7 +1410,7 @@ const runTranscriptionJob = async ({
             useAppFallback,
         });
 
-        // ----------------- UPLOAD -----------------
+        //  UPLOAD
         emitStep(TRANSCRIPTION_STEPS.UPLOAD, "in_progress");
 
         const uploadUrl = await uploadAudioFile(
@@ -1390,7 +1420,7 @@ const runTranscriptionJob = async ({
 
         emitStep(TRANSCRIPTION_STEPS.UPLOAD, "success");
 
-        // ----------------- TRANSCRIBE -----------------
+        //  TRANSCRIBE
         emitStep(TRANSCRIPTION_STEPS.TRANSCRIBE, "in_progress");
 
         const transcriptionOptions = {
@@ -1487,7 +1517,9 @@ const runTranscriptionJob = async ({
 
         emitStep(TRANSCRIPTION_STEPS.SAVE_FILE, "success");
 
-        // ----------------- COMPLETE -----------------
+        //  COMPLETE
+        // Emit the finalized offline transcript payload used by the client immediately
+        // after upload so history/detail views do not need a refetch for timing data.
         setStepStatus(steps, TRANSCRIPTION_STEPS.COMPLETE, "success", null);
         job.result = insertedTranscription;
         job.error = null;
@@ -1499,6 +1531,7 @@ const runTranscriptionJob = async ({
             transcriptData: {
                 ...insertedTranscription,
                 utterances: extractUtterances(transcript),
+                words: extractWords(transcript),
             },
         });
 
