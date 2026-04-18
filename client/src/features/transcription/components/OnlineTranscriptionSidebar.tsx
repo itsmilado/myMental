@@ -21,12 +21,19 @@ import { getAudioStreamUrl } from "../../auth/api";
 import { AudioPlayer } from "./AudioPlayer";
 import { OnlineTranscription } from "../../../types/types";
 import { TranscriptText } from "./TranscriptText";
-import { normalizeOnlineHistoryMetadata } from "../utils/transcriptionHistoryAdapters";
+import { useTranscriptPlaybackSync } from "../hooks/useTranscriptPlaybackSync";
+import {
+    normalizeOnlineHistoryMetadata,
+    normalizeTranscriptTiming,
+} from "../utils/transcriptionHistoryAdapters";
 
 /*
-- Renders one metadata field with a compact card-like presentation
-- Keeps the sidebar metadata readable in a two-column layout
+- purpose: render one compact metadata field inside the online transcript sidebar
+- inputs: metadata label and display value
+- outputs: small card-like metadata item
+- important behavior: keeps metadata readable in the two-column responsive grid
 */
+
 const DetailItem = ({ label, value }: { label: string; value: string }) => {
     return (
         <Box
@@ -65,6 +72,29 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
     transcription,
     onClose,
 }) => {
+    const [currentTimeSeconds, setCurrentTimeSeconds] = React.useState(0);
+
+    const timing = React.useMemo(() => {
+        if (!transcription) {
+            return {
+                words: null,
+                utterances: null,
+            };
+        }
+
+        return normalizeTranscriptTiming(transcription);
+    }, [transcription]);
+
+    const {
+        activeWordIndex,
+        activeUtteranceIndex,
+        hasWordTiming,
+        hasUtteranceTiming,
+    } = useTranscriptPlaybackSync({
+        currentTimeSeconds,
+        timing,
+    });
+
     if (!transcription) return null;
 
     const isDeleted = transcription.audio_url === "http://deleted_by_user";
@@ -81,6 +111,14 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
         const normalized = value?.toString().trim();
         return normalized ? normalized : fallback;
     };
+
+    /*
+    - purpose: format optional online transcript timestamps for compact metadata display
+    - inputs: nullable ISO-like date string from AssemblyAI history data
+    - outputs: localized date-time string or safe fallback label
+    - important behavior: returns the raw value when parsing fails so malformed data
+      stays visible instead of disappearing
+    */
 
     const formatDateTime = (value: string | null | undefined): string => {
         if (!value) return "Not available";
@@ -323,11 +361,14 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
                         disabledMessage={
                             isDeleted ? "Deleted by user." : undefined
                         }
+                        onTimeChange={setCurrentTimeSeconds}
+                        onSeek={setCurrentTimeSeconds}
+                        onEnded={() => setCurrentTimeSeconds(0)}
                     />
 
                     <Divider sx={{ my: 2 }} />
 
-                    {/* Transcript Text section */}
+                    {/* Playback-synced transcript section */}
                     <Typography variant="h6" mb={1}>
                         Transcript Text
                     </Typography>
@@ -335,7 +376,12 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
                     <Box sx={{ maxHeight: "60vh", overflowY: "auto" }}>
                         <TranscriptText
                             text={transcription.transcription}
-                            utterances={transcription.utterances}
+                            utterances={timing.utterances}
+                            words={timing.words}
+                            activeWordIndex={activeWordIndex}
+                            activeUtteranceIndex={activeUtteranceIndex}
+                            highlightActiveWord={hasWordTiming}
+                            highlightActiveSpeakerBlock={hasUtteranceTiming}
                             maxHeight="50vh"
                         />
                     </Box>
