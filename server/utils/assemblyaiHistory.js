@@ -87,6 +87,44 @@ const extractUtterances = (transcriptObject) => {
     }));
 };
 
+/*
+- Normalizes AssemblyAI word timing into a frontend-safe shape.
+- Inputs: parsed transcript object from backup raw data.
+- Outputs: ordered word array with text/start/end or null when unavailable.
+- Important behavior: filters out invalid timing entries so playback sync logic 
+  only receives usable timed words.
+*/
+const extractWords = (transcriptObject) => {
+    const words = transcriptObject?.words;
+
+    if (!Array.isArray(words) || words.length === 0) return null;
+
+    const normalizedWords = words
+        .map((word) => {
+            const text = String(word?.text ?? "").trim();
+            const start = typeof word?.start === "number" ? word.start : null;
+            const end = typeof word?.end === "number" ? word.end : null;
+
+            if (!text || start === null || end === null) {
+                return null;
+            }
+
+            return {
+                text,
+                start,
+                end,
+                confidence:
+                    typeof word?.confidence === "number"
+                        ? word.confidence
+                        : null,
+                speaker: word?.speaker ?? null,
+            };
+        })
+        .filter(Boolean);
+
+    return normalizedWords.length > 0 ? normalizedWords : null;
+};
+
 // Best-effort flattening from AssemblyAI transcript object
 const flattenTranscription = (transcript) => {
     if (!transcript) return "";
@@ -196,6 +234,7 @@ const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
                     language: transcriptObject?.language_code ?? null,
                     transcription: "",
                     utterances: null,
+                    words: null,
                 };
             }
 
@@ -206,6 +245,10 @@ const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
 
             const utterances = transcriptObject
                 ? extractUtterances(transcriptObject)
+                : null;
+
+            const words = transcriptObject
+                ? extractWords(transcriptObject)
                 : null;
 
             return {
@@ -232,6 +275,7 @@ const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
 
                 transcription: transcriptionText,
                 utterances,
+                words,
 
                 file_name: backupRow.file_name ?? null,
                 file_recorded_at: backupRow.file_recorded_at ?? null,
