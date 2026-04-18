@@ -1,5 +1,6 @@
 // src/features/transcription/components/TranscriptionDetailContent.tsx
 
+import * as React from "react";
 import {
     Accordion,
     AccordionDetails,
@@ -21,6 +22,7 @@ import { DeleteButton } from "./DeleteButton";
 import { getAudioStreamUrl } from "../../auth/api";
 import { AudioPlayer } from "./AudioPlayer";
 import { TranscriptText } from "./TranscriptText";
+import { useTranscriptPlaybackSync } from "../hooks/useTranscriptPlaybackSync";
 import { normalizeOfflineHistoryMetadata } from "../utils/transcriptionHistoryAdapters";
 
 type DeleteArgs = {
@@ -48,6 +50,32 @@ export const TranscriptionDetailContent = ({
     const { options, audio_duration } = transcription ?? {};
 
     const metadata = normalizeOfflineHistoryMetadata(transcription);
+    const [currentTimeSeconds, setCurrentTimeSeconds] = React.useState(0);
+
+    const timing = React.useMemo(() => {
+        return {
+            words: transcription?.words ?? null,
+            utterances: transcription?.utterances ?? null,
+        };
+    }, [transcription?.words, transcription?.utterances]);
+
+    const {
+        activeWordIndex,
+        activeUtteranceIndex,
+        hasWordTiming,
+        hasUtteranceTiming,
+    } = useTranscriptPlaybackSync({
+        currentTimeSeconds,
+        timing,
+    });
+
+    /*
+    - purpose: normalize mixed duration shapes for metadata display
+    - inputs: persisted duration value from the offline transcription record
+    - outputs: human-readable duration string or fallback placeholder
+    - important behavior: supports both legacy structured duration objects and
+      already-formatted string values
+    */
 
     const formatDuration = (dur: any): string => {
         if (!dur) return "-";
@@ -58,18 +86,29 @@ export const TranscriptionDetailContent = ({
         return `${h}:${m}:${s}`;
     };
 
+    /*
+    - purpose: format timestamp-like metadata fields for the detail view
+    - inputs: optional ISO-like date string from the transcription record
+    - outputs: localized display string or safe fallback value
+    - important behavior: returns the raw value when parsing fails so malformed data
+      stays visible instead of disappearing
+    */
+
     const formatDate = (value: string | null | undefined) => {
         if (!value) return "-";
-        const d = new Date(value);
-        if (Number.isNaN(d.getTime())) return value; // fallback to raw if invalid
 
-        const day = String(d.getDate()).padStart(2, "0");
-        const month = String(d.getMonth() + 1).padStart(2, "0");
-        const year = d.getFullYear();
-        const hours = String(d.getHours()).padStart(2, "0");
-        const minutes = String(d.getMinutes()).padStart(2, "0");
+        const date = new Date(value);
 
-        // dd.MM.yyyy HH:mm
+        if (Number.isNaN(date.getTime())) {
+            return value;
+        }
+
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = date.getFullYear();
+        const hours = String(date.getHours()).padStart(2, "0");
+        const minutes = String(date.getMinutes()).padStart(2, "0");
+
         return `${day}.${month}.${year}_${hours}:${minutes}`;
     };
 
@@ -84,7 +123,7 @@ export const TranscriptionDetailContent = ({
                 flexDirection: "column",
             }}
         >
-            {/* ───────────────── Header (sticky) ───────────────── */}
+            {/* Header (sticky) */}
             <Box
                 sx={{
                     position: "sticky",
@@ -175,7 +214,8 @@ export const TranscriptionDetailContent = ({
                 </Box>
             </Box>
 
-            {/* ───────────────── Body (scrollable) ───────────────── */}
+            {/* Shared metadata section used by both modal and full-page offline detail views */}
+
             <Box
                 sx={{
                     flex: 1,
@@ -280,13 +320,18 @@ export const TranscriptionDetailContent = ({
                 </Accordion>
                 {fileName ? (
                     <Box>
-                        <AudioPlayer src={audioSrc} />
+                        <AudioPlayer
+                            src={audioSrc}
+                            onTimeChange={setCurrentTimeSeconds}
+                            onSeek={setCurrentTimeSeconds}
+                            onEnded={() => setCurrentTimeSeconds(0)}
+                        />
                     </Box>
                 ) : null}
 
                 <Divider />
 
-                {/* Transcript */}
+                {/* Transcript panel; playback-synced highlight props are wired here */}
                 <Box
                     sx={{
                         display: "flex",
@@ -318,7 +363,14 @@ export const TranscriptionDetailContent = ({
                     >
                         <TranscriptText
                             text={transcription.transcription}
-                            utterances={transcription.utterances}
+                            utterances={timing.utterances}
+                            words={timing.words}
+                            activeWordIndex={activeWordIndex}
+                            activeUtteranceIndex={activeUtteranceIndex}
+                            highlightActiveWord={hasWordTiming}
+                            highlightActiveSpeakerBlock={hasUtteranceTiming}
+                            defaultShowSpeakers
+                            defaultShowTimestamps={false}
                             disableInternalScroll
                         />
                     </Paper>
