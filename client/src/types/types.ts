@@ -113,6 +113,8 @@ export interface User {
     user_role?: string;
     auth_provider?: "local" | "google";
     google_sub?: string | null;
+    has_password?: boolean;
+    has_google_auth?: boolean;
 }
 
 export type AuthState = {
