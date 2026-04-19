@@ -204,11 +204,7 @@ const updateUserPasswordByIdQuery = async ({ id, hashed_password }) => {
     try {
         const q = `
             UPDATE users
-            SET hashed_password = $2,
-                auth_provider = CASE
-                    WHEN google_sub IS NOT NULL THEN 'local'
-                    ELSE auth_provider
-                END
+            SET hashed_password = $2
             WHERE id = $1
             RETURNING *;
         `;
