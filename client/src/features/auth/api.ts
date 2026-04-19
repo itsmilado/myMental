@@ -250,10 +250,18 @@ export const deleteMyAccount = async (): Promise<string> => {
     }
 };
 
+/*
+- purpose: submit authenticated password create/update requests
+- inputs: newPassword and optional currentPassword
+- outputs: auth response with success message and refreshed user data
+- important behavior:
+  - supports both initial password setup and password changes
+  - returns updated auth capabilities so the account UI can refresh immediately
+*/
 export const changeMyPassword = async (
     newPassword: string,
     currentPassword?: string,
-): Promise<string> => {
+): Promise<AuthResponse> => {
     try {
         const response = await apiClient.post(
             `${USER_BASE_PATH}/me/change-password`,
@@ -269,7 +277,7 @@ export const changeMyPassword = async (
             throw new Error(response.data?.message || "Password update failed");
         }
 
-        return (response.data?.message as string) || "Password updated";
+        return response.data as AuthResponse;
     } catch (error) {
         throw new Error(getApiErrorMessage(error, "Password update failed"));
     }
