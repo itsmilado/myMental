@@ -99,15 +99,29 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
     (response) => response,
-    (error: AxiosError<{ message?: string }>) => {
+    async (error: AxiosError<{ message?: string }>) => {
         const status = error.response?.status;
         const message = error.response?.data?.message?.toLowerCase() || "";
+        const originalRequest = error.config as
+            | (InternalAxiosRequestConfig & { _csrfRetry?: boolean })
+            | undefined;
 
-        if (
+        const isCsrfFailure =
             status === 403 &&
-            (message.includes("csrf") || message.includes("origin"))
-        ) {
+            (message.includes("csrf") || message.includes("origin"));
+
+        if (isCsrfFailure) {
             clearCsrfTokenCache();
+
+            // Retry once with a freshly issued CSRF token
+            if (originalRequest && !originalRequest._csrfRetry) {
+                originalRequest._csrfRetry = true;
+
+                const csrfToken = await fetchCsrfToken();
+                setRequestHeader(originalRequest, "X-CSRF-Token", csrfToken);
+
+                return apiClient(originalRequest);
+            }
         }
 
         return Promise.reject(error);
