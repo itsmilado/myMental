@@ -4,7 +4,6 @@ const crypto = require("crypto");
 const { OAuth2Client } = require("google-auth-library");
 const logger = require("../utils/logger");
 const { establishAuthenticatedSession } = require("../utils/sessionAuth");
-const { hashPassword } = require("../utils/hashPass");
 const {
     getUserByEmailQuery,
     getUserByIdQuery,
@@ -271,32 +270,33 @@ const googleOAuthCallback = async (req, res) => {
 
         const byEmail = await getUserByEmailQuery({ email });
         if (byEmail) {
+            // Prevent linking a different Google identity onto an already-linked account
             if (byEmail.google_sub && byEmail.google_sub !== google_sub) {
                 return res.redirect(
                     `${oauthSuccessRedirect}?error=This Google account conflicts with an existing linked account.`,
                 );
             }
 
-            return res.redirect(
-                `${oauthSuccessRedirect}?error=This email already exists. Sign in normally and link Google from Account settings.`,
-            );
+            /*
+            - purpose: allow Google sign-in to establish linkage for an existing same-email account
+            - inputs: existing user matched by email and verified Google subject
+            - outputs: linked/authenticated user session
+            - important behavior:
+                - automatically links Google on normal sign-in when the account email matches and no Google account is currently linked
+                - preserves existing linkage when the same Google account signs in again
+            */
+            user = byEmail;
+
+            if (!user.google_sub) {
+                user = await linkGoogleSubByIdQuery({
+                    id: user.id,
+                    google_sub,
+                });
+            }
+
+            await establishAuthenticatedSession(req, user);
+            return res.redirect(oauthSuccessRedirect);
         }
-
-        const randomPassword = crypto.randomBytes(32).toString("hex");
-        const hashed_password = await hashPassword(randomPassword);
-
-        user = await createUserQuery({
-            first_name,
-            last_name,
-            email,
-            hashed_password,
-            user_role: "user",
-            auth_provider: "google",
-            google_sub,
-        });
-
-        await establishAuthenticatedSession(req, user);
-        return res.redirect(oauthSuccessRedirect);
     } catch (err) {
         logger.error(`[googleOAuthCallback] => ${err.message}`);
         return res.redirect(oauthErrorRedirect);
