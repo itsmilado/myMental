@@ -175,7 +175,10 @@ const AccountPage = () => {
     }, [editingProfile, firstName, lastName]);
 
     const authProvider = user?.auth_provider ?? "local";
-    const hasGoogleConnection = Boolean(user?.google_sub);
+    const hasGoogleConnection = Boolean(
+        user?.has_google_auth ?? user?.google_sub,
+    );
+    const hasPassword = Boolean(user?.has_password);
     const isGooglePrimaryAccount = authProvider === "google";
     const isEmailConfirmed = Boolean(user?.isconfirmed);
     const pendingEmail = user?.pending_email ?? null;
@@ -655,7 +658,8 @@ const AccountPage = () => {
                     } else if (intent === "delete") {
                         setDeleteConfirmOpen(true);
                     } else if (intent === "unlink") {
-                        if (isGooglePrimaryAccount) {
+                        // Only require password setup when no password sign-in exists yet.
+                        if (!hasPassword) {
                             setSetPasswordBeforeUnlinkOpen(true);
                         } else {
                             setRemovingGoogle(true);
@@ -732,6 +736,14 @@ const AccountPage = () => {
         }
     };
 
+    /*
+- purpose: submit password create/update requests and sync account auth state
+- inputs: currentPassword and newPassword from the password dialog
+- outputs: updates local auth store and closes the dialog on success
+- important behavior:
+  - immediately reflects Google-only → dual-auth after initial password creation
+  - keeps success messaging aligned with password setup vs password change
+*/
     const handleChangePassword = async ({
         currentPassword,
         newPassword,
@@ -741,11 +753,30 @@ const AccountPage = () => {
     }) => {
         try {
             setChangingPw(true);
-            const msg = await changeMyPassword(newPassword, currentPassword);
-            openToast(msg || "Password updated.", "success");
+            const response = await changeMyPassword(
+                newPassword,
+                currentPassword,
+            );
+
+            // Sync returned auth capabilities so AccountPage updates without refresh
+            if (response?.userData) {
+                setUser(response.userData);
+            }
+
+            openToast(
+                response?.message ||
+                    (hasPassword ? "Password updated." : "Password created."),
+                "success",
+            );
             setChangePwOpen(false);
         } catch (e: any) {
-            openToast(e?.message || "Failed to update password.", "error");
+            openToast(
+                e?.message ||
+                    (hasPassword
+                        ? "Failed to update password."
+                        : "Failed to create password."),
+                "error",
+            );
             return;
         } finally {
             setChangingPw(false);
@@ -770,6 +801,7 @@ const AccountPage = () => {
         }
     };
 
+    // Opens password-based re-authentication for protected account actions.
     const openPasswordReauth = (
         action: Exclude<ReauthAction, null>,
         title: string,
@@ -783,6 +815,8 @@ const AccountPage = () => {
         setReauthOpen(true);
     };
 
+    // Opens Google-based re-authentication for protected account actions that
+    // explicitly require the linked Google identity.
     const openGoogleReauth = (
         action: Exclude<ReauthAction, null>,
         title: string,
@@ -797,8 +831,17 @@ const AccountPage = () => {
         setReauthOpen(true);
     };
 
+    /*
+    - purpose: start the protected email-change flow with the correct reauthentication method
+    - outputs: opens the matching reauthentication dialog
+    - important behavior:
+     - uses password reauthentication whenever password sign-in exists
+     - keeps Google-only accounts on explicit Google reauthentication
+    */
+
     const startChangeEmailFlow = () => {
-        if (hasGoogleConnection) {
+        // Keep Google-only accounts on the Google reauth path
+        if (!hasPassword && hasGoogleConnection) {
             openGoogleReauth(
                 "email",
                 "Confirm email change",
@@ -815,8 +858,17 @@ const AccountPage = () => {
         );
     };
 
+    /*
+    - purpose: start the protected account-deletion flow with the correct reauthentication method
+    - outputs: opens the matching reauthentication dialog
+    - important behavior:
+     - uses password reauthentication whenever password sign-in exists
+     - keeps Google-only accounts on explicit Google reauthentication
+    */
+
     const startDeleteFlow = () => {
-        if (hasGoogleConnection) {
+        // Keep Google-only accounts on the Google reauth path
+        if (!hasPassword && hasGoogleConnection) {
             openGoogleReauth(
                 "delete",
                 "Confirm account deletion",
@@ -833,7 +885,24 @@ const AccountPage = () => {
         );
     };
 
+    /*
+    - purpose: start Google-link verification for the current account
+    - outputs: opens the correct reauthentication dialog
+    - important behavior:
+      - uses password reauthentication when password sign-in exists
+      - prevents Google-only accounts from reaching a password-only link flow
+    */
+
     const startLinkGoogleFlow = () => {
+        // Linking Google requires an existing local/password-authenticated account
+        if (!hasPassword) {
+            openToast(
+                "Password sign-in must be enabled before linking Google.",
+                "error",
+            );
+            return;
+        }
+
         openPasswordReauth(
             "link",
             "Confirm Google linking",
@@ -841,6 +910,8 @@ const AccountPage = () => {
         );
     };
 
+    // Starts Google unlink verification and preserves the Google-created account
+    // safeguard that requires password setup before removing the last sign-in method.
     const startUnlinkGoogleFlow = () => {
         openGoogleReauth(
             "unlink",
@@ -852,7 +923,21 @@ const AccountPage = () => {
         );
     };
 
+    /*
+    - purpose: start the password-management flow for the current account
+    - outputs: opens the reauthentication dialog or password dialog with the correct mode
+    - important behavior:
+     - requires password reauthentication only when password sign-in already exists
+     - allows Google-only accounts to open initial password setup without a missing current-password prompt
+    */
+
     const startChangePasswordFlow = () => {
+        // Skip reauth for Google-only accounts so they can create an initial password
+        if (!hasPassword) {
+            setChangePwOpen(true);
+            return;
+        }
+
         setReauthAction("password");
         setReauthMode("password");
         setReauthTitle("Confirm password change");
@@ -1291,7 +1376,60 @@ const AccountPage = () => {
                         </Stack>
                     </Paper>
 
-                    {hasGoogleConnection ? (
+                    <>
+                        <Paper sx={sectionCardSx}>
+                            <Stack spacing={2.5}>
+                                <Box>
+                                    <Typography variant="h6" fontWeight={700}>
+                                        Security
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Manage your password-based sign-in and
+                                        account protection.
+                                    </Typography>
+                                </Box>
+
+                                <Divider />
+
+                                <Stack
+                                    direction={{ xs: "column", sm: "row" }}
+                                    spacing={2}
+                                    alignItems={{
+                                        xs: "flex-start",
+                                        sm: "center",
+                                    }}
+                                    justifyContent="space-between"
+                                >
+                                    <Box>
+                                        <Typography fontWeight={600}>
+                                            Password
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                            sx={{ mt: 0.5 }}
+                                        >
+                                            {hasPassword
+                                                ? "Update your password after confirming your identity."
+                                                : "Set a password to enable password sign-in for this account."}
+                                        </Typography>
+                                    </Box>
+
+                                    <Button
+                                        variant="outlined"
+                                        onClick={startChangePasswordFlow}
+                                    >
+                                        {hasPassword
+                                            ? "Change Password"
+                                            : "Set Password"}
+                                    </Button>
+                                </Stack>
+                            </Stack>
+                        </Paper>
+
                         <Paper sx={sectionCardSx}>
                             <Stack spacing={2.5}>
                                 <Box>
@@ -1302,8 +1440,9 @@ const AccountPage = () => {
                                         variant="body2"
                                         color="text.secondary"
                                     >
-                                        Manage third-party sign-in methods
-                                        linked to this account.
+                                        {hasGoogleConnection
+                                            ? "Manage third-party sign-in methods linked to this account."
+                                            : "You can link Google for faster sign-in and provider-based verification flows."}
                                     </Typography>
                                 </Box>
 
@@ -1327,34 +1466,50 @@ const AccountPage = () => {
                                             color="text.secondary"
                                             sx={{ mt: 0.5 }}
                                         >
-                                            {isGooglePrimaryAccount
-                                                ? "This account currently uses Google as its primary sign-in method."
-                                                : "Google is linked to this account as an additional sign-in method."}
+                                            {hasGoogleConnection
+                                                ? isGooglePrimaryAccount
+                                                    ? "This account currently uses Google as its primary sign-in method."
+                                                    : "Google is linked to this account as an additional sign-in method."
+                                                : "Link Google to your existing account."}
                                         </Typography>
                                     </Box>
 
-                                    <Stack
-                                        direction="row"
-                                        spacing={1}
-                                        alignItems="center"
-                                    >
-                                        <Chip
-                                            label="Connected"
-                                            color="success"
-                                            variant="filled"
-                                        />
+                                    {hasGoogleConnection ? (
+                                        <Stack
+                                            direction="row"
+                                            spacing={1.5}
+                                            flexWrap="wrap"
+                                        >
+                                            <Chip
+                                                label={
+                                                    isGooglePrimaryAccount
+                                                        ? "Primary sign-in"
+                                                        : "Linked"
+                                                }
+                                                color="success"
+                                                variant="filled"
+                                            />
+                                            <Button
+                                                variant="outlined"
+                                                color="warning"
+                                                onClick={startUnlinkGoogleFlow}
+                                                disabled={removingGoogle}
+                                            >
+                                                Remove Google link
+                                            </Button>
+                                        </Stack>
+                                    ) : (
                                         <Button
                                             variant="outlined"
-                                            color="warning"
-                                            onClick={startUnlinkGoogleFlow}
-                                            disabled={removingGoogle}
+                                            onClick={startLinkGoogleFlow}
                                         >
-                                            Remove Google link
+                                            Link Google
                                         </Button>
-                                    </Stack>
+                                    )}
                                 </Stack>
 
-                                {isGooglePrimaryAccount ? (
+                                {hasGoogleConnection &&
+                                isGooglePrimaryAccount ? (
                                     <Alert severity="info">
                                         To remove Google sign-in from a
                                         Google-created account, verify with
@@ -1365,116 +1520,7 @@ const AccountPage = () => {
                                 ) : null}
                             </Stack>
                         </Paper>
-                    ) : (
-                        <>
-                            <Paper sx={sectionCardSx}>
-                                <Stack spacing={2.5}>
-                                    <Box>
-                                        <Typography
-                                            variant="h6"
-                                            fontWeight={700}
-                                        >
-                                            Security
-                                        </Typography>
-                                        <Typography
-                                            variant="body2"
-                                            color="text.secondary"
-                                        >
-                                            Manage your password-based sign-in
-                                            and account protection.
-                                        </Typography>
-                                    </Box>
-
-                                    <Divider />
-
-                                    <Stack
-                                        direction={{ xs: "column", sm: "row" }}
-                                        spacing={2}
-                                        alignItems={{
-                                            xs: "flex-start",
-                                            sm: "center",
-                                        }}
-                                        justifyContent="space-between"
-                                    >
-                                        <Box>
-                                            <Typography fontWeight={600}>
-                                                Password
-                                            </Typography>
-                                            <Typography
-                                                variant="body2"
-                                                color="text.secondary"
-                                                sx={{ mt: 0.5 }}
-                                            >
-                                                Update your password after
-                                                confirming your identity.
-                                            </Typography>
-                                        </Box>
-
-                                        <Button
-                                            variant="outlined"
-                                            onClick={startChangePasswordFlow}
-                                        >
-                                            Change password
-                                        </Button>
-                                    </Stack>
-                                </Stack>
-                            </Paper>
-
-                            <Paper sx={sectionCardSx}>
-                                <Stack spacing={2.5}>
-                                    <Box>
-                                        <Typography
-                                            variant="h6"
-                                            fontWeight={700}
-                                        >
-                                            Connected accounts
-                                        </Typography>
-                                        <Typography
-                                            variant="body2"
-                                            color="text.secondary"
-                                        >
-                                            You can link Google for faster
-                                            sign-in and provider-based
-                                            verification flows.
-                                        </Typography>
-                                    </Box>
-
-                                    <Divider />
-
-                                    <Stack
-                                        direction={{ xs: "column", sm: "row" }}
-                                        spacing={2}
-                                        alignItems={{
-                                            xs: "flex-start",
-                                            sm: "center",
-                                        }}
-                                        justifyContent="space-between"
-                                    >
-                                        <Box>
-                                            <Typography fontWeight={600}>
-                                                Google
-                                            </Typography>
-                                            <Typography
-                                                variant="body2"
-                                                color="text.secondary"
-                                                sx={{ mt: 0.5 }}
-                                            >
-                                                Link Google to your existing
-                                                account.
-                                            </Typography>
-                                        </Box>
-
-                                        <Button
-                                            variant="outlined"
-                                            onClick={startLinkGoogleFlow}
-                                        >
-                                            Link Google
-                                        </Button>
-                                    </Stack>
-                                </Stack>
-                            </Paper>
-                        </>
-                    )}
+                    </>
                     <Paper sx={sectionCardSx}>
                         <Stack spacing={2.5}>
                             <Stack
@@ -1757,7 +1803,8 @@ const AccountPage = () => {
                     loading={changingPw}
                     onClose={() => setChangePwOpen(false)}
                     onSubmit={handleChangePassword}
-                    requireCurrentPassword={!hasGoogleConnection}
+                    // Require current password whenever password sign-in already exists.
+                    requireCurrentPassword={hasPassword}
                 />
 
                 <SetPasswordBeforeUnlinkDialog
