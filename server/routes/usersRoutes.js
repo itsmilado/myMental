@@ -164,7 +164,6 @@ usersRoutes.delete(
 usersRoutes.post(
     "/me/change-password",
     isAuthenticated,
-    requireRecentReauth(),
     changeMyPassword,
     errorHandler,
 );
