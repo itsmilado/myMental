@@ -73,14 +73,7 @@ const createUsers = async (request, response, next) => {
         response.status(201).json({
             success: true,
             message: "User created successfully",
-            userData: {
-                id: newUser.id,
-                first_name: newUser.first_name,
-                last_name: newUser.last_name,
-                email: newUser.email,
-                role: newUser.user_role,
-                created_at: newUser.created_at,
-            },
+            userData: serializeUserInfo(newUser),
         });
     } catch (error) {
         logger.error(
@@ -136,14 +129,7 @@ const userLogin = async (request, response, next) => {
         return response.status(201).json({
             success: true,
             message: "login success",
-            userData: {
-                id: matchUser.id,
-                first_name: matchUser.first_name,
-                last_name: matchUser.last_name,
-                email: matchUser.email,
-                role: matchUser.user_role,
-                created_at: matchUser.created_at,
-            },
+            userData: serializeUserInfo(matchUser),
         });
     } catch (error) {
         logger.error(`[userHandlers > userLogin] Error: ${error.message}`);
@@ -448,9 +434,16 @@ const patchMyPreferences = async (request, response, next) => {
     }
 };
 
-// Re-auth: confirm current password and set a session timestamp
 const REAUTH_WINDOW_MS = 1000 * 60 * 5; // 5 minutes (tweakable)
 
+/*
+- purpose: re-authenticate the current session with password when password sign-in is enabled
+- inputs: authenticated session and request body containing password
+- outputs: short-lived reauthentication timestamp in the session
+- important behavior:
+ - rejects password reauth for accounts without a stored password
+ - allows password reauth for both password-only and dual-auth accounts
+*/
 const reauthCurrentUser = async (request, response, next) => {
     try {
         logger.info(
@@ -481,11 +474,12 @@ const reauthCurrentUser = async (request, response, next) => {
             });
         }
 
-        if (user.auth_provider === "google") {
+        // Reject password reauth when password sign-in is not enabled
+        if (!user.hashed_password) {
             return response.status(400).json({
                 success: false,
                 message:
-                    "This account uses Google sign-in. Please continue with Google to verify your identity.",
+                    "This account does not have password sign-in enabled. Please continue with Google to verify your identity.",
             });
         }
 
@@ -516,6 +510,14 @@ const reauthCurrentUser = async (request, response, next) => {
     }
 };
 
+/*
+- purpose: remove Google sign-in from the authenticated user's account
+- inputs: authenticated session user
+- outputs: updated user payload without Google linkage
+- important behavior:
+ - blocks unlinking when password sign-in is not enabled, preventing the account from losing its only login method
+ - allows unlinking for dual-auth accounts that already have a real password
+*/
 const unlinkMyGoogle = async (request, response, next) => {
     try {
         logger.info(
@@ -545,7 +547,8 @@ const unlinkMyGoogle = async (request, response, next) => {
             });
         }
 
-        if (user.auth_provider === "google") {
+        // Prevent removing the only available sign-in method
+        if (!user.hashed_password) {
             return response.status(400).json({
                 success: false,
                 message:
@@ -689,6 +692,15 @@ const deleteMe = async (request, response, next) => {
     });
 };
 
+/*
+- purpose: create or update the authenticated user's password
+- inputs: request body with new_password and optional current_password
+- outputs: success response with updated user auth capabilities
+- important behavior:
+  - allows initial password setup when the account has no password yet
+  - requires current password when password sign-in already exists
+  - returns refreshed user auth state so the client can switch from Google-only to dual-auth immediately
+*/
 const changeMyPassword = async (request, response, next) => {
     try {
         logger.info(
@@ -724,9 +736,10 @@ const changeMyPassword = async (request, response, next) => {
             });
         }
 
-        const isGooglePrimaryAccount = user.auth_provider === "google";
+        const hasPassword = Boolean(user.hashed_password);
 
-        if (!isGooglePrimaryAccount) {
+        if (hasPassword) {
+            // Require current password when password auth is already enabled
             if (
                 !current_password ||
                 typeof current_password !== "string" ||
@@ -735,14 +748,6 @@ const changeMyPassword = async (request, response, next) => {
                 return response.status(400).json({
                     success: false,
                     message: "Current password is required.",
-                });
-            }
-
-            if (!user.hashed_password) {
-                return response.status(400).json({
-                    success: false,
-                    message:
-                        "Current password is unavailable for this account.",
                 });
             }
 
@@ -757,9 +762,8 @@ const changeMyPassword = async (request, response, next) => {
                     message: "Current password is incorrect.",
                 });
             }
-        }
 
-        if (user.hashed_password) {
+            // Prevent reusing the existing password
             const isSame = await compare(new_password, user.hashed_password);
             if (isSame) {
                 return response.status(400).json({
@@ -786,7 +790,8 @@ const changeMyPassword = async (request, response, next) => {
 
         return response.status(200).json({
             success: true,
-            message: "Password updated",
+            message: hasPassword ? "Password updated" : "Password created",
+            userData: serializeUserInfo(updated),
         });
     } catch (error) {
         logger.error(`[changeMyPassword] => Error: ${error.message}`);
@@ -1534,8 +1539,19 @@ const filterSensitiveFields = (body, fieldsToHide) => {
     return filteredBody;
 };
 
-// Helper function to serialize user information for response
+/*
+- purpose: serialize user data for client-facing auth and account responses
+- inputs: full user row from the database
+- outputs: safe user payload with explicit authentication capability flags
+- important behavior:
+ - derives password capability from actual stored password presence
+ - exposes Google linkage explicitly so the client can render Google-only, password-only, and dual-auth states correctly
+*/
+
 const serializeUserInfo = (user) => {
+    const hasGoogleAuth = Boolean(user.google_sub);
+    const hasPassword = Boolean(user.hashed_password);
+
     return {
         id: user.id,
         first_name: user.first_name,
@@ -1547,6 +1563,8 @@ const serializeUserInfo = (user) => {
         created_at: user.created_at,
         auth_provider: user.auth_provider,
         google_sub: user.google_sub,
+        has_password: hasPassword,
+        has_google_auth: hasGoogleAuth,
     };
 };
 
