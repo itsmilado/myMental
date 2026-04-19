@@ -12,9 +12,14 @@ const loginCheck = async ({ email, password }) => {
     logger.info(
         `Login Check Matched Found: user_id(${JSON.stringify(matchedUser.id)})`,
     );
-    if (matchedUser.auth_provider === "google" || matchedUser.google_sub) {
+    const hasPassword = Boolean(matchedUser.hashed_password);
+    const hasGoogleAuth = Boolean(matchedUser.google_sub);
+
+    // Block only true Google-only accounts
+    if (!hasPassword && hasGoogleAuth) {
         return { blocked: true, reason: "google_only" };
     }
+
     const match = await compare(password, matchedUser.hashed_password);
     if (!match) {
         return false;
