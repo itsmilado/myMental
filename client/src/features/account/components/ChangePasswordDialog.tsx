@@ -1,3 +1,5 @@
+//src/features/account/components/ChangePasswordDialog.tsx
+
 import {
     Dialog,
     DialogTitle,
@@ -80,13 +82,20 @@ const ChangePasswordDialog = ({
             });
             reset();
         } catch (e: any) {
-            setError(e?.message || "Failed to update password.");
+            setError(
+                e?.message ||
+                    (requireCurrentPassword
+                        ? "Failed to update password."
+                        : "Failed to create password."),
+            );
         }
     };
 
     return (
         <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs">
-            <DialogTitle>Change password</DialogTitle>
+            <DialogTitle>
+                {requireCurrentPassword ? "Change password" : "Set password"}
+            </DialogTitle>
 
             <DialogContent>
                 <Stack spacing={2} sx={{ mt: 1 }}>
@@ -137,7 +146,7 @@ const ChangePasswordDialog = ({
                     variant="contained"
                     disabled={loading}
                 >
-                    Save
+                    {requireCurrentPassword ? "Save" : "Set password"}
                 </Button>
             </DialogActions>
         </Dialog>
