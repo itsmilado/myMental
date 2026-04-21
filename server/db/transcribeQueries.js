@@ -11,12 +11,22 @@ const ALLOWED_SORT_FIELDS = [
 ];
 const ALLOWED_DIRECTIONS = ["asc", "desc"];
 
+/*
+- purpose: insert a transcription backup row into the database
+- inputs: transcript id, user info, raw AssemblyAI response, file metadata, optional category, and connection metadata
+- outputs: inserted transcription_backups row
+- important behavior:
+  - stores the full raw API response for later restore and history use
+  - keeps metadata aligned with the original transcription request
+  - returns the inserted row from the database
+*/
 const insertTranscriptionBackupQuery = async ({
     transcript_id,
     user_id,
     user_role,
     raw_api_data,
     file_name,
+    category = null,
     file_recorded_at,
     assemblyai_connection_id = null,
     assemblyai_connection_label = null,
@@ -30,25 +40,29 @@ const insertTranscriptionBackupQuery = async ({
                 user_role,
                 raw_api_data,
                 file_name,
+                category,
                 file_recorded_at,
                 assemblyai_connection_id,
                 assemblyai_connection_label,
                 assemblyai_connection_source
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *;
         `;
+
         const insertValues = [
             transcript_id,
             user_id,
             user_role,
             raw_api_data,
             file_name,
+            category,
             file_recorded_at ?? null,
             assemblyai_connection_id,
             assemblyai_connection_label,
             assemblyai_connection_source,
         ];
+
         const result = await pool.query(insertQuery, insertValues);
         return result.rows[0];
     } catch (error) {
@@ -59,8 +73,14 @@ const insertTranscriptionBackupQuery = async ({
     }
 };
 
-// Get backup rows for a list of transcript_ids, scoped to a user.
-
+/*
+- purpose: fetch backup rows for a list of transcript ids
+- inputs: transcriptIds array, user_id, and admin flag
+- outputs: array of backup rows
+- important behavior:
+  - filters by user_id unless admin
+  - returns raw API data and metadata needed for restore and history
+*/
 const getBackupsByTranscriptIdsQuery = async ({
     transcriptIds = [],
     user_id = null,
@@ -72,15 +92,18 @@ const getBackupsByTranscriptIdsQuery = async ({
 
     try {
         const params = [transcriptIds];
+
         let query = `
-            SELECT transcript_id,
-                   user_id,
-                   file_name,
-                   file_recorded_at,
-                   raw_api_data,
-                   assemblyai_connection_id,
-                   assemblyai_connection_label,
-                   assemblyai_connection_source
+            SELECT 
+                transcript_id,
+                user_id,
+                file_name,
+                category,
+                file_recorded_at,
+                raw_api_data,
+                assemblyai_connection_id,
+                assemblyai_connection_label,
+                assemblyai_connection_source
             FROM transcription_backups
             WHERE transcript_id = ANY($1)
         `;
@@ -102,11 +125,21 @@ const getBackupsByTranscriptIdsQuery = async ({
     }
 };
 
+/*
+- purpose: fetch one backup row by transcript id
+- inputs: transcript_id
+- outputs: one transcription_backups row or null
+- important behavior:
+  - returns the raw API response together with stored backup metadata
+  - reads only one matching row
+  - returns null when no backup exists
+*/
 const getBackupWithRawByTranscriptIdQuery = async (transcript_id) => {
     try {
         const query = `
             SELECT transcript_id,
                    file_name,
+                   category,
                    file_recorded_at,
                    raw_api_data,
                    assemblyai_connection_id,
@@ -134,6 +167,7 @@ const insertTranscriptionQuery = async ({
     transcript_id,
     transcription,
     options,
+    category = null,
     file_recorded_at,
     assemblyai_connection_id = null,
     assemblyai_connection_label = null,
@@ -148,12 +182,13 @@ const insertTranscriptionQuery = async ({
                 transcript_id,
                 transcription,
                 options,
+                category,
                 file_recorded_at,
                 assemblyai_connection_id,
                 assemblyai_connection_label,
                 assemblyai_connection_source
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *;
         `;
         const insertValues = [
@@ -163,6 +198,7 @@ const insertTranscriptionQuery = async ({
             transcript_id,
             transcription,
             options,
+            category,
             file_recorded_at,
             assemblyai_connection_id,
             assemblyai_connection_label,
@@ -215,12 +251,15 @@ const getAllTranscriptionsQuery = async () => {
     }
 };
 
-/**
- * Fetches filtered and sorted transcriptions for a given user.
- * @param {object} filters - Filtering and sorting options.
- * @returns {Promise<Array>} Array of transcription rows.
- */
-
+/*
+- purpose: fetch filtered and sorted transcription rows for a user
+- inputs: filters object with user_id, file_name, transcript_id, optional category, date range, and sort settings
+- outputs: array of transcription rows
+- important behavior:
+  - always scopes results by user_id when provided
+  - applies only allowed sort fields and directions
+  - limits results to the latest 500 rows
+*/
 const getFilteredTranscriptionsQuery = async (filters) => {
     try {
         logger.info(
@@ -234,14 +273,22 @@ const getFilteredTranscriptionsQuery = async (filters) => {
             params.push(filters.user_id);
             where.push(`user_id = $${params.length}`);
         }
+
         if (filters.file_name) {
             params.push(`%${filters.file_name}%`);
             where.push(`file_name ILIKE $${params.length}`);
         }
+
         if (filters.transcript_id) {
             params.push(filters.transcript_id);
             where.push(`transcript_id = $${params.length}`);
         }
+
+        if (filters.category) {
+            params.push(filters.category);
+            where.push(`category = $${params.length}`);
+        }
+
         if (filters.date_from) {
             params.push(filters.date_from);
             where.push(`created_at >= $${params.length}::date`);
@@ -256,12 +303,14 @@ const getFilteredTranscriptionsQuery = async (filters) => {
 
         let orderBy = "id";
         let direction = "DESC";
+
         if (
             filters.order_by &&
             ALLOWED_SORT_FIELDS.includes(filters.order_by)
         ) {
             orderBy = filters.order_by;
         }
+
         if (
             filters.direction &&
             ALLOWED_DIRECTIONS.includes(filters.direction.toLowerCase())
@@ -269,17 +318,36 @@ const getFilteredTranscriptionsQuery = async (filters) => {
             direction = filters.direction.toUpperCase();
         }
 
-        let fetchQuery = "SELECT * FROM transcriptions";
+        let fetchQuery = `
+            SELECT
+                id,
+                user_id,
+                file_name,
+                audio_duration,
+                transcript_id,
+                transcription,
+                options,
+                category,
+                file_recorded_at,
+                assemblyai_connection_id,
+                assemblyai_connection_label,
+                assemblyai_connection_source,
+                created_at
+            FROM transcriptions
+        `;
+
         if (where.length > 0) {
             fetchQuery += " WHERE " + where.join(" AND ");
         }
 
-        fetchQuery += ` ORDER BY ${orderBy} ${direction} LIMIT 100`;
+        fetchQuery += ` ORDER BY ${orderBy} ${direction} LIMIT 500`;
 
         const { rows } = await pool.query(fetchQuery, params);
+
         logger.info(
             `[transcribeQueries > getFilteredTranscriptionsQuery] - Fetched ${rows.length} transcriptions with filters`,
         );
+
         return rows;
     } catch (error) {
         logger.error(
