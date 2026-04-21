@@ -4,11 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const {
-    saveTranscriptionToFile,
-    deleteTranscriptionTxtFile,
-    deleteAudioFileCopy,
-} = require("../utils/fileProcessor");
+const { deleteAudioFileCopy } = require("../utils/fileProcessor");
 const uploadAudioFile = require("../utils/assemblyaiUploader");
 
 const {
@@ -48,7 +44,6 @@ const TRANSCRIPTION_STEPS = {
     UPLOAD: "upload",
     TRANSCRIBE: "transcribe",
     SAVE_DB: "save_db",
-    SAVE_FILE: "save_file",
     COMPLETE: "complete",
 };
 
@@ -57,12 +52,11 @@ const createInitialStepsState = () => ({
     [TRANSCRIPTION_STEPS.UPLOAD]: { status: "pending", error: null },
     [TRANSCRIPTION_STEPS.TRANSCRIBE]: { status: "pending", error: null },
     [TRANSCRIPTION_STEPS.SAVE_DB]: { status: "pending", error: null },
-    [TRANSCRIPTION_STEPS.SAVE_FILE]: { status: "pending", error: null },
     [TRANSCRIPTION_STEPS.COMPLETE]: { status: "pending", error: null },
 });
 
-/**
- * status: "pending" | "in_progress" | "success" | "error"
+/*
+  status: "pending" | "in_progress" | "success" | "error"
  */
 const setStepStatus = (steps, stepKey, status, errorMessage = null) => {
     if (!steps[stepKey]) return;
@@ -78,7 +72,7 @@ const setStepStatus = (steps, stepKey, status, errorMessage = null) => {
  */
 const transcriptionJobs = {};
 
-/**
+/*
  - SSE-enabled entry point:
    - expects multipart form with file (field: "audio") + options + fileModifiedDate
    - creates a jobId and starts runTranscriptionJob in the background
@@ -576,10 +570,16 @@ const fetchApiTranscriptionById = async (request, response, next) => {
         next(error);
     }
 };
-/**
- * Export a transcription in the requested format (txt, etc.).
- * Checks user authorization and logs all steps.
- */
+
+/*
+- purpose: export one stored transcription in the requested download format
+- inputs: request params id, request query format, authenticated session user
+- outputs: downloadable file response with content headers and file buffer
+- important behavior:
+  - reads the transcription record from the database first
+  - authorizes access before generating the export
+  - generates txt, pdf, or docx content on demand
+*/
 const exportTranscription = async (request, response, next) => {
     try {
         const { id } = request.params;
@@ -588,20 +588,16 @@ const exportTranscription = async (request, response, next) => {
 
         logger.info(
             `Incoming request to ${request.method} ${request.originalUrl}`,
-        ); // Log the request URL
+        );
 
-        // Fetch transcription
         const transcription = await getTranscriptionByIdQuery(id);
         if (!transcription) {
-            logger.error(
-                `[transcriptionsMiddleware - fetchApiTranscriptionById] => Error fetching transcription by ID: ${error.message}`,
-            );
             return response.status(404).json({
                 success: false,
                 message: `transcription with ID ${id} Not found`,
             });
         }
-        // Check user authorization
+
         if (transcription.user_id !== user.id && user.role !== "admin") {
             return response.status(403).json({
                 success: false,
@@ -609,14 +605,10 @@ const exportTranscription = async (request, response, next) => {
             });
         }
 
-        // Export transcription to file
+        // Generate the export file directly from the stored database content.
         const { buffer, mime, fileName } = await exportTranscriptionToFile(
             transcription,
             format,
-        );
-
-        logger.info(
-            `[transcriptionsMiddleware - exportTranscription] => file name: ${fileName} `,
         );
 
         response.setHeader("Content-Type", mime);
@@ -625,6 +617,7 @@ const exportTranscription = async (request, response, next) => {
             `attachment; filename="${fileName}"`,
         );
         response.send(buffer);
+
         logger.info(
             `[transcriptionsMiddleware - exportTranscription] User ${request.session.user.id} exported ${transcription.transcript_id} as ${format}`,
         );
@@ -636,6 +629,15 @@ const exportTranscription = async (request, response, next) => {
     }
 };
 
+/*
+- purpose: delete an offline transcription record and optionally clean up linked audio and AssemblyAI data
+- inputs: request params id, request body deleteFromAssembly/deleteAudioFile, authenticated session user
+- outputs: json response with delete result flags
+- important behavior:
+  - always deletes the database record first
+  - does not attempt any transcription .txt file deletion
+  - preserves optional audio-copy and AssemblyAI cleanup behavior
+*/
 const deleteDBTranscription = async (request, response, next) => {
     try {
         const { id } = request.params;
@@ -643,13 +645,10 @@ const deleteDBTranscription = async (request, response, next) => {
 
         logger.info(
             `Incoming request to ${request.method} ${request.originalUrl}`,
-        ); // Log the request URL
+        );
 
-        const {
-            deleteFromAssembly = false,
-            deleteTxtFile = false,
-            deleteAudioFile = false,
-        } = request.body || {};
+        const { deleteFromAssembly = false, deleteAudioFile = false } =
+            request.body || {};
 
         const transcription = await getTranscriptionByIdQuery(id);
         if (!transcription) {
@@ -661,6 +660,7 @@ const deleteDBTranscription = async (request, response, next) => {
                 message: `transcription with ID ${id} Not found`,
             });
         }
+
         if (transcription.user_id !== user.id && user.role !== "admin") {
             return response.status(403).json({
                 success: false,
@@ -671,18 +671,13 @@ const deleteDBTranscription = async (request, response, next) => {
         const results = {
             dbDeleted: false,
             assemblyDeleted: false,
-            txtDeleted: false,
             audioDeleted: false,
         };
 
-        // 1) delete from DB (always, this is the primary action)
-
+        // Delete the database record first.
         const transcriptionDeleted = await deleteTranscriptionByIdQuery(id);
         if (!transcriptionDeleted) {
-            logger.error(
-                `[transcriptionsMiddleware - deleteDBTranscription] => Error delete transcription by ID: ${error.message}`,
-            );
-            next(error);
+            throw new Error("Failed to delete transcription by ID.");
         }
 
         results.dbDeleted = true;
@@ -691,24 +686,13 @@ const deleteDBTranscription = async (request, response, next) => {
             `[deleteTranscription] User ${user.id} deleted transcription ${id} from database`,
         );
 
-        // remove associated local files here
-
-        // 2) optionally delete txt file
-
-        if (deleteTxtFile) {
-            deleteTranscriptionTxtFile(transcription.file_name);
-            results.txtDeleted = true; // best-effort, errors just logged
-        }
-
-        // 3) optionally delete audio file copy
-
+        // Optionally remove the local audio copy.
         if (deleteAudioFile) {
             deleteAudioFileCopy(transcription.file_name);
             results.audioDeleted = true;
         }
 
-        // 4) optionally delete from AssemblyAI
-
+        // Optionally remove the AssemblyAI transcript.
         if (deleteFromAssembly && transcription.transcript_id) {
             try {
                 const backup = await getBackupWithRawByTranscriptIdQuery(
@@ -1530,17 +1514,6 @@ const runTranscriptionJob = async ({
 
         emitStep(TRANSCRIPTION_STEPS.SAVE_DB, "success");
 
-        // ----------------- SAVE_FILE -----------------
-        emitStep(TRANSCRIPTION_STEPS.SAVE_FILE, "in_progress");
-
-        const storedTxtfilePath = saveTranscriptionToFile(
-            filename,
-            insertedTranscription.transcription,
-            fileModifiedDisplayDate,
-        );
-
-        emitStep(TRANSCRIPTION_STEPS.SAVE_FILE, "success");
-
         //  COMPLETE
         // Emit the finalized offline transcript payload used by the client immediately
         // after upload so history/detail views do not need a refetch for timing data.
@@ -1551,7 +1524,7 @@ const runTranscriptionJob = async ({
         emitter.emit("completed", {
             jobId,
             steps,
-            message: `Transcription created and stored successfully at: ${storedTxtfilePath}`,
+            message: `Transcription created and stored successfully `,
             transcriptData: {
                 ...insertedTranscription,
                 utterances: extractUtterances(transcript),
