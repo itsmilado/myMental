@@ -11,7 +11,7 @@ import { exportTranscription } from "../../auth/api";
 import { downloadBlob } from "../../../utils/downloadFile";
 
 type Props = {
-    transcriptId: string;
+    transcriptId: number;
     fileName: string;
 };
 
@@ -36,7 +36,7 @@ export const ExportButton = ({ transcriptId, fileName }: Props) => {
         try {
             const { blob, fileName: downloadName } = await exportTranscription(
                 transcriptId,
-                format
+                format,
             );
             downloadBlob(blob, downloadName);
         } catch (err) {
