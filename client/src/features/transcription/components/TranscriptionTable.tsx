@@ -120,6 +120,14 @@ export const TranscriptionTable = ({
     };
 
     /*
+    - Normalizes Category labels for the offline Category column.
+    */
+    const getCategoryLabel = (t: TranscriptData): string => {
+        const trimmedCategory = String(t.category || "").trim();
+        return trimmedCategory || "Uncategorized";
+    };
+
+    /*
     - Normalizes Project labels for the offline Project column.
     */
     const getProjectLabel = (t: TranscriptData): string => {
@@ -198,7 +206,7 @@ export const TranscriptionTable = ({
             <Table size="small">
                 <TableHead>
                     <TableRow>
-                        <TableCell sx={{ width: 90 }}>
+                        <TableCell sx={{ width: 90 }} align="center">
                             <TableSortLabel
                                 active={sort.orderBy === "id"}
                                 direction={
@@ -224,8 +232,15 @@ export const TranscriptionTable = ({
                                 Date
                             </TableSortLabel>
                         </TableCell>
-                        <TableCell sx={{ minWidth: 260 }}>File Name</TableCell>
-                        <TableCell sx={{ minWidth: 160 }}>Project</TableCell>
+                        <TableCell sx={{ minWidth: 160 }} align="center">
+                            Project
+                        </TableCell>
+                        <TableCell sx={{ minWidth: 160 }} align="center">
+                            Category
+                        </TableCell>
+                        <TableCell sx={{ minWidth: 260 }} align="center">
+                            File Name
+                        </TableCell>
                         <TableCell align="center" sx={{ width: 130 }}>
                             Audio Length
                         </TableCell>
@@ -250,22 +265,11 @@ export const TranscriptionTable = ({
                                 onRowClick ? () => onRowClick(t) : undefined
                             }
                         >
-                            <TableCell>{t.id}</TableCell>
+                            <TableCell align="center">{t.id}</TableCell>
                             <TableCell align="center">
                                 {formatDate(t.created_at)}
                             </TableCell>
-                            <TableCell sx={{ maxWidth: 0 }}>
-                                <Box
-                                    sx={{
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        whiteSpace: "nowrap",
-                                    }}
-                                >
-                                    {cleanFileName(t.file_name)}
-                                </Box>
-                            </TableCell>
-                            <TableCell>
+                            <TableCell align="center">
                                 <Box
                                     sx={{
                                         overflow: "hidden",
@@ -276,6 +280,29 @@ export const TranscriptionTable = ({
                                     {getProjectLabel(t)}
                                 </Box>
                             </TableCell>
+                            <TableCell align="center">
+                                <Box
+                                    sx={{
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                    }}
+                                >
+                                    {getCategoryLabel(t)}
+                                </Box>
+                            </TableCell>
+                            <TableCell sx={{ maxWidth: 0 }} align="center">
+                                <Box
+                                    sx={{
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                    }}
+                                >
+                                    {cleanFileName(t.file_name)}
+                                </Box>
+                            </TableCell>
+
                             <TableCell align="center">
                                 {formatDuration(t.audio_duration)}
                             </TableCell>
