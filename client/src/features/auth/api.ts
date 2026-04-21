@@ -454,10 +454,19 @@ export const resetPassword = async (
     }
 };
 
-// SSE-based background job starter
+/*
+- purpose: start a background transcription job for one uploaded audio file
+- inputs: upload file, transcription options, optional category, and AssemblyAI connection selection
+- outputs: API response containing the created job id
+- important behavior:
+  - sends multipart form data expected by the backend start endpoint
+  - keeps connection routing metadata outside the serialized options payload
+  - includes category only when the caller provided a non-empty value
+*/
 export const startTranscriptionJob = async ({
     file,
     options,
+    category = null,
     assemblyai_connection_id = null,
     use_app_fallback = false,
 }: StartTranscriptionJobPayload): Promise<StartTranscriptionResponse> => {
@@ -466,9 +475,14 @@ export const startTranscriptionJob = async ({
 
         const modified = new Date(file.lastModified);
         const fileModifiedDate = modified.toISOString();
+        const trimmedCategory = String(category ?? "").trim();
 
         formData.append("fileModifiedDate", fileModifiedDate);
         formData.append("options", JSON.stringify(options));
+
+        if (trimmedCategory) {
+            formData.append("category", trimmedCategory);
+        }
 
         if (assemblyai_connection_id != null) {
             formData.append(
@@ -504,7 +518,15 @@ export const getTranscriptionProgressUrl = (jobId: string): string => {
     return `${base}${TRANSCRIPTION_BASE_PATH}/progress/${jobId}`;
 };
 
-// fetch all transcripts for a user
+/*
+- purpose: fetch offline transcription history for the current user
+- inputs: filter values and sort state
+- outputs: filtered transcript rows from the backend
+- important behavior:
+  - forwards filter values as query params to the filtered history endpoint
+  - keeps sort values in the API layer so callers do not build raw query params
+  - passes category through with the rest of the active filters
+*/
 export const fetchUserTranscripts = async (
     filters: Filters = {},
     sort: SortState = { orderBy: "file_recorded_at", direction: "desc" },
@@ -538,13 +560,13 @@ export const fetchUserTranscripts = async (
 };
 
 export const exportTranscription = async (
-    transcriptId: string,
+    id: number,
     format: "txt" | "pdf" | "docx",
     fallbackFileName?: string,
 ): Promise<{ blob: Blob; fileName: string }> => {
     try {
         const res = await apiClient.get(
-            `${TRANSCRIPTION_BASE_PATH}/export/${transcriptId}`,
+            `${TRANSCRIPTION_BASE_PATH}/export/${id}`,
             {
                 params: { format },
                 responseType: "blob",
@@ -553,8 +575,8 @@ export const exportTranscription = async (
 
         const cd = (res.headers as any)["content-disposition"];
         let fileName = fallbackFileName
-            ? `${fallbackFileName.replace(/\.[^/.]+$/, "")}-${transcriptId}.${format}`
-            : `${transcriptId}.${format}`;
+            ? `${fallbackFileName.replace(/\.[^/.]+$/, "")}-${id}.${format}`
+            : `${id}.${format}`;
 
         if (cd) {
             const match = cd.match(/filename="?([^"]+)"?/);
@@ -570,7 +592,7 @@ export const exportTranscription = async (
 };
 
 export const deleteTranscription = async (
-    id: string,
+    id: number,
     options?: DeleteTranscriptionOptions,
 ): Promise<string> => {
     try {
