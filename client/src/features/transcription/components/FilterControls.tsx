@@ -46,32 +46,50 @@ const buildFilterTextFieldSx = (colors: ReturnType<typeof tokens>) => ({
 type OfflineFilterControlsProps = {
     project: string;
     projects: string[];
+    category: string;
+    categories: string[];
     onProjectApply: (value: string) => void;
+    onCategoryApply: (value: string) => void;
 };
 
 /*
 - Offline history filter controls used by OfflineHistoryPage.
-- Inputs: applied Project filter and available Project options.
-- Outputs: store updates for text/date filters plus local Project apply events.
+- Inputs: applied Project and Category filters plus available filter options.
+- Outputs: store updates for text/date filters plus local Project and Category apply events.
 - Important behavior: keeps offline controls visually aligned with online controls.
 */
 export const OfflineFilterControls = ({
     project,
     projects,
+    category,
+    categories,
     onProjectApply,
+    onCategoryApply,
 }: OfflineFilterControlsProps) => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
     const { filters, setFilters } = useTranscriptionStore();
     const textFieldSx = buildFilterTextFieldSx(colors);
 
-    const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+    const [projectAnchorEl, setProjectAnchorEl] = useState<HTMLElement | null>(
+        null,
+    );
+    const [categoryAnchorEl, setCategoryAnchorEl] =
+        useState<HTMLElement | null>(null);
     const [draftProject, setDraftProject] = useState(project);
+    const [draftCategory, setDraftCategory] = useState(category);
 
     const displayProjects = useMemo(() => {
         const uniqueProjects = Array.from(new Set(projects.filter(Boolean)));
         return ["all", ...uniqueProjects];
     }, [projects]);
+
+    const displayCategories = useMemo(() => {
+        const uniqueCategories = Array.from(
+            new Set(categories.filter(Boolean)),
+        );
+        return ["all", ...uniqueCategories];
+    }, [categories]);
 
     /*
     - Opens the Project filter popover.
@@ -81,14 +99,14 @@ export const OfflineFilterControls = ({
         event: React.MouseEvent<HTMLElement>,
     ): void => {
         setDraftProject(project);
-        setAnchorEl(event.currentTarget);
+        setProjectAnchorEl(event.currentTarget);
     };
 
     /*
     - Closes the Project filter popover without applying changes.
     */
     const handleCloseProjectFilter = (): void => {
-        setAnchorEl(null);
+        setProjectAnchorEl(null);
     };
 
     /*
@@ -96,17 +114,45 @@ export const OfflineFilterControls = ({
     */
     const handleApplyProjectFilter = (): void => {
         onProjectApply(draftProject);
-        setAnchorEl(null);
+        setProjectAnchorEl(null);
     };
 
     /*
-    - Clears store-backed filters and the applied Project selection together.
+    - Opens the Category filter popover.
+    - Syncs the draft selection with the applied value.
+    */
+    const handleOpenCategoryFilter = (
+        event: React.MouseEvent<HTMLElement>,
+    ): void => {
+        setDraftCategory(category);
+        setCategoryAnchorEl(event.currentTarget);
+    };
+
+    /*
+    - Closes the Category filter popover without applying changes.
+    */
+    const handleCloseCategoryFilter = (): void => {
+        setCategoryAnchorEl(null);
+    };
+
+    /*
+    - Applies the selected Category filter and closes the popover.
+    */
+    const handleApplyCategoryFilter = (): void => {
+        onCategoryApply(draftCategory);
+        setCategoryAnchorEl(null);
+    };
+
+    /*
+    - Clears store-backed filters and the applied local metadata filters together.
     - Important behavior: preserves one-click reset parity with online history.
     */
     const handleClearFilters = (): void => {
         setFilters({});
         onProjectApply("all");
-        setAnchorEl(null);
+        onCategoryApply("all");
+        setProjectAnchorEl(null);
+        setCategoryAnchorEl(null);
     };
 
     return (
@@ -158,8 +204,8 @@ export const OfflineFilterControls = ({
             </Button>
 
             <Popover
-                open={Boolean(anchorEl)}
-                anchorEl={anchorEl}
+                open={Boolean(projectAnchorEl)}
+                anchorEl={projectAnchorEl}
                 onClose={handleCloseProjectFilter}
                 anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
                 transformOrigin={{ vertical: "top", horizontal: "left" }}
@@ -200,6 +246,78 @@ export const OfflineFilterControls = ({
                         variant="contained"
                         size="small"
                         onClick={handleApplyProjectFilter}
+                        sx={{ minWidth: 84 }}
+                    >
+                        Apply
+                    </Button>
+                </Box>
+            </Popover>
+
+            <Button
+                variant="outlined"
+                size="medium"
+                startIcon={<FilterListIcon />}
+                onClick={handleOpenCategoryFilter}
+                sx={{
+                    height: 40,
+                    minHeight: 40,
+                    px: 1.5,
+                    color: colors.grey[100],
+                    borderColor: colors.grey[300],
+                    textTransform: "none",
+                    alignSelf: "stretch",
+                    "&:hover": {
+                        borderColor: colors.grey[200],
+                        backgroundColor: theme.palette.action.hover,
+                    },
+                }}
+            >
+                {`Category: ${category === "all" ? "All" : category}`}
+            </Button>
+
+            <Popover
+                open={Boolean(categoryAnchorEl)}
+                anchorEl={categoryAnchorEl}
+                onClose={handleCloseCategoryFilter}
+                anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                transformOrigin={{ vertical: "top", horizontal: "left" }}
+                slotProps={{
+                    paper: {
+                        sx: {
+                            mt: 1,
+                            px: 1.25,
+                            py: 1.25,
+                            minWidth: 0,
+                            borderRadius: 3,
+                        },
+                    },
+                }}
+            >
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+                    Category
+                </Typography>
+
+                <RadioGroup
+                    value={draftCategory}
+                    onChange={(e) => setDraftCategory(e.target.value)}
+                    sx={{ width: "fit-content" }}
+                >
+                    {displayCategories.map((option) => (
+                        <FormControlLabel
+                            key={option}
+                            value={option}
+                            control={<Radio size="small" />}
+                            label={option === "all" ? "All" : option}
+                            sx={{ my: 0, mr: 0 }}
+                        />
+                    ))}
+                </RadioGroup>
+
+                <Box display="flex" justifyContent="center" mt={0.75}>
+                    <Button
+                        variant="contained"
+                        size="small"
+                        onClick={handleApplyCategoryFilter}
                         sx={{ minWidth: 84 }}
                     >
                         Apply
@@ -281,16 +399,20 @@ type OnlineFilterControlsProps = {
     searchId: string;
     project: string;
     projects: string[];
+    category: string;
+    categories: string[];
     onDateFromChange: (value: string) => void;
     onDateToChange: (value: string) => void;
     onSearchIdChange: (value: string) => void;
     onProjectApply: (value: string) => void;
+    onCategoryApply: (value: string) => void;
     onClearSearchId: () => void;
+    onClearFilters: () => void;
 };
 
 /*
 - Online history filter controls used by OnlineHistoryPage
-- Supports date range, Project radio menu, and transcript ID search
+- Supports date range, Category radio menu, Project radio menu, and transcript ID search
 */
 export const OnlineFilterControls = ({
     dateFrom,
@@ -298,23 +420,65 @@ export const OnlineFilterControls = ({
     searchId,
     project,
     projects,
+    category,
+    categories,
     onDateFromChange,
     onDateToChange,
     onSearchIdChange,
     onProjectApply,
+    onCategoryApply,
     onClearSearchId,
+    onClearFilters,
 }: OnlineFilterControlsProps) => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
     const textFieldSx = buildFilterTextFieldSx(colors);
 
-    const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+    const [projectAnchorEl, setProjectAnchorEl] = useState<HTMLElement | null>(
+        null,
+    );
+    const [categoryAnchorEl, setCategoryAnchorEl] =
+        useState<HTMLElement | null>(null);
     const [draftProject, setDraftProject] = useState(project);
+    const [draftCategory, setDraftCategory] = useState(category);
 
     const displayProjects = useMemo(() => {
         const uniqueProjects = Array.from(new Set(projects.filter(Boolean)));
         return ["all", ...uniqueProjects];
     }, [projects]);
+
+    const displayCategories = useMemo(() => {
+        const uniqueCategories = Array.from(
+            new Set(categories.filter(Boolean)),
+        );
+        return ["all", ...uniqueCategories];
+    }, [categories]);
+
+    /*
+    - Opens the Category filter popover
+    - Syncs the draft selection with the applied value
+    */
+    const handleOpenCategoryFilter = (
+        event: React.MouseEvent<HTMLElement>,
+    ): void => {
+        setDraftCategory(category);
+        setCategoryAnchorEl(event.currentTarget);
+    };
+
+    /*
+    - Closes the Category filter popover without applying changes
+    */
+    const handleCloseCategoryFilter = (): void => {
+        setCategoryAnchorEl(null);
+    };
+
+    /*
+    - Applies the selected Category filter and closes the popover
+    */
+    const handleApplyCategoryFilter = (): void => {
+        onCategoryApply(draftCategory);
+        setCategoryAnchorEl(null);
+    };
 
     /*
     - Opens the Project filter popover
@@ -324,14 +488,14 @@ export const OnlineFilterControls = ({
         event: React.MouseEvent<HTMLElement>,
     ): void => {
         setDraftProject(project);
-        setAnchorEl(event.currentTarget);
+        setProjectAnchorEl(event.currentTarget);
     };
 
     /*
     - Closes the Project filter popover without applying changes
     */
     const handleCloseProjectFilter = (): void => {
-        setAnchorEl(null);
+        setProjectAnchorEl(null);
     };
 
     /*
@@ -339,7 +503,7 @@ export const OnlineFilterControls = ({
     */
     const handleApplyProjectFilter = (): void => {
         onProjectApply(draftProject);
-        setAnchorEl(null);
+        setProjectAnchorEl(null);
     };
 
     return (
@@ -387,8 +551,8 @@ export const OnlineFilterControls = ({
             </Button>
 
             <Popover
-                open={Boolean(anchorEl)}
-                anchorEl={anchorEl}
+                open={Boolean(projectAnchorEl)}
+                anchorEl={projectAnchorEl}
                 onClose={handleCloseProjectFilter}
                 anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
                 transformOrigin={{ vertical: "top", horizontal: "left" }}
@@ -436,6 +600,78 @@ export const OnlineFilterControls = ({
                 </Box>
             </Popover>
 
+            <Button
+                variant="outlined"
+                size="medium"
+                startIcon={<FilterListIcon />}
+                onClick={handleOpenCategoryFilter}
+                sx={{
+                    height: 40,
+                    minHeight: 40,
+                    px: 1.5,
+                    color: colors.grey[100],
+                    borderColor: colors.grey[300],
+                    textTransform: "none",
+                    alignSelf: "stretch",
+                    "&:hover": {
+                        borderColor: colors.grey[200],
+                        backgroundColor: theme.palette.action.hover,
+                    },
+                }}
+            >
+                {`Category: ${category === "all" ? "All" : category}`}
+            </Button>
+
+            <Popover
+                open={Boolean(categoryAnchorEl)}
+                anchorEl={categoryAnchorEl}
+                onClose={handleCloseCategoryFilter}
+                anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                transformOrigin={{ vertical: "top", horizontal: "left" }}
+                slotProps={{
+                    paper: {
+                        sx: {
+                            mt: 1,
+                            px: 1.25,
+                            py: 1.25,
+                            minWidth: 0,
+                            borderRadius: 3,
+                        },
+                    },
+                }}
+            >
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+                    Category
+                </Typography>
+
+                <RadioGroup
+                    value={draftCategory}
+                    onChange={(e) => setDraftCategory(e.target.value)}
+                    sx={{ width: "fit-content" }}
+                >
+                    {displayCategories.map((option) => (
+                        <FormControlLabel
+                            key={option}
+                            value={option}
+                            control={<Radio size="small" />}
+                            label={option === "all" ? "All" : option}
+                            sx={{ my: 0, mr: 0 }}
+                        />
+                    ))}
+                </RadioGroup>
+
+                <Box display="flex" justifyContent="center" mt={0.75}>
+                    <Button
+                        variant="contained"
+                        size="small"
+                        onClick={handleApplyCategoryFilter}
+                        sx={{ minWidth: 84 }}
+                    >
+                        Apply
+                    </Button>
+                </Box>
+            </Popover>
+
             <Divider
                 orientation="vertical"
                 flexItem
@@ -465,8 +701,20 @@ export const OnlineFilterControls = ({
                     },
                 }}
             />
+            <Button
+                variant="outlined"
+                onClick={onClearFilters}
+                sx={{
+                    color: colors.grey[100],
+                    borderColor: colors.grey[300],
+                    "&:hover": {
+                        borderColor: colors.grey[200],
+                        backgroundColor: theme.palette.action.hover,
+                    },
+                }}
+            >
+                Clear
+            </Button>
         </Box>
     );
 };
-
-export default OfflineFilterControls;
