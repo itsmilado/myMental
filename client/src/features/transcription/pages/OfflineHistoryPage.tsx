@@ -10,13 +10,14 @@ import { OfflineFilterControls } from "../components/FilterControls";
 import { OfflineTranscriptionModal } from "../components/OfflineTranscriptionModal";
 import type { TranscriptData } from "../../../types/types";
 
-const OfflineHistoryPage = () => {
+export const OfflineHistoryPage = () => {
     const { list, loading, error, setActive, filters, sort } =
         useTranscriptionStore();
     const { loadTranscriptions } = useTranscriptionList();
 
     const [selected, setSelected] = useState<TranscriptData | null>(null);
     const [appliedProject, setAppliedProject] = useState("all");
+    const [appliedCategory, setAppliedCategory] = useState("all");
 
     // Trigger initial data load when the page mounts
     useEffect(() => {
@@ -62,6 +63,17 @@ const OfflineHistoryPage = () => {
     };
 
     /*
+- Normalizes a local transcript row into the Category label used by filters and table display.
+- Inputs: one offline transcription row.
+- Outputs: one display-safe Category label.
+- Important behavior: uses "Uncategorized" when no category was stored.
+*/
+    const getCategoryLabel = (item: TranscriptData): string => {
+        const trimmedCategory = String(item.category || "").trim();
+        return trimmedCategory || "Uncategorized";
+    };
+
+    /*
 - Builds the offline Project filter options from currently loaded rows.
 - Inputs: current offline history list.
 - Outputs: deduplicated Project labels for the offline filter popover.
@@ -77,13 +89,37 @@ const OfflineHistoryPage = () => {
         );
     }, [list]);
 
-    const filteredList = useMemo(() => {
-        if (appliedProject === "all") {
-            return list;
-        }
+    /*
+- Builds the offline Category filter options from currently loaded rows.
+- Inputs: current offline history list.
+- Outputs: deduplicated Category labels for the offline filter popover.
+- Important behavior: includes the display fallback for rows without a stored category.
+*/
+    const categoryOptions = useMemo(() => {
+        return Array.from(new Set(list.map((item) => getCategoryLabel(item))));
+    }, [list]);
 
-        return list.filter((item) => getProjectLabel(item) === appliedProject);
-    }, [list, appliedProject]);
+    /*
+- Applies local Project and Category filtering on top of the loaded offline rows.
+- Inputs: current offline history list and applied local filters.
+- Outputs: filtered offline transcription rows.
+- Important behavior: keeps metadata filtering local without changing table interaction behavior.
+*/
+    const filteredList = useMemo(() => {
+        return list.filter((item) => {
+            const matchesProject =
+                appliedProject === "all"
+                    ? true
+                    : getProjectLabel(item) === appliedProject;
+
+            const matchesCategory =
+                appliedCategory === "all"
+                    ? true
+                    : getCategoryLabel(item) === appliedCategory;
+
+            return matchesProject && matchesCategory;
+        });
+    }, [list, appliedProject, appliedCategory]);
 
     /*
 - Closes the offline detail modal if the selected row is filtered out locally.
@@ -119,7 +155,10 @@ const OfflineHistoryPage = () => {
             <OfflineFilterControls
                 project={appliedProject}
                 projects={projectOptions}
+                category={appliedCategory}
+                categories={categoryOptions}
                 onProjectApply={setAppliedProject}
+                onCategoryApply={setAppliedCategory}
             />
 
             {loading ? (
@@ -137,7 +176,8 @@ const OfflineHistoryPage = () => {
                     filters.transcript_id ||
                     filters.date_from ||
                     filters.date_to ||
-                    appliedProject !== "all"
+                    appliedProject !== "all" ||
+                    appliedCategory !== "all"
                         ? "No transcriptions match the current filters."
                         : "No offline transcriptions found."}
                 </Typography>
@@ -161,5 +201,3 @@ const OfflineHistoryPage = () => {
         </Paper>
     );
 };
-
-export default OfflineHistoryPage;
