@@ -559,6 +559,15 @@ export const fetchUserTranscripts = async (
     }
 };
 
+/*
+- purpose: request a transcription export file from the backend
+- inputs: transcription database id, requested format, optional fallback file name
+- outputs: downloaded file blob and resolved file name
+- important behavior:
+  - requests the existing export endpoint as a blob response
+  - reads the download filename from the content-disposition header when present
+  - stays compatible with server-side on-demand file generation
+*/
 export const exportTranscription = async (
     id: number,
     format: "txt" | "pdf" | "docx",
