@@ -208,6 +208,7 @@ const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
 
                     // keep file metadata
                     file_name: backupRow.file_name ?? null,
+                    category: backupRow.category ?? null,
                     file_recorded_at: backupRow.file_recorded_at ?? null,
                     assemblyai_connection_id:
                         backupRow.assemblyai_connection_id ?? null,
@@ -278,6 +279,7 @@ const buildHistoryResponseFromBackups = ({ historyIds, backups }) => {
                 words,
 
                 file_name: backupRow.file_name ?? null,
+                category: backupRow.category ?? null,
                 file_recorded_at: backupRow.file_recorded_at ?? null,
                 assemblyai_connection_id:
                     backupRow.assemblyai_connection_id ?? null,
