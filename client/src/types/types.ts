@@ -528,7 +528,6 @@ export type TranscriptionStepKey =
     | "upload"
     | "transcribe"
     | "save_db"
-    | "save_file"
     | "complete";
 
 /*
