@@ -34,8 +34,6 @@ import { useTranscriptionStore } from "../../../store/useTranscriptionStore"; //
 import { useAssemblyTranscriptionStore } from "../../../store/useAssemblyTranscriptionStore";
 import { restoreTranscription } from "../../auth/api";
 import { deleteAssemblyTranscription } from "../../auth/api";
-// import { useTheme } from "@mui/material/styles";
-// import { tokens } from "../../../theme/theme";
 
 type Props = {
     data: OnlineTranscription[];
@@ -44,8 +42,6 @@ type Props = {
 type StatusFilter = "all" | "completed" | "deleted";
 
 export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
-    // const theme = useTheme();
-    // const colors = tokens(theme.palette.mode);
     // Offline (restored) list
     const { addTranscription, list: offlineList } = useTranscriptionStore();
     // Online/assembly state
@@ -56,6 +52,31 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
 
     const getDisplayStatus = (t: OnlineTranscription) =>
         t.audio_url === "http://deleted_by_user" ? "deleted" : t.status;
+
+    const getProjectLabel = (item: OnlineTranscription): string | null => {
+        const trimmedLabel = String(
+            item.assemblyai_connection_label || "",
+        ).trim();
+
+        if (trimmedLabel) {
+            return trimmedLabel;
+        }
+
+        if (item.assemblyai_connection_source === "default_connection") {
+            return "Default key";
+        }
+
+        if (item.assemblyai_connection_source === "app_fallback") {
+            return "App fallback";
+        }
+
+        return null;
+    };
+
+    const getCategoryLabel = (t: OnlineTranscription): string => {
+        const trimmedCategory = String(t.category || "").trim();
+        return trimmedCategory || "Uncategorized";
+    };
 
     const filteredData = data.filter((t) => {
         const displayStatus = getDisplayStatus(t);
@@ -111,7 +132,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
     }, [statusFilter]);
 
     /*
-• Copies transcript ID and shows temporary success feedback on the row icon
+- Copies transcript ID and shows temporary success feedback on the row icon
 */
     const handleCopyTranscriptId = async (
         transcriptId: string,
@@ -230,7 +251,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                 <TableHead>
                     <TableRow>
                         <TableCell align="center">Date</TableCell>
-                        <TableCell align="center">
+                        <TableCell>
                             <FormControl
                                 size="small"
                                 variant="standard"
@@ -256,11 +277,13 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                 </Select>
                             </FormControl>
                         </TableCell>
-                        <TableCell>File Name</TableCell>
+                        <TableCell align="center">Project</TableCell>
+                        <TableCell align="center">Category</TableCell>
+                        <TableCell align="center">File Name</TableCell>
                         <TableCell align="center">Audio Length</TableCell>
                         <TableCell align="center">Transcript ID</TableCell>
-                        <TableCell>Audio URL</TableCell>
-                        <TableCell>Actions</TableCell>
+                        <TableCell align="center">Audio URL</TableCell>
+                        <TableCell align="center">Actions</TableCell>
                         <TableCell align="center">Details</TableCell>
                     </TableRow>
                 </TableHead>
@@ -281,15 +304,21 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                     : undefined
                             }
                         >
-                            <TableCell align="center">
-                                {formatDate(t.created_at)}
-                            </TableCell>
-                            <TableCell align="center">
+                            <TableCell>{formatDate(t.created_at)}</TableCell>
+                            <TableCell>
                                 {t.audio_url === "http://deleted_by_user"
                                     ? "deleted"
                                     : t.status}
                             </TableCell>
-                            <TableCell>{cleanFileName(t.file_name)}</TableCell>
+                            <TableCell align="center">
+                                {getProjectLabel(t)}
+                            </TableCell>
+                            <TableCell align="center">
+                                {getCategoryLabel(t)}
+                            </TableCell>
+                            <TableCell align="center">
+                                {cleanFileName(t.file_name)}
+                            </TableCell>
                             <TableCell align="center">
                                 {t.audio_duration || "-"}
                             </TableCell>
@@ -363,7 +392,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                 </Box>
                             </TableCell>
                             {/* --- Actions cell --- */}
-                            <TableCell>
+                            <TableCell align="center">
                                 {/* Restore */}
                                 <Tooltip
                                     title={
