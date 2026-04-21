@@ -21,6 +21,15 @@ const formats = [
     { label: "DOCX", value: "docx" },
 ];
 
+/*
+- purpose: export the selected transcript in the requested format and download it locally
+- inputs: target export format selected from the menu
+- outputs: none
+- important behavior:
+  - keeps the current loading state behavior during export
+  - downloads the blob returned by the API 
+  - preserves the current user-facing error handling
+*/
 export const ExportButton = ({ transcriptId, fileName }: Props) => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [loading, setLoading] = useState(false);
