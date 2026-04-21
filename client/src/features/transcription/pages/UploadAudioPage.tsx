@@ -75,7 +75,6 @@ const TRANSCRIPTION_STEP_ORDER: TranscriptionStepKey[] = [
     "upload",
     "transcribe",
     "save_db",
-    "save_file",
     "complete",
 ];
 
@@ -91,12 +90,19 @@ const TRANSCRIPTION_CATEGORIES = [
     "Interview",
 ] as const;
 
+/*
+- purpose: build the default SSE step state for a newly queued upload item
+- inputs: none
+- outputs: initialized transcription step state object
+- important behavior:
+  - mirrors the backend step contract exactly
+  - starts every tracked step in a pending state
+*/
 const createInitialStepsState = (): TranscriptionStepsState => ({
     init: { status: "pending", error: null },
     upload: { status: "pending", error: null },
     transcribe: { status: "pending", error: null },
     save_db: { status: "pending", error: null },
-    save_file: { status: "pending", error: null },
     complete: { status: "pending", error: null },
 });
 
@@ -115,6 +121,7 @@ const getActiveStepIndexFromSteps = (
     return lastIndex;
 };
 
+// purpose: convert a transcription step key into a readable UI label
 const labelForStepKey = (key: TranscriptionStepKey): string => {
     switch (key) {
         case "init":
@@ -125,8 +132,6 @@ const labelForStepKey = (key: TranscriptionStepKey): string => {
             return "Transcribe";
         case "save_db":
             return "Save to Database";
-        case "save_file":
-            return "Save File";
         case "complete":
             return "Complete";
         default:
@@ -150,6 +155,14 @@ const createUploadItem = (file: File): UploadItem => ({
 const buildQueueItems = (files: File[]): UploadItem[] =>
     files.slice(0, MAX_UPLOAD_FILES).map(createUploadItem);
 
+/*
+- purpose: derive the current upload item status from its tracked step states
+- inputs: full transcription step state object for one upload item
+- outputs: normalized upload item status used by the queue UI
+- important behavior:
+  - marks the item as failed when any tracked step errors
+  - treats transcribe, save_db, and complete-in-progress as active processing
+*/
 const getUploadItemStatusFromSteps = (
     steps: TranscriptionStepsState,
 ): UploadItemStatus => {
@@ -166,8 +179,6 @@ const getUploadItemStatusFromSteps = (
         steps.transcribe.status === "success" ||
         steps.save_db.status === "in_progress" ||
         steps.save_db.status === "success" ||
-        steps.save_file.status === "in_progress" ||
-        steps.save_file.status === "success" ||
         steps.complete.status === "in_progress"
     ) {
         return "processing";
