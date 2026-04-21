@@ -15,7 +15,7 @@ import {
     AssemblyAiConnection,
 } from "../../../types/types";
 
-const OnlineHistoryPage = () => {
+export const OnlineHistoryPage = () => {
     const { loadAssemblyTranscriptions } = useAssemblyTranscriptionList();
 
     const { list, loading, error, searchId, setSearchId } =
@@ -25,6 +25,7 @@ const OnlineHistoryPage = () => {
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const [appliedProject, setAppliedProject] = useState("all");
+    const [appliedCategory, setAppliedCategory] = useState("all");
     const [connectionOptions, setConnectionOptions] = useState<
         AssemblyAiConnection[]
     >([]);
@@ -80,6 +81,17 @@ const OnlineHistoryPage = () => {
     };
 
     /*
+- Normalizes a history row into the Category label used by filters and table display.
+- Inputs: one online transcription row.
+- Outputs: one display-safe Category label.
+- Important behavior: uses "Uncategorized" when no category was stored.
+*/
+    const getCategoryLabel = (item: OnlineTranscription): string => {
+        const trimmedCategory = String(item.category || "").trim();
+        return trimmedCategory || "Uncategorized";
+    };
+
+    /*
 - Builds Project options from saved user connections first, then merges history-only labels.
 - Inputs: saved connection rows and current history rows.
 - Outputs: stable Project filter options covering all API keys.
@@ -98,6 +110,16 @@ const OnlineHistoryPage = () => {
     }, [connectionOptions, list]);
 
     /*
+- Builds Category options from the current online history rows.
+- Inputs: current AssemblyAI history list.
+- Outputs: deduplicated Category labels for the online Category filter.
+- Important behavior: includes the display fallback for rows without a stored category.
+*/
+    const categoryOptions = useMemo(() => {
+        return Array.from(new Set(list.map((item) => getCategoryLabel(item))));
+    }, [list]);
+
+    /*
 - Normalize a row date for inclusive date-range filtering.
 - Inputs: raw created_at value.
 - Outputs: YYYY-MM-DD string or null.
@@ -112,6 +134,12 @@ const OnlineHistoryPage = () => {
         return date.toISOString().slice(0, 10);
     };
 
+    /*
+- Applies search, Project, Category, and date filters to the online history list.
+- Inputs: current online rows and applied filter values.
+- Outputs: filtered online transcription rows for the table and sidebar.
+- Important behavior: keeps online filtering fully client-side.
+*/
     const filteredList = useMemo(() => {
         const q = (searchId ?? "").trim().toLowerCase();
 
@@ -125,6 +153,12 @@ const OnlineHistoryPage = () => {
                 appliedProject === "all"
                     ? true
                     : normalizedProject === appliedProject;
+
+            const normalizedCategory = getCategoryLabel(t);
+            const matchesCategory =
+                appliedCategory === "all"
+                    ? true
+                    : normalizedCategory === appliedCategory;
 
             const createdDate = getCreatedDateOnly(t.created_at);
             const matchesDateFrom = dateFrom
@@ -141,17 +175,26 @@ const OnlineHistoryPage = () => {
             return (
                 matchesSearch &&
                 matchesProject &&
+                matchesCategory &&
                 matchesDateFrom &&
                 matchesDateTo
             );
         });
-    }, [list, searchId, appliedProject, dateFrom, dateTo]);
+    }, [list, searchId, appliedProject, appliedCategory, dateFrom, dateTo]);
+
+    const handleClearFilters = () => {
+        setDateFrom("");
+        setDateTo("");
+        setSearchId("");
+        setAppliedProject("all");
+        setAppliedCategory("all");
+    };
 
     /*
 - Closes the sidebar if the selected row is filtered out of the visible list.
 - Inputs: selected row and filtered list.
 - Outputs: none.
-- Important behavior: prevents stale detail state after Project/date/search changes.
+- Important behavior: prevents stale detail state after Project/category/date/search changes.
 */
     useEffect(() => {
         if (!selected) return;
@@ -185,11 +228,15 @@ const OnlineHistoryPage = () => {
                 searchId={searchId}
                 project={appliedProject}
                 projects={projectOptions}
+                category={appliedCategory}
+                categories={categoryOptions}
                 onDateFromChange={setDateFrom}
                 onDateToChange={setDateTo}
                 onSearchIdChange={setSearchId}
                 onProjectApply={setAppliedProject}
+                onCategoryApply={setAppliedCategory}
                 onClearSearchId={() => setSearchId("")}
+                onClearFilters={handleClearFilters}
             />
 
             {/* Content */}
@@ -217,7 +264,8 @@ const OnlineHistoryPage = () => {
                         {searchId ||
                         dateFrom ||
                         dateTo ||
-                        appliedProject !== "all"
+                        appliedProject !== "all" ||
+                        appliedCategory !== "all"
                             ? "No transcriptions match the current filters."
                             : "No AssemblyAI history found."}
                     </Typography>
@@ -238,5 +286,3 @@ const OnlineHistoryPage = () => {
         </Paper>
     );
 };
-
-export default OnlineHistoryPage;
