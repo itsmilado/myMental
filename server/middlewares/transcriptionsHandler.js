@@ -116,6 +116,7 @@ outside the transcription options object.
         const rawConnectionId = String(
             request.body.assemblyai_connection_id ?? "",
         ).trim();
+        const rawCategory = String(request.body.category ?? "").trim();
 
         /*
 - Parse connection-routing inputs outside the transcription options payload.
@@ -127,6 +128,7 @@ outside the transcription options object.
             String(request.body.use_app_fallback || "")
                 .trim()
                 .toLowerCase() === "true";
+        const category = rawCategory.length > 0 ? rawCategory : null;
 
         if (
             selectedAssemblyConnectionId !== null &&
@@ -170,6 +172,7 @@ outside the transcription options object.
             filename: file.filename,
             rawDate,
             userOptions,
+            category,
             selectedAssemblyConnectionId,
             useAppFallback,
         }).catch((err) => {
@@ -295,10 +298,15 @@ const fetchAllTranscriptions = async (request, response, next) => {
     }
 };
 
-/**
- * Fetch filtered transcriptions based on query parameters and user session.
- * Logs incoming request, filters, and result.
- */
+/*
+- purpose: fetch filtered transcription history rows for the current user
+- inputs: request query filters and session user
+- outputs: filtered transcription rows with timing metadata added from backups
+- important behavior:
+  - scopes history to the authenticated user unless admin rules apply downstream
+  - passes supported filter fields to the DB query layer
+  - hydrates returned rows with utterances and words from backup raw API data
+*/
 const fetchFilteredTranscriptions = async (request, response, next) => {
     try {
         logger.info(
@@ -313,6 +321,7 @@ const fetchFilteredTranscriptions = async (request, response, next) => {
         const {
             file_name,
             transcript_id,
+            category,
             date_from,
             date_to,
             order_by,
@@ -323,6 +332,7 @@ const fetchFilteredTranscriptions = async (request, response, next) => {
             user_id: userId,
             file_name,
             transcript_id,
+            category,
             date_from,
             date_to,
             order_by,
@@ -820,6 +830,15 @@ const deleteAssemblyAiTranscript = async (request, response, next) => {
     }
 };
 
+/*
+- purpose: restore an offline transcription row from backup data
+- inputs: request with transcript_id and optional fallback metadata from the client
+- outputs: restored transcription row in the offline table
+- important behavior:
+  - uses backup data as the source of truth when available
+  - prevents duplicate offline rows for the same transcript_id
+  - rebuilds stored options and transcript text from backup data
+*/
 const restoreTranscription = async (request, response, next) => {
     try {
         const user = request.session.user;
@@ -886,6 +905,7 @@ const restoreTranscription = async (request, response, next) => {
         // Prefer backup values (source of truth), fallback to client only if needed
         const restoredFileName = backup.file_name ?? clientFileName;
         const restoredRecordedAt = backup.file_recorded_at ?? null;
+        const restoredCategory = backup.category ?? null;
 
         if (!restoredFileName) {
             return response.status(400).json({
@@ -972,6 +992,7 @@ const restoreTranscription = async (request, response, next) => {
             transcript_id,
             transcription: transcriptionText,
             options,
+            category: restoredCategory,
             file_recorded_at: restoredRecordedAt,
             audio_duration: restoredAudioDuration,
             assemblyai_connection_id: backup.assemblyai_connection_id ?? null,
@@ -1325,6 +1346,7 @@ const runTranscriptionJob = async ({
     filename,
     rawDate,
     userOptions,
+    category = null,
     selectedAssemblyConnectionId = null,
     useAppFallback = false,
 }) => {
@@ -1460,6 +1482,7 @@ const runTranscriptionJob = async ({
             user_role: userRole,
             raw_api_data: transcript,
             file_name: filename,
+            category,
             file_recorded_at: fileModifiedDate,
             assemblyai_connection_id: resolvedAssembly.assemblyai_connection_id,
             assemblyai_connection_label:
@@ -1491,6 +1514,7 @@ const runTranscriptionJob = async ({
             audio_duration,
             transcript_id: transcriptId,
             options: resTranscriptOptions,
+            category,
             file_recorded_at: fileModifiedDate,
             transcriptObject: transcript,
             assemblyai_connection_id: resolvedAssembly.assemblyai_connection_id,
