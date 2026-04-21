@@ -83,6 +83,14 @@ const AUTO_LANGUAGE_CODE = "auto";
 const DISABLED_U3_FORMATTING_TEXT =
     "This feature is not configurable for universal-3-pro.";
 
+const TRANSCRIPTION_CATEGORIES = [
+    "Phone Call",
+    "Meeting",
+    "Doctor Visit",
+    "Journal",
+    "Interview",
+] as const;
+
 const createInitialStepsState = (): TranscriptionStepsState => ({
     init: { status: "pending", error: null },
     upload: { status: "pending", error: null },
@@ -521,7 +529,7 @@ export const UploadAudioPage = () => {
     const [options, setOptions] = useState<TranscriptionOptions>(
         defaultTranscriptionOptions,
     );
-
+    const [selectedCategory, setSelectedCategory] = useState<string>("");
     const [speakerSectionOpen, setSpeakerSectionOpen] = useState(true);
     const [formatSectionOpen, setFormatSectionOpen] = useState(false);
     const [selectedPromptPreset, setSelectedPromptPreset] =
@@ -1291,10 +1299,13 @@ export const UploadAudioPage = () => {
     );
 
     /*
-- Handles the full lifecycle for a single queued file.
-- Inputs: queue item plus frozen batch request options and connection mode.
-- Outputs: resolves after the item finishes or tracking stops.
-- Important behavior: delegates SSE tracking to a shared helper so retry-tracking uses the same event parsing path.
+- purpose: handle the full lifecycle for one queued upload item
+- inputs: queue item, frozen transcription options, frozen connection id, and frozen app-fallback mode
+- outputs: resolves after the item starts successfully and progress tracking is attached, or after failure is recorded
+- important behavior:
+  - starts exactly one backend job for the current item
+  - keeps sequential queue behavior unchanged
+  - reuses the shared SSE attach helper for live progress updates
 */
     const runSingleUpload = async (
         item: UploadItem,
@@ -1313,6 +1324,7 @@ export const UploadAudioPage = () => {
             const response = await startTranscriptionJob({
                 file: item.file,
                 options: sharedOptions,
+                category: selectedCategory.trim() || null,
                 assemblyai_connection_id: assemblyaiConnectionId,
                 use_app_fallback: useAppFallback,
             });
@@ -2428,24 +2440,64 @@ export const UploadAudioPage = () => {
                             </Accordion>
                         </Box>
 
-                        {/* ROW 5 — Project (AssemblyAI Key) */}
+                        {/* ROW 5 — Category + Project (AssemblyAI Key) */}
                         <Box
                             sx={{
                                 display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
+                                flexDirection: { xs: "column", md: "row" },
+                                alignItems: "stretch",
+                                justifyContent: "center",
                                 gap: 1.25,
                                 pt: 0.5,
                             }}
                         >
                             <FormControl
+                                disabled={isProcessingQueue}
+                                sx={{
+                                    flex: 1,
+                                    minWidth: { xs: "100%", md: 260 },
+                                }}
+                            >
+                                <InputLabel id="transcription-category-select-label">
+                                    Category
+                                </InputLabel>
+                                <Select
+                                    labelId="transcription-category-select-label"
+                                    value={selectedCategory || "None"}
+                                    label="Category"
+                                    onChange={(event) =>
+                                        setSelectedCategory(
+                                            String(event.target.value),
+                                        )
+                                    }
+                                >
+                                    <MenuItem value="None">None</MenuItem>
+
+                                    {TRANSCRIPTION_CATEGORIES.map(
+                                        (category) => (
+                                            <MenuItem
+                                                key={category}
+                                                value={category}
+                                            >
+                                                {category}
+                                            </MenuItem>
+                                        ),
+                                    )}
+                                </Select>
+
+                                <FormHelperText>
+                                    Optional metadata used for history display
+                                    and filtering.
+                                </FormHelperText>
+                            </FormControl>
+
+                            <FormControl
                                 disabled={
                                     isProcessingQueue || connectionsLoading
                                 }
                                 sx={{
-                                    width: "fit-content",
+                                    flex: 1,
                                     minWidth: { xs: "100%", md: 260 },
-                                    maxWidth: "100%",
                                 }}
                             >
                                 <InputLabel id="assembly-connection-select-label">
@@ -3177,11 +3229,23 @@ export const UploadAudioPage = () => {
                                             variant="body2"
                                             sx={{ color: "text.secondary" }}
                                         >
+                                            Category:{" "}
+                                            {selectedResultItem.result
+                                                .category || "—"}
+                                        </Typography>
+
+                                        <Typography
+                                            variant="body2"
+                                            sx={{ color: "text.secondary" }}
+                                        >
                                             Recorded at:{" "}
-                                            {formatDateTime(
-                                                selectedResultItem.result
-                                                    .file_recorded_at,
-                                            )}
+                                            {selectedResultItem.result
+                                                .file_recorded_at
+                                                ? formatDateTime(
+                                                      selectedResultItem.result
+                                                          .file_recorded_at,
+                                                  )
+                                                : "—"}
                                         </Typography>
                                     </Box>
                                 </Box>
