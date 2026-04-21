@@ -13,8 +13,8 @@ import ProtectedRoute from "./ProtectedRoute";
 import { UploadAudioPage } from "../features/transcription/pages/UploadAudioPage";
 import TranscriptionHistoryPage from "../features/transcription/pages/TranscriptionHistoryPage";
 import TranscriptionDetailPage from "../features/transcription/pages/TranscriptionDetailPage";
-import OfflineHistoryPage from "../features/transcription/pages/OfflineHistoryPage";
-import OnlineHistoryPage from "../features/transcription/pages/OnlineHistoryPage";
+import { OfflineHistoryPage } from "../features/transcription/pages/OfflineHistoryPage";
+import { OnlineHistoryPage } from "../features/transcription/pages/OnlineHistoryPage";
 
 import AccountPage from "../features/account/pages/AccountPage";
 import PreferencesPage from "../features/preferences/pages/PreferencesPage";
