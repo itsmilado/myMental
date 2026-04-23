@@ -42,9 +42,6 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage: storage,
     fileFilter: (req, file, cb) => {
-        logger.info(
-            `Incoming file: ${file.originalname}, type: ${file.mimetype}`,
-        );
         const allowedTypes = [
             "audio/mp4",
             "audio/m4a",
@@ -57,49 +54,94 @@ const upload = multer({
             "audio/mpeg",
             "audio/webm",
         ];
+
         if (!allowedTypes.includes(file.mimetype)) {
-            logger.warn(`Invalid file type: ${file.mimetype}`);
+            logger.warn(
+                `[uploadMiddleware.fileFilter] => validate mime type: denied | ${JSON.stringify(
+                    {
+                        mimeType: file.mimetype,
+                        originalName: file.originalname,
+                    },
+                )}`,
+            );
+
             return cb(
                 new Error("Only MP4, M4A, MP3, WAV, and OGG files are allowed"),
             );
         }
-        cb(null, true);
+
+        return cb(null, true);
     },
-    limits: { fileSize: 80 * 1024 * 1024 }, // 80MB limit
+    limits: { fileSize: 80 * 1024 * 1024 },
 });
 
+/*
+- purpose: parse a single audio upload request and stop the request on upload errors
+- inputs: express request, response, and next callback
+- outputs: forwards to next middleware or returns an upload error response
+- important behavior:
+  - accepts a single file from the audioFile field
+  - handles both multer-specific and general upload errors
+  - requires a parsed file before allowing the request to continue
+*/
 const uploadMiddleware = (req, res, next) => {
     const uploadSingle = upload.single("audioFile");
 
     uploadSingle(req, res, (err) => {
         if (err) {
-            // Handle Multer-specific errors
             if (err instanceof multer.MulterError) {
-                logger.error(`Multer error: ${err.message}`);
+                logger.error(
+                    `[uploadMiddleware.uploadMiddleware] => process upload: failed | ${JSON.stringify(
+                        {
+                            errorType: "multer",
+                            error: err.message,
+                        },
+                    )}`,
+                );
+
                 return res.status(500).json({
                     success: false,
                     message: `File upload error: ${err.message}`,
                 });
             }
 
-            // Handle unknown errors
-            logger.error(`Upload error: ${err.message}`);
+            logger.error(
+                `[uploadMiddleware.uploadMiddleware] => process upload: failed | ${JSON.stringify(
+                    {
+                        errorType: "general",
+                        error: err.message,
+                    },
+                )}`,
+            );
+
             return res.status(500).json({
                 success: false,
                 message: `${err.message}`,
             });
         }
 
-        // Ensure the file exists before proceeding
         if (!req.file) {
-            logger.warn("No file uploaded in the request");
+            logger.warn(
+                `[uploadMiddleware.uploadMiddleware] => validate upload payload: denied | ${JSON.stringify(
+                    {
+                        reason: "No_file_uploaded",
+                    },
+                )}`,
+            );
+
             return res.status(400).json({
                 success: false,
                 message: "No file uploaded. Please provide a valid audio file.",
             });
         }
 
-        logger.info(`File successfully uploaded to API: ${req.file.filename}`);
+        logger.info(
+            `[uploadMiddleware.uploadMiddleware] => process upload: success | ${JSON.stringify(
+                {
+                    fileName: req.file.filename,
+                },
+            )}`,
+        );
 
         next();
     });

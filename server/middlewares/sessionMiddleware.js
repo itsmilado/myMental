@@ -14,14 +14,16 @@ const redisClient = redis.createClient({
 
 redisClient.connect().catch((error) => {
     logger.error(
-        `[sessionMiddleware > - redisClient.connect()] Error => ${error.message}`,
+        `[sessionMiddleware.redisClient] => connect redis: failed | ${JSON.stringify(
+            {
+                error: error.message,
+            },
+        )}`,
     );
 });
 
 redisClient.on("connect", () => {
-    logger.info(
-        `[sessionMiddleware > - redisClient.connect()] => Redis client succesfully connected.`,
-    );
+    logger.info(`[sessionMiddleware.redisClient] => connect redis: success`);
 });
 
 let sessionMiddleware;
@@ -41,7 +43,11 @@ try {
     });
 } catch (error) {
     logger.error(
-        `[sessionMiddleware > Error setting up session middleware: - redisClient.connect()] Error => ${error.message}`,
+        `[sessionMiddleware.session] => initialize middleware: failed | ${JSON.stringify(
+            {
+                error: error.message,
+            },
+        )}`,
     );
 }
 

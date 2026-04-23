@@ -21,18 +21,32 @@ const deleteAudioFileCopy = (fileName) => {
             // Delete the uploaded audio copy.
             fs.unlinkSync(audioPath);
             logger.info(
-                `[deleteAudioFileCopy] Deleted audio file copy: ${audioPath}`,
+                `[fileProcessor.deleteAudioFileCopy] => delete audio file copy: success | ${JSON.stringify(
+                    {
+                        resourceId: fileName,
+                    },
+                )}`,
             );
 
             // Skip silently when the local file is already gone.
         } else {
             logger.info(
-                `[deleteAudioFileCopy] Audio file not found, skipping: ${audioPath}`,
+                `[fileProcessor.deleteAudioFileCopy] => delete audio file copy: denied | ${JSON.stringify(
+                    {
+                        resourceId: fileName,
+                        reason: "audio_file_not_found",
+                    },
+                )}`,
             );
         }
     } catch (error) {
         logger.error(
-            `[deleteAudioFileCopy] Error deleting audio file: ${error.message}`,
+            `[fileProcessor.deleteAudioFileCopy] => delete audio file copy: failed | ${JSON.stringify(
+                {
+                    resourceId: fileName,
+                    error: error.message,
+                },
+            )}`,
         );
     }
 };

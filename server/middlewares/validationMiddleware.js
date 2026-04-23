@@ -1,4 +1,5 @@
 // middlwares/validationMiddleware.js
+
 const logger = require("../utils/logger");
 const { body, validationResult } = require("express-validator");
 
@@ -81,17 +82,34 @@ const validateResetPasswordRules = [
         .withMessage("Password must be at least 8 characters"),
 ];
 
+/*
+- purpose: stop request processing when express-validator returns validation errors
+- inputs: express request, response, and next callback
+- outputs: forwards to next middleware or returns 400 json response with validation details
+- important behavior:
+  - logs validation failures with request context
+  - preserves the existing validation response payload
+  - does not modify the validator error array before returning it
+*/
 const handleValidationErrors = (request, response, next) => {
     const errors = validationResult(request);
+
     if (!errors.isEmpty()) {
-        logger.error(`Validation errors: ${JSON.stringify(errors.array())}`);
+        logger.warn(
+            `[validationMiddleware.handleValidationErrors] => validate request: failed | ${JSON.stringify(
+                {
+                    errorCount: errors.array().length,
+                },
+            )}`,
+        );
+
         return response.status(400).json({
             success: false,
             message: "Validation failed. Please check your input.",
             errors: errors.array(),
         });
     }
-    // If no errors, proceed to the next middleware
+
     next();
 };
 

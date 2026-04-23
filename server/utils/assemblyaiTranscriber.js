@@ -67,8 +67,13 @@ const buildAssemblyAiTranscriptionRequest = (transcriptionOptions = {}) => {
     return removeUndefinedEntries(request);
 };
 
-/**
-- Sends transcription request to AssemblyAI and returns transcript ID
+/*
+- purpose: submit a normalized transcription request to AssemblyAI
+- inputs: transcription options payload, optional AssemblyAI client instance
+- outputs: AssemblyAI transcript creation response
+- important behavior:
+  - logs only safe request metadata without exposing audio urls or full payload bodies
+  - rethrows upstream errors unchanged so handler behavior remains intact
 */
 const requestTranscription = async (
     transcriptionOptions,
@@ -78,29 +83,37 @@ const requestTranscription = async (
         const assemblyRequest =
             buildAssemblyAiTranscriptionRequest(transcriptionOptions);
 
+        const transcript = await client.transcripts.submit(assemblyRequest);
+
         logger.info(
-            `[assemblyaiTranscriber.requestTranscription] => submitting transcript request: ${JSON.stringify(
+            `[assemblyaiTranscriber.requestTranscription] => submit transcript: success | ${JSON.stringify(
                 {
-                    ...assemblyRequest,
-                    audio_url: assemblyRequest.audio_url
-                        ? "[redacted]"
-                        : undefined,
+                    transcriptId: transcript?.id || null,
+                    status: transcript?.status || null,
                 },
             )}`,
         );
 
-        const transcript = await client.transcripts.submit(assemblyRequest);
-
         return transcript;
     } catch (error) {
         logger.error(
-            `[assemblyaiTranscriber.requestTranscription] => failed to submit transcript: ${error.message}`,
+            `[assemblyaiTranscriber.requestTranscription] => submit transcript: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
 };
 
-// Poll for transcription result
+/*
+- purpose: poll AssemblyAI until a transcript reaches a terminal state
+- inputs: transcript id, optional AssemblyAI client instance, polling interval in milliseconds
+- outputs: completed transcript payload
+- important behavior:
+  - rethrows polling errors unchanged so upstream handlers keep current behavior
+*/
 const pollTranscriptionResult = async (
     transcriptId,
     client = assemblyClient,
@@ -110,12 +123,19 @@ const pollTranscriptionResult = async (
         let transcript;
         while (true) {
             transcript = await client.transcripts.get(transcriptId);
+
             if (transcript.status === "completed") {
                 logger.info(
-                    `[pollTranscriptionResult] => Transcription completed and fetched`,
+                    `[assemblyaiTranscriber.pollTranscriptionResult] => poll transcript: success | ${JSON.stringify(
+                        {
+                            transcriptId,
+                            status: transcript.status,
+                        },
+                    )}`,
                 );
                 return transcript;
             }
+
             if (transcript.status === "error") {
                 throw new Error(
                     transcript.error || "AssemblyAI transcription failed.",
@@ -126,7 +146,12 @@ const pollTranscriptionResult = async (
         }
     } catch (error) {
         logger.error(
-            `[pollTranscriptionResult] => Error polling transcription: ${error.message}`,
+            `[assemblyaiTranscriber.pollTranscriptionResult] => poll transcript: failed | ${JSON.stringify(
+                {
+                    transcriptId,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }

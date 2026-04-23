@@ -40,7 +40,13 @@ const createUserQuery = async ({
         const createdUser = await pool.query(insertQuery, insertValues);
         return createdUser.rows[0];
     } catch (error) {
-        logger.error(`[createUserQuery] Error: ${error.message}`);
+        logger.error(
+            `[usersQueries.createUserQuery] => create user: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
+        );
         throw error;
     }
 };
@@ -73,7 +79,12 @@ const getUserByIdQuery = async ({ id }) => {
 
         if (user.rows.length === 0) {
             logger.error(
-                `[usersQueries > getUserByIdQuery] => User not found with ID: ${id}`,
+                `[usersQueries.getUserByIdQuery] => fetch user by id: denied | ${JSON.stringify(
+                    {
+                        resourceId: id,
+                        reason: "user_not_found",
+                    },
+                )}`,
             );
             return false; // Explicitly return false if no user is found
         }
@@ -81,7 +92,12 @@ const getUserByIdQuery = async ({ id }) => {
         return user.rows[0];
     } catch (error) {
         logger.error(
-            `[usersQueries > getUserById] => Error getting user by ID: ${error.message}`,
+            `[usersQueries.getUserByIdQuery] => fetch user by id: failed | ${JSON.stringify(
+                {
+                    resourceId: id,
+                    error: error.message,
+                },
+            )}`,
         );
 
         throw error; // Rethrow the error to be caught in the calling function
@@ -97,7 +113,11 @@ const getUserByEmailQuery = async ({ email }) => {
 
         if (user.rows.length === 0) {
             logger.error(
-                `[usersQueries > getUserByIdQuery] => User not found with Email: ${email}`,
+                `[usersQueries.getUserByEmailQuery] => fetch user by email: denied | ${JSON.stringify(
+                    {
+                        reason: "user_not_found",
+                    },
+                )}`,
             );
             return false; // Explicitly return false if no user is found
         }
@@ -105,7 +125,11 @@ const getUserByEmailQuery = async ({ email }) => {
         return user.rows[0];
     } catch (error) {
         logger.error(
-            `[usersQueries > getUserByEmail] => Error getting user by email: ${error.message}`,
+            `[usersQueries.getUserByEmailQuery] => fetch user by email: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
 
         throw error; // Rethrow the error to be caught in the calling function
@@ -119,7 +143,11 @@ const getAllUsersQuery = async () => {
 
         if (users.rows.length === 0) {
             logger.error(
-                `[usersQueries > getAllUsersQuery] => No users retrieved`,
+                `[usersQueries.getAllUsersQuery] => fetch all users: denied | ${JSON.stringify(
+                    {
+                        reason: "users_not_found",
+                    },
+                )}`,
             );
             return false; // Explicitly return false if no user is found
         }
@@ -127,7 +155,11 @@ const getAllUsersQuery = async () => {
         return users.rows;
     } catch (error) {
         logger.error(
-            `[usersQueries > getAllUsers] => Error getting all users: ${error.message}`,
+            `[usersQueries.getAllUsersQuery] => fetch all users: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
 
         throw error; // Rethrow the error to be caught in the calling function
@@ -162,7 +194,12 @@ const updateUserByIdQuery = async ({ id, first_name, last_name, email }) => {
         return updated.rows[0];
     } catch (error) {
         logger.error(
-            `[usersQueries > updateUserByIdQuery] => Error updating user: ${error.message}`,
+            `[usersQueries.updateUserByIdQuery] => update user by id: failed | ${JSON.stringify(
+                {
+                    resourceId: id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -194,7 +231,12 @@ const deleteUserByIdQuery = async ({ id }) => {
         return res.rows[0] || null;
     } catch (error) {
         logger.error(
-            `[usersQueries > deleteUserByIdQuery] => Error deleting user: ${error.message}`,
+            `[usersQueries.deleteUserByIdQuery] => delete user by id: failed | ${JSON.stringify(
+                {
+                    resourceId: id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -212,7 +254,12 @@ const updateUserPasswordByIdQuery = async ({ id, hashed_password }) => {
         return res.rows[0] || null;
     } catch (error) {
         logger.error(
-            `[usersQueries > updateUserPasswordByIdQuery] => Error updating password: ${error.message}`,
+            `[usersQueries.updateUserPasswordByIdQuery] => update user password by id: failed | ${JSON.stringify(
+                {
+                    resourceId: id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -299,7 +346,12 @@ const setPasswordResetTokenByIdQuery = async ({
         return res.rows[0] || null;
     } catch (error) {
         logger.error(
-            `[usersQueries > setPasswordResetTokenByIdQuery] => Error: ${error.message}`,
+            `[usersQueries.setPasswordResetTokenByIdQuery] => set password reset token by id: failed | ${JSON.stringify(
+                {
+                    resourceId: id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -317,7 +369,11 @@ const getUserByPasswordResetTokenHashQuery = async ({ token_hash }) => {
         return res.rows[0] || null;
     } catch (error) {
         logger.error(
-            `[usersQueries > getUserByPasswordResetTokenHashQuery] => Error: ${error.message}`,
+            `[usersQueries.getUserByPasswordResetTokenHashQuery] => fetch user by password reset token hash: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -336,7 +392,12 @@ const clearPasswordResetTokenByIdQuery = async ({ id }) => {
         return res.rows[0] || null;
     } catch (error) {
         logger.error(
-            `[usersQueries > clearPasswordResetTokenByIdQuery] => Error: ${error.message}`,
+            `[usersQueries.clearPasswordResetTokenByIdQuery] => clear password reset token by id: failed | ${JSON.stringify(
+                {
+                    resourceId: id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }

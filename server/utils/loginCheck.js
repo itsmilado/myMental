@@ -10,7 +10,7 @@ const loginCheck = async ({ email, password }) => {
         return false;
     }
     logger.info(
-        `Login Check Matched Found: user_id(${JSON.stringify(matchedUser.id)})`,
+        `[loginCheck] => process Login with password: success | ${JSON.stringify({ user_id: matchedUser.id })}`,
     );
     const hasPassword = Boolean(matchedUser.hashed_password);
     const hasGoogleAuth = Boolean(matchedUser.google_sub);

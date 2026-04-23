@@ -82,6 +82,13 @@ const startTranscriptionJob = async (request, response, next) => {
     try {
         const user = request.session.user;
         if (!user || !user.id) {
+            logger.warn(
+                `[transcriptionsHandler.startTranscriptionJob] => start transcription job: denied | ${JSON.stringify(
+                    {
+                        reason: "missing_session_user",
+                    },
+                )}`,
+            );
             return response.status(401).json({
                 success: false,
                 message: "User not authenticated",
@@ -90,6 +97,14 @@ const startTranscriptionJob = async (request, response, next) => {
 
         const file = request.file;
         if (!file || !file.path || !file.filename) {
+            logger.warn(
+                `[transcriptionsHandler.startTranscriptionJob] => validate audio file: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        reason: "missing_audio_file",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "No audio file provided",
@@ -128,6 +143,14 @@ outside the transcription options object.
             selectedAssemblyConnectionId !== null &&
             !Number.isInteger(selectedAssemblyConnectionId)
         ) {
+            logger.warn(
+                `[transcriptionsHandler.startTranscriptionJob] => validate assembly connection selection: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        reason: "invalid_connection_selection",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Invalid AssemblyAI connection selection.",
@@ -135,6 +158,14 @@ outside the transcription options object.
         }
 
         if (useAppFallback && selectedAssemblyConnectionId !== null) {
+            logger.warn(
+                `[transcriptionsHandler.startTranscriptionJob] => validate assembly connection selection: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        reason: "conflicting_connection_selection",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Conflicting AssemblyAI connection selection.",
@@ -155,7 +186,12 @@ outside the transcription options object.
         };
 
         logger.info(
-            `[startTranscriptionJob] => Created job ${jobId} for user ${user.id}`,
+            `[transcriptionsHandler.startTranscriptionJob] => start transcription job: success | ${JSON.stringify(
+                {
+                    userId: user.id,
+                    jobId,
+                },
+            )}`,
         );
 
         // fire & forget: run worker in background
@@ -171,7 +207,13 @@ outside the transcription options object.
             useAppFallback,
         }).catch((err) => {
             logger.error(
-                `[startTranscriptionJob] => Unhandled error in job ${jobId}: ${err.message}`,
+                `[transcriptionsHandler.startTranscriptionJob] => run transcription job: failed | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        jobId,
+                        error: err.message,
+                    },
+                )}`,
             );
         });
 
@@ -182,7 +224,11 @@ outside the transcription options object.
         });
     } catch (error) {
         logger.error(
-            `[startTranscriptionJob] => Error starting job: ${error.message}`,
+            `[transcriptionsHandler.startTranscriptionJob] => start transcription job: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -198,6 +244,14 @@ const streamTranscriptionProgress = (request, response, next) => {
         const job = transcriptionJobs[jobId];
 
         if (!job) {
+            logger.warn(
+                `[transcriptionsHandler.streamTranscriptionProgress] => stream transcription progress: denied | ${JSON.stringify(
+                    {
+                        jobId,
+                        reason: "job_not_found",
+                    },
+                )}`,
+            );
             return response
                 .status(404)
                 .json({ success: false, message: "Job not found" });
@@ -242,6 +296,14 @@ const streamTranscriptionProgress = (request, response, next) => {
         emitter.on("completed", sendCompleted);
         emitter.on("error", sendErrorEvent);
 
+        logger.info(
+            `[transcriptionsHandler.streamTranscriptionProgress] => stream transcription progress: success | ${JSON.stringify(
+                {
+                    jobId,
+                },
+            )}`,
+        );
+
         // cleanup on client disconnect
         request.on("close", () => {
             emitter.removeListener("step", sendStep);
@@ -251,7 +313,11 @@ const streamTranscriptionProgress = (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[streamTranscriptionProgress] => Error streaming SSE: ${error.message}`,
+            `[transcriptionsHandler.streamTranscriptionProgress] => stream transcription progress: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -264,12 +330,15 @@ const streamTranscriptionProgress = (request, response, next) => {
 
 const fetchAllTranscriptions = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const transcriptions = await getAllTranscriptionsQuery();
         if (!transcriptions) {
+            logger.warn(
+                `[transcriptionsHandler.fetchAllTranscriptions] => fetch all transcriptions: denied | ${JSON.stringify(
+                    {
+                        reason: "transcriptions_not_found",
+                    },
+                )}`,
+            );
             response
                 .status(404)
                 .json({ success: false, message: "No transcriptions found" });
@@ -277,7 +346,11 @@ const fetchAllTranscriptions = async (request, response, next) => {
         }
 
         logger.info(
-            `[transcriptionsMiddleware - fetchAllTranscriptions] => Transcriptions retrieved`,
+            `[transcriptionsHandler.fetchAllTranscriptions] => fetch all transcriptions: success | ${JSON.stringify(
+                {
+                    transcriptionCount: transcriptions.length,
+                },
+            )}`,
         );
         response.status(200).json({
             success: true,
@@ -286,7 +359,11 @@ const fetchAllTranscriptions = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - getAllTranscriptions] => Error fetching transcriptions: ${error.message}`,
+            `[transcriptionsHandler.fetchAllTranscriptions] => fetch all transcriptions: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -303,10 +380,6 @@ const fetchAllTranscriptions = async (request, response, next) => {
 */
 const fetchFilteredTranscriptions = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const user = request.session.user;
         const userId = user.id;
         const isAdmin = String(user.role || "").toLowerCase() === "admin";
@@ -336,6 +409,14 @@ const fetchFilteredTranscriptions = async (request, response, next) => {
         const transcriptions = await getFilteredTranscriptionsQuery(filters);
 
         if (!transcriptions) {
+            logger.warn(
+                `[transcriptionsHandler.fetchFilteredTranscriptions] => fetch filtered transcriptions: denied | ${JSON.stringify(
+                    {
+                        userId,
+                        reason: "transcriptions_not_found",
+                    },
+                )}`,
+            );
             response
                 .status(404)
                 .json({ success: false, message: "No transcriptions found" });
@@ -371,9 +452,21 @@ const fetchFilteredTranscriptions = async (request, response, next) => {
             message: "Transcriptions found",
             data: hydrated,
         });
+        logger.info(
+            `[transcriptionsHandler.fetchFilteredTranscriptions] => fetch filtered transcriptions: success | ${JSON.stringify(
+                {
+                    userId,
+                    transcriptionCount: hydrated.length,
+                },
+            )}`,
+        );
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - fetchFilteredTranscriptions] => Error: ${error.message}`,
+            `[transcriptionsHandler.fetchFilteredTranscriptions] => fetch filtered transcriptions: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -386,10 +479,6 @@ const fetchFilteredTranscriptions = async (request, response, next) => {
 
 const fetchTranscriptionById = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const user = request.session.user;
         const isAdmin = String(user.role || "").toLowerCase() === "admin";
         const { id } = request.params;
@@ -398,6 +487,15 @@ const fetchTranscriptionById = async (request, response, next) => {
         const transcription = await getTranscriptionByIdQuery(id);
 
         if (!transcription) {
+            logger.warn(
+                `[transcriptionsHandler.fetchTranscriptionById] => fetch transcription by id: denied | ${JSON.stringify(
+                    {
+                        userId: user?.id,
+                        resourceId: id,
+                        reason: "transcription_not_found",
+                    },
+                )}`,
+            );
             response.status(401).json({
                 success: false,
                 message: `Transcription with ID: ${id} does not exist`,
@@ -407,6 +505,15 @@ const fetchTranscriptionById = async (request, response, next) => {
 
         // Enforce ownership unless admin
         if (!isAdmin && transcription.user_id !== user.id) {
+            logger.warn(
+                `[transcriptionsHandler.fetchTranscriptionById] => fetch transcription by id: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        resourceId: id,
+                        reason: "forbidden",
+                    },
+                )}`,
+            );
             return response.status(403).json({
                 success: false,
                 message: "You are not authorized to access this resource!",
@@ -422,7 +529,12 @@ const fetchTranscriptionById = async (request, response, next) => {
         const rawApiData = backups?.[0]?.raw_api_data ?? null;
 
         logger.info(
-            `[transcriptionsMiddleware - fetchTranscriptionById] => Transcription fetched with ID: ${id}`,
+            `[transcriptionsHandler.fetchTranscriptionById] => fetch transcription by id: success | ${JSON.stringify(
+                {
+                    userId: user.id,
+                    resourceId: id,
+                },
+            )}`,
         );
 
         response.status(200).json({
@@ -436,7 +548,11 @@ const fetchTranscriptionById = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - fetchTranscriptionById] => Error fetching transcription with ID: ${error.message}`,
+            `[transcriptionsHandler.fetchTranscriptionById] => fetch transcription by id: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -452,19 +568,19 @@ const fetchTranscriptionByApiId = async (request, response, next) => {
         const isAdmin = String(user.role || "").toLowerCase() === "admin";
         const { transcriptId } = request.params;
 
-        logger.info(
-            `Incoming request to ${request.method} ${
-                request.originalUrl
-            }, params: ${JSON.stringify(request.params)}`,
-        );
-
         // Fetch the transcription by API transcript ID
         const transcription =
             await getTranscriptionByApiTranscriptIdQuery(transcriptId);
 
         if (!transcription) {
             logger.warn(
-                `[transcriptionsMiddleware - fetchTranscriptionByApiId] => Transcription with API ID: ${transcriptId} not found`,
+                `[transcriptionsHandler.fetchTranscriptionByApiId] => fetch transcription by api id: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        resourceId: transcriptId,
+                        reason: "transcription_not_found",
+                    },
+                )}`,
             );
             response.status(401).json({
                 success: false,
@@ -474,6 +590,15 @@ const fetchTranscriptionByApiId = async (request, response, next) => {
         }
 
         if (!isAdmin && transcription.user_id !== user.id) {
+            logger.warn(
+                `[transcriptionsHandler.fetchTranscriptionByApiId] => fetch transcription by api id: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        resourceId: transcriptId,
+                        reason: "forbidden",
+                    },
+                )}`,
+            );
             return response.status(403).json({
                 success: false,
                 message: "You are not authorized to access this resource!",
@@ -489,7 +614,12 @@ const fetchTranscriptionByApiId = async (request, response, next) => {
         const rawApiData = backups?.[0]?.raw_api_data ?? null;
 
         logger.info(
-            `[transcriptionsMiddleware - fetchTranscriptionByApiId] => Transcription fetched with API ID: ${transcriptId}`,
+            `[transcriptionsHandler.fetchTranscriptionByApiId] => fetch transcription by api id: success | ${JSON.stringify(
+                {
+                    userId: user.id,
+                    resourceId: transcriptId,
+                },
+            )}`,
         );
         response.status(200).json({
             success: true,
@@ -502,7 +632,11 @@ const fetchTranscriptionByApiId = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - fetchTranscriptionByApiId] => Error fetching transcription: ${error.message}`,
+            `[transcriptionsHandler.fetchTranscriptionByApiId] => fetch transcription by api id: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -517,15 +651,15 @@ const fetchApiTranscriptionById = async (request, response, next) => {
         const { transcript_id } = request.body;
         const user = request.session.user;
 
-        logger.info(
-            `Incoming request to ${request.method} ${
-                request.originalUrl
-            } body: ${JSON.stringify(
-                request.body,
-            )}, transcript_id: ${transcript_id}`,
-        );
-
         if (!user?.id) {
+            logger.warn(
+                `[transcriptionsHandler.fetchApiTranscriptionById] => fetch api transcription by id: denied | ${JSON.stringify(
+                    {
+                        resourceId: transcript_id,
+                        reason: "missing_session_user",
+                    },
+                )}`,
+            );
             return response.status(401).json({
                 success: false,
                 message: "User not authenticated",
@@ -549,6 +683,15 @@ const fetchApiTranscriptionById = async (request, response, next) => {
         );
 
         if (!transcript) {
+            logger.warn(
+                `[transcriptionsHandler.fetchApiTranscriptionById] => fetch api transcription by id: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        resourceId: transcript_id,
+                        reason: "transcript_not_found",
+                    },
+                )}`,
+            );
             return response.status(404).json({
                 success: false,
                 message: "Transcript not found in AssemblyAI",
@@ -556,7 +699,12 @@ const fetchApiTranscriptionById = async (request, response, next) => {
         }
 
         logger.info(
-            `[transcriptionsMiddleware - fetchApiTranscriptionById] => Transcription fetched by ID: ${transcript_id}`,
+            `[transcriptionsHandler.fetchApiTranscriptionById] => fetch api transcription by id: success | ${JSON.stringify(
+                {
+                    userId: user.id,
+                    resourceId: transcript_id,
+                },
+            )}`,
         );
         response.status(200).json({
             success: true,
@@ -565,7 +713,11 @@ const fetchApiTranscriptionById = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - fetchApiTranscriptionById] => Error fetching transcription : ${error.message}`,
+            `[transcriptionsHandler.fetchApiTranscriptionById] => fetch api transcription by id: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -586,12 +738,17 @@ const exportTranscription = async (request, response, next) => {
         const format = (request.query.format || "txt").toLowerCase();
         const user = request.session.user;
 
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const transcription = await getTranscriptionByIdQuery(id);
         if (!transcription) {
+            logger.warn(
+                `[transcriptionsHandler.exportTranscription] => export transcription: denied | ${JSON.stringify(
+                    {
+                        userId: user?.id,
+                        resourceId: id,
+                        reason: "transcription_not_found",
+                    },
+                )}`,
+            );
             return response.status(404).json({
                 success: false,
                 message: `transcription with ID ${id} Not found`,
@@ -599,6 +756,15 @@ const exportTranscription = async (request, response, next) => {
         }
 
         if (transcription.user_id !== user.id && user.role !== "admin") {
+            logger.warn(
+                `[transcriptionsHandler.exportTranscription] => export transcription: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        resourceId: id,
+                        reason: "forbidden",
+                    },
+                )}`,
+            );
             return response.status(403).json({
                 success: false,
                 message: "You are not authorized to access this resource!",
@@ -619,11 +785,21 @@ const exportTranscription = async (request, response, next) => {
         response.send(buffer);
 
         logger.info(
-            `[transcriptionsMiddleware - exportTranscription] User ${request.session.user.id} exported ${transcription.transcript_id} as ${format}`,
+            `[transcriptionsHandler.exportTranscription] => export transcription: success | ${JSON.stringify(
+                {
+                    userId: request.session.user.id,
+                    resourceId: transcription.transcript_id,
+                    format,
+                },
+            )}`,
         );
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - exportTranscription] => Error exporting transcription : ${error.message}`,
+            `[transcriptionsHandler.exportTranscription] => export transcription: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -643,17 +819,19 @@ const deleteDBTranscription = async (request, response, next) => {
         const { id } = request.params;
         const user = request.session.user;
 
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const { deleteFromAssembly = false, deleteAudioFile = false } =
             request.body || {};
 
         const transcription = await getTranscriptionByIdQuery(id);
         if (!transcription) {
-            logger.error(
-                `[transcriptionsMiddleware - fetchApiTranscriptionById] => transcription with ID ${id} Not found`,
+            logger.warn(
+                `[transcriptionsHandler.deleteDBTranscription] => delete db transcription: denied | ${JSON.stringify(
+                    {
+                        userId: user?.id,
+                        resourceId: id,
+                        reason: "transcription_not_found",
+                    },
+                )}`,
             );
             return response.status(404).json({
                 success: false,
@@ -662,6 +840,15 @@ const deleteDBTranscription = async (request, response, next) => {
         }
 
         if (transcription.user_id !== user.id && user.role !== "admin") {
+            logger.warn(
+                `[transcriptionsHandler.deleteDBTranscription] => delete db transcription: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        resourceId: id,
+                        reason: "forbidden",
+                    },
+                )}`,
+            );
             return response.status(403).json({
                 success: false,
                 message: "You are not Not Authorized to access this resource!",
@@ -683,7 +870,12 @@ const deleteDBTranscription = async (request, response, next) => {
         results.dbDeleted = true;
 
         logger.info(
-            `[deleteTranscription] User ${user.id} deleted transcription ${id} from database`,
+            `[transcriptionsHandler.deleteDBTranscription] => delete database record: success | ${JSON.stringify(
+                {
+                    userId: user.id,
+                    resourceId: id,
+                },
+            )}`,
         );
 
         // Optionally remove the local audio copy.
@@ -714,19 +906,45 @@ const deleteDBTranscription = async (request, response, next) => {
                 if (status === "completed") {
                     results.assemblyDeleted = true;
                     logger.info(
-                        `[deleteTranscription] Transcript ${transcription.transcript_id} deleted from AssemblyAI`,
+                        `[transcriptionsHandler.deleteDBTranscription] => delete assembly transcript: success | ${JSON.stringify(
+                            {
+                                userId: user.id,
+                                resourceId: transcription.transcript_id,
+                            },
+                        )}`,
                     );
                 } else {
                     logger.warn(
-                        `[deleteTranscription] AssemblyAI delete for ${transcription.transcript_id} returned status: ${status}`,
+                        `[transcriptionsHandler.deleteDBTranscription] => delete assembly transcript: denied | ${JSON.stringify(
+                            {
+                                userId: user.id,
+                                resourceId: transcription.transcript_id,
+                                reason: status,
+                            },
+                        )}`,
                     );
                 }
             } catch (err) {
                 logger.error(
-                    `[deleteTranscription] Error deleting from AssemblyAI: ${err.message}`,
+                    `[transcriptionsHandler.deleteDBTranscription] => delete assembly transcript: failed | ${JSON.stringify(
+                        {
+                            userId: user.id,
+                            resourceId: transcription.transcript_id,
+                            error: err.message,
+                        },
+                    )}`,
                 );
             }
         }
+
+        logger.info(
+            `[transcriptionsHandler.deleteDBTranscription] => delete db transcription: success | ${JSON.stringify(
+                {
+                    userId: user.id,
+                    resourceId: id,
+                },
+            )}`,
+        );
 
         return response.json({
             success: true,
@@ -734,6 +952,13 @@ const deleteDBTranscription = async (request, response, next) => {
             results,
         });
     } catch (error) {
+        logger.error(
+            `[transcriptionsHandler.deleteDBTranscription] => delete db transcription: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
+        );
         next(error);
     }
 };
@@ -741,12 +966,16 @@ const deleteDBTranscription = async (request, response, next) => {
 const fetchAssemblyAIHistory = async (request, response, next) => {
     try {
         const user = request.session.user;
+        const data = await fetchAssemblyHistory({ user });
 
         logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
+            `[transcriptionsHandler.fetchAssemblyAIHistory] => fetch assembly history: success | ${JSON.stringify(
+                {
+                    userId: user?.id,
+                    transcriptionCount: Array.isArray(data) ? data.length : 0,
+                },
+            )}`,
         );
-
-        const data = await fetchAssemblyHistory({ user });
 
         response.status(200).json({
             success: true,
@@ -755,7 +984,11 @@ const fetchAssemblyAIHistory = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - fetchAssemblyAIHistory] => Error fetching transcriptions: ${error.message}`,
+            `[transcriptionsHandler.fetchAssemblyAIHistory] => fetch assembly history: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -766,11 +999,15 @@ const deleteAssemblyAiTranscript = async (request, response, next) => {
         const { transcriptId } = request.params;
         const user = request.session.user;
 
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}, params: ${request.params}`,
-        );
-
         if (!user?.id) {
+            logger.warn(
+                `[transcriptionsHandler.deleteAssemblyAiTranscript] => delete assembly transcript: denied | ${JSON.stringify(
+                    {
+                        resourceId: transcriptId,
+                        reason: "missing_session_user",
+                    },
+                )}`,
+            );
             return response.status(401).json({
                 success: false,
                 message: "User not authenticated",
@@ -794,13 +1031,24 @@ const deleteAssemblyAiTranscript = async (request, response, next) => {
 
         if (status !== "completed") {
             logger.warn(
-                `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Request to ${request.originalUrl} was not successful.`,
+                `[transcriptionsHandler.deleteAssemblyAiTranscript] => delete assembly transcript: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        resourceId: transcriptId,
+                        reason: status,
+                    },
+                )}`,
             );
             throw new Error("Failed to delete transcript from AssemblyAI.");
         }
 
         logger.info(
-            `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Transcript with ID ${transcriptId} deleted from AssemblyAI API`,
+            `[transcriptionsHandler.deleteAssemblyAiTranscript] => delete assembly transcript: success | ${JSON.stringify(
+                {
+                    userId: user.id,
+                    resourceId: transcriptId,
+                },
+            )}`,
         );
         response.json({
             success: true,
@@ -808,7 +1056,11 @@ const deleteAssemblyAiTranscript = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - deleteAssemblyAiTranscript] => Error delete transcript: ${error.message}`,
+            `[transcriptionsHandler.deleteAssemblyAiTranscript] => delete assembly transcript: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -834,13 +1086,14 @@ const restoreTranscription = async (request, response, next) => {
             audio_duration: clientAudioDuration,
         } = request.body;
 
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         if (!userId) {
             logger.warn(
-                `[transcriptionsMiddleware - restoreTranscription] => Unauthorized restore attempt`,
+                `[transcriptionsHandler.restoreTranscription] => restore transcription: denied | ${JSON.stringify(
+                    {
+                        resourceId: transcript_id,
+                        reason: "missing_session_user",
+                    },
+                )}`,
             );
             return response.status(401).json({
                 success: false,
@@ -851,7 +1104,12 @@ const restoreTranscription = async (request, response, next) => {
         // Required fields
         if (!transcript_id) {
             logger.warn(
-                `[transcriptionsMiddleware - restoreTranscription] => Missing fields. transcript_id? "${transcript_id}" `,
+                `[transcriptionsHandler.restoreTranscription] => validate restore payload: denied | ${JSON.stringify(
+                    {
+                        userId,
+                        reason: "missing_transcript_id",
+                    },
+                )}`,
             );
             return response.status(400).json({
                 success: false,
@@ -864,7 +1122,13 @@ const restoreTranscription = async (request, response, next) => {
             await getTranscriptionByApiTranscriptIdQuery(transcript_id);
         if (existing) {
             logger.warn(
-                `[transcriptionsMiddleware - restoreTranscription] => Transcript with ID: ${transcript_id} already exists in database`,
+                `[transcriptionsHandler.restoreTranscription] => restore transcription: denied | ${JSON.stringify(
+                    {
+                        userId,
+                        resourceId: transcript_id,
+                        reason: "transcript_already_exists",
+                    },
+                )}`,
             );
             return response.status(409).json({
                 success: false,
@@ -876,7 +1140,13 @@ const restoreTranscription = async (request, response, next) => {
         const backup = await getBackupWithRawByTranscriptIdQuery(transcript_id);
         if (!backup) {
             logger.warn(
-                `[transcriptionsMiddleware - restoreTranscription] => No backup found for transcript_id: ${transcript_id}`,
+                `[transcriptionsHandler.restoreTranscription] => restore transcription: denied | ${JSON.stringify(
+                    {
+                        userId,
+                        resourceId: transcript_id,
+                        reason: "backup_not_found",
+                    },
+                )}`,
             );
             return response.status(404).json({
                 success: false,
@@ -965,7 +1235,13 @@ const restoreTranscription = async (request, response, next) => {
 
         if (!transcriptionText) {
             logger.warn(
-                `[transcriptionsMiddleware - restoreTranscription] => Could not derive transcription text from backup.raw_api_data for transcript_id: ${transcript_id}`,
+                `[transcriptionsHandler.restoreTranscription] => derive transcription text: denied | ${JSON.stringify(
+                    {
+                        userId,
+                        resourceId: transcript_id,
+                        reason: "missing_transcription_text",
+                    },
+                )}`,
             );
         }
 
@@ -986,7 +1262,12 @@ const restoreTranscription = async (request, response, next) => {
                 backup.assemblyai_connection_source ?? "legacy_unknown",
         });
         logger.info(
-            `[transcriptionsMiddleware - restoreTranscription] => Transcript with ID ${transcript_id} restored to offline successfully for user ${userId}`,
+            `[transcriptionsHandler.restoreTranscription] => restore transcription: success | ${JSON.stringify(
+                {
+                    userId,
+                    resourceId: transcript_id,
+                },
+            )}`,
         );
 
         return response.status(201).json({
@@ -996,7 +1277,11 @@ const restoreTranscription = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - restoreTranscription] => Error restoring transcript: ${error.message}`,
+            `[transcriptionsHandler.restoreTranscription] => restore transcription: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -1013,10 +1298,26 @@ const streamAudioFile = (request, response, next) => {
         const audioPath = path.join(uploadDir, safeName);
 
         if (!audioPath.startsWith(uploadDir)) {
+            logger.warn(
+                `[transcriptionsHandler.streamAudioFile] => validate audio file path: denied | ${JSON.stringify(
+                    {
+                        resourceId: safeName,
+                        reason: "invalid_file_name",
+                    },
+                )}`,
+            );
             return response.status(400).json({ message: "Invalid file name" });
         }
 
         if (!fs.existsSync(audioPath)) {
+            logger.warn(
+                `[transcriptionsHandler.streamAudioFile] => stream audio file: denied | ${JSON.stringify(
+                    {
+                        resourceId: safeName,
+                        reason: "audio_file_not_found",
+                    },
+                )}`,
+            );
             return response
                 .status(404)
                 .json({ message: "Audio file not found" });
@@ -1045,6 +1346,14 @@ const streamAudioFile = (request, response, next) => {
             const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
 
             if (Number.isNaN(start) || Number.isNaN(end) || start > end) {
+                logger.warn(
+                    `[transcriptionsHandler.streamAudioFile] => validate audio range: denied | ${JSON.stringify(
+                        {
+                            resourceId: safeName,
+                            reason: "invalid_range",
+                        },
+                    )}`,
+                );
                 return response
                     .status(416)
                     .send("Requested Range Not Satisfiable");
@@ -1060,7 +1369,24 @@ const streamAudioFile = (request, response, next) => {
             });
 
             const stream = fs.createReadStream(audioPath, { start, end });
-            stream.on("error", next);
+            stream.on("error", (error) => {
+                logger.error(
+                    `[transcriptionsHandler.streamAudioFile] => stream audio file: failed | ${JSON.stringify(
+                        {
+                            resourceId: safeName,
+                            error: error.message,
+                        },
+                    )}`,
+                );
+                next(error);
+            });
+            logger.info(
+                `[transcriptionsHandler.streamAudioFile] => stream audio file: success | ${JSON.stringify(
+                    {
+                        resourceId: safeName,
+                    },
+                )}`,
+            );
             return stream.pipe(response);
         }
 
@@ -1071,9 +1397,26 @@ const streamAudioFile = (request, response, next) => {
         });
 
         const stream = fs.createReadStream(audioPath);
-        stream.on("error", next);
+        stream.on("error", (error) => {
+            logger.error(
+                `[transcriptionsHandler.streamAudioFile] => stream audio file: failed | ${JSON.stringify(
+                    {
+                        resourceId: safeName,
+                        error: error.message,
+                    },
+                )}`,
+            );
+            next(error);
+        });
         return stream.pipe(response);
     } catch (err) {
+        logger.error(
+            `[transcriptionsHandler.streamAudioFile] => stream audio file: failed | ${JSON.stringify(
+                {
+                    error: err.message,
+                },
+            )}`,
+        );
         return next(err);
     }
 };
@@ -1337,7 +1680,12 @@ const runTranscriptionJob = async ({
     const job = transcriptionJobs[jobId];
     if (!job) {
         logger.warn(
-            `[runTranscriptionJob] => Job ${jobId} no longer exists in registry`,
+            `[transcriptionsHandler.runTranscriptionJob] => run transcription job: denied | ${JSON.stringify(
+                {
+                    jobId,
+                    reason: "job_not_found",
+                },
+            )}`,
         );
         return;
     }
@@ -1364,6 +1712,14 @@ const runTranscriptionJob = async ({
 
         if (!loggedUserId) {
             const msg = "User not authenticated";
+            logger.warn(
+                `[transcriptionsHandler.runTranscriptionJob] => run transcription job: denied | ${JSON.stringify(
+                    {
+                        jobId,
+                        reason: "missing_user",
+                    },
+                )}`,
+            );
             emitStep(TRANSCRIPTION_STEPS.INIT, "error", msg);
             setStepStatus(steps, TRANSCRIPTION_STEPS.COMPLETE, "error", msg);
             emitter.emit("error", {
@@ -1377,6 +1733,15 @@ const runTranscriptionJob = async ({
 
         if (!filePath || !filename) {
             const msg = "No audio file provided";
+            logger.warn(
+                `[transcriptionsHandler.runTranscriptionJob] => validate audio file: denied | ${JSON.stringify(
+                    {
+                        userId: loggedUserId,
+                        jobId,
+                        reason: "missing_audio_file",
+                    },
+                )}`,
+            );
             emitStep(TRANSCRIPTION_STEPS.INIT, "error", msg);
             setStepStatus(steps, TRANSCRIPTION_STEPS.COMPLETE, "error", msg);
             emitter.emit("error", {
@@ -1389,24 +1754,6 @@ const runTranscriptionJob = async ({
         }
 
         const fileModifiedDate = rawDate ? new Date(rawDate) : "00.00.00";
-        const fileModifiedDisplayDate =
-            fileModifiedDate instanceof Date &&
-            !Number.isNaN(fileModifiedDate.getTime())
-                ? fileModifiedDate.toLocaleString("en-GB").replace(/\//g, ".")
-                : "00.00.00";
-
-        logger.info(
-            `Incoming SSE transcription job ${jobId} from user_id ${loggedUserId}`,
-        );
-
-        console.log(
-            `[runTranscriptionJob] => jobId=${jobId}, filename=${filename}, fileModifiedDate=${fileModifiedDisplayDate}`,
-        );
-        console.log(
-            `[runTranscriptionJob] Received options: ${JSON.stringify(
-                userOptions,
-            )}`,
-        );
 
         emitStep(TRANSCRIPTION_STEPS.INIT, "success");
 
@@ -1433,12 +1780,6 @@ const runTranscriptionJob = async ({
             audio_url: uploadUrl,
             ...userOptions,
         };
-
-        console.log(
-            `[runTranscriptionJob] transcriptionOptions: ${JSON.stringify(
-                transcriptionOptions,
-            )}`,
-        );
 
         const transcriptResponse = await requestTranscription(
             transcriptionOptions,
@@ -1482,7 +1823,13 @@ const runTranscriptionJob = async ({
         }
 
         logger.info(
-            `[runTranscriptionJob] => insertTranscriptionBackupQuery: Transcript's API response for User ${loggedUserId} stored`,
+            `[transcriptionsHandler.runTranscriptionJob] => store transcription backup: success | ${JSON.stringify(
+                {
+                    userId: loggedUserId,
+                    jobId,
+                    resourceId: transcriptId,
+                },
+            )}`,
         );
 
         const { audio_duration } = transcript;
@@ -1533,11 +1880,24 @@ const runTranscriptionJob = async ({
         });
 
         logger.info(
-            `[runTranscriptionJob] => job ${jobId} completed successfully`,
+            `[transcriptionsHandler.runTranscriptionJob] => run transcription job: success | ${JSON.stringify(
+                {
+                    userId: loggedUserId,
+                    jobId,
+                    resourceId: transcriptId,
+                },
+            )}`,
         );
     } catch (err) {
         const msg = err && err.message ? err.message : String(err);
-        logger.error(`[runTranscriptionJob] => Error in job ${jobId}: ${msg}`);
+        logger.error(
+            `[transcriptionsHandler.runTranscriptionJob] => run transcription job: failed | ${JSON.stringify(
+                {
+                    jobId,
+                    error: msg,
+                },
+            )}`,
+        );
         job.error = msg;
 
         setStepStatus(steps, TRANSCRIPTION_STEPS.COMPLETE, "error", msg);
@@ -1606,7 +1966,13 @@ const storeTranscriptionText = async ({ transcriptData }) => {
         }
 
         logger.info(
-            `[transcriptionMiddleware - createTranscription - storeTranscriptionText] => Transcription text prepared (length=${transcriptionText.length}).`,
+            `[transcriptionsHandler.storeTranscriptionText] => prepare transcription text: success | ${JSON.stringify(
+                {
+                    userId: transcriptData.user_id,
+                    resourceId: transcriptData.transcript_id,
+                    textLength: transcriptionText.length,
+                },
+            )}`,
         );
 
         const transcriptionDataToInsert = {
@@ -1618,12 +1984,25 @@ const storeTranscriptionText = async ({ transcriptData }) => {
             ...transcriptionDataToInsert,
         });
 
-        logger.info(`Transcription stored in database.`);
+        logger.info(
+            `[transcriptionsHandler.storeTranscriptionText] => store transcription text: success | ${JSON.stringify(
+                {
+                    userId: transcriptData.user_id,
+                    resourceId: transcriptData.transcript_id,
+                },
+            )}`,
+        );
 
         return insertedTranscription;
     } catch (error) {
         logger.error(
-            `[transcriptionsMiddleware - storeTranscriptionText] => Error storing transcription: ${error.message}`,
+            `[transcriptionsHandler.storeTranscriptionText] => store transcription text: failed | ${JSON.stringify(
+                {
+                    userId: transcriptData.user_id,
+                    resourceId: transcriptData.transcript_id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }

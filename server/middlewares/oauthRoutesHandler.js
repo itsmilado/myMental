@@ -66,13 +66,24 @@ const hasRecentReauth = (req, windowMs = 1000 * 60 * 5) => {
     return Date.now() - ts <= windowMs;
 };
 
+/*
+- purpose: start the Google OAuth flow for the current request intent
+- inputs: express request, response, and next callback
+- outputs: redirects the client to Google's OAuth consent flow
+- important behavior:
+  - validates required Google OAuth environment variables before starting
+  - stores oauth state and intent in the session
+  - forwards startup errors to the global error handler
+*/
 const startGoogleOAuth = async (req, res, next) => {
     try {
         requireGoogleEnv();
 
         const state = crypto.randomBytes(24).toString("hex");
+        const intent = getOAuthIntent(req);
+
         req.session.oauthState = state;
-        req.session.oauthIntent = getOAuthIntent(req);
+        req.session.oauthIntent = intent;
 
         const url = oauth2.generateAuthUrl({
             access_type: "online",
@@ -83,11 +94,26 @@ const startGoogleOAuth = async (req, res, next) => {
 
         return res.redirect(url);
     } catch (err) {
-        logger.error(`[startGoogleOAuth] => ${err.message}`);
+        logger.error(
+            `[oauthRoutesHandler.startGoogleOAuth] => start oauth: failed | ${JSON.stringify(
+                {
+                    error: err.message,
+                },
+            )}`,
+        );
         return next(err);
     }
 };
 
+/*
+- purpose: complete the Google OAuth callback flow and resolve the requested auth intent
+- inputs: express request and response
+- outputs: redirects the client to the appropriate success or error destination
+- important behavior:
+  - validates callback state before exchanging the authorization code
+  - supports sign-in, account linking, and recent reauthentication intents
+  - clears transient oauth session state before processing the callback
+*/
 const googleOAuthCallback = async (req, res) => {
     try {
         requireGoogleEnv();
@@ -101,11 +127,27 @@ const googleOAuthCallback = async (req, res) => {
         req.session.oauthIntent = null;
 
         if (!code || !state || !sessionState || state !== sessionState) {
+            logger.warn(
+                `[oauthRoutesHandler.googleOAuthCallback] => validate callback state: denied | ${JSON.stringify(
+                    {
+                        intent,
+                    },
+                )}`,
+            );
+
             return res.redirect(oauthErrorRedirect);
         }
 
         const { tokens } = await oauth2.getToken(code);
         if (!tokens?.id_token) {
+            logger.warn(
+                `[oauthRoutesHandler.googleOAuthCallback] => exchange token: denied | ${JSON.stringify(
+                    {
+                        intent,
+                    },
+                )}`,
+            );
+
             return res.redirect(oauthErrorRedirect);
         }
 
@@ -115,7 +157,17 @@ const googleOAuthCallback = async (req, res) => {
         });
 
         const payload = ticket.getPayload();
-        if (!payload) return res.redirect(oauthErrorRedirect);
+        if (!payload) {
+            logger.warn(
+                `[oauthRoutesHandler.googleOAuthCallback] => verify identity token: denied | ${JSON.stringify(
+                    {
+                        intent,
+                    },
+                )}`,
+            );
+
+            return res.redirect(oauthErrorRedirect);
+        }
 
         const google_sub = String(payload.sub || "").trim();
         const email = String(payload.email || "")
@@ -126,6 +178,17 @@ const googleOAuthCallback = async (req, res) => {
         const last_name = String(payload.family_name || "").trim();
 
         if (!google_sub || !email || !emailVerified) {
+            logger.warn(
+                `[oauthRoutesHandler.googleOAuthCallback] => validate google identity: denied | ${JSON.stringify(
+                    {
+                        intent,
+                        hasGoogleSub: Boolean(google_sub),
+                        hasEmail: Boolean(email),
+                        emailVerified,
+                    },
+                )}`,
+            );
+
             return res.redirect(
                 redirectWithParams(oauthSuccessRedirect, {
                     error: "Google account email is missing or not verified.",
@@ -143,6 +206,15 @@ const googleOAuthCallback = async (req, res) => {
             const sessionUser = req.session?.user;
 
             if (!sessionUser?.id) {
+                logger.warn(
+                    `[oauthRoutesHandler.googleOAuthCallback] => validate reauth session: denied | ${JSON.stringify(
+                        {
+                            intent,
+                            email,
+                        },
+                    )}`,
+                );
+
                 return res.redirect(
                     redirectWithParams(accountRedirectBase, {
                         error: "Please sign in again to continue.",
@@ -152,6 +224,15 @@ const googleOAuthCallback = async (req, res) => {
 
             const currentUser = await getUserByIdQuery({ id: sessionUser.id });
             if (!currentUser) {
+                logger.warn(
+                    `[oauthRoutesHandler.googleOAuthCallback] => load reauth user: denied | ${JSON.stringify(
+                        {
+                            intent,
+                            userId: sessionUser.id,
+                        },
+                    )}`,
+                );
+
                 return res.redirect(
                     redirectWithParams(accountRedirectBase, {
                         error: "User not found.",
@@ -160,6 +241,15 @@ const googleOAuthCallback = async (req, res) => {
             }
 
             if (!currentUser.google_sub) {
+                logger.warn(
+                    `[oauthRoutesHandler.googleOAuthCallback] => validate google linkage: denied | ${JSON.stringify(
+                        {
+                            intent,
+                            userId: currentUser.id,
+                        },
+                    )}`,
+                );
+
                 return res.redirect(
                     redirectWithParams(accountRedirectBase, {
                         error: "Google sign-in is not linked to this account.",
@@ -168,6 +258,15 @@ const googleOAuthCallback = async (req, res) => {
             }
 
             if (String(currentUser.google_sub) !== String(google_sub)) {
+                logger.warn(
+                    `[oauthRoutesHandler.googleOAuthCallback] => validate google account match: denied | ${JSON.stringify(
+                        {
+                            intent,
+                            userId: currentUser.id,
+                        },
+                    )}`,
+                );
+
                 return res.redirect(
                     redirectWithParams(accountRedirectBase, {
                         error: "The selected Google account does not match this user.",
@@ -186,6 +285,15 @@ const googleOAuthCallback = async (req, res) => {
                         ? "unlink"
                         : "reauth_assembly_connection";
 
+            logger.info(
+                `[oauthRoutesHandler.googleOAuthCallback] => complete reauth: success | ${JSON.stringify(
+                    {
+                        intent,
+                        userId: currentUser.id,
+                    },
+                )}`,
+            );
+
             return req.session.save(() =>
                 res.redirect(
                     redirectWithParams(accountRedirectBase, {
@@ -201,6 +309,15 @@ const googleOAuthCallback = async (req, res) => {
             const sessionUser = req.session?.user;
 
             if (!sessionUser) {
+                logger.warn(
+                    `[oauthRoutesHandler.googleOAuthCallback] => validate link session: denied | ${JSON.stringify(
+                        {
+                            intent,
+                            email,
+                        },
+                    )}`,
+                );
+
                 return res.redirect(
                     redirectWithParams(accountRedirectBase, {
                         error: "You need to be signed in before linking Google.",
@@ -298,7 +415,13 @@ const googleOAuthCallback = async (req, res) => {
             return res.redirect(oauthSuccessRedirect);
         }
     } catch (err) {
-        logger.error(`[googleOAuthCallback] => ${err.message}`);
+        logger.error(
+            `[oauthRoutesHandler.googleOAuthCallback] => process callback: failed | ${JSON.stringify(
+                {
+                    error: err.message,
+                },
+            )}`,
+        );
         return res.redirect(oauthErrorRedirect);
     }
 };

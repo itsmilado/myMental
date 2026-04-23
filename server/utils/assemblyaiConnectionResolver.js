@@ -231,7 +231,13 @@ const resolveAssemblyHistoryWithFallback = async ({
             return await fetchWithApiKey(apiKey);
         } catch (error) {
             logger.warn(
-                `[assemblyaiConnectionResolver] Skipping AssemblyAI key ${connection.id}: ${error.message}`,
+                `[assemblyaiConnectionResolver.resolveAssemblyHistoryWithFallback] => resolve assembly history connection: denied | ${JSON.stringify(
+                    {
+                        userId: user_id,
+                        resourceId: connection.id,
+                        reason: error.message,
+                    },
+                )}`,
             );
         }
     }

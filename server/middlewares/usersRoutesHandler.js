@@ -46,16 +46,11 @@ const { validateAssemblyApiKey } = require("../utils/assemblyaiClient");
 
 const createUsers = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        ); // Log the request URL
-
         // Filter sensitive fields from the request body before logging
         const filteredBody = filterSensitiveFields(request.body, [
             "password",
             "repeat_password",
         ]);
-        logger.info(`Request body: ${JSON.stringify(filteredBody)}`); // Log filtered body
 
         const { password, user_role } = request.body;
         const hashed_password = await hashPassword(password);
@@ -64,9 +59,14 @@ const createUsers = async (request, response, next) => {
             hashed_password,
             user_role: user_role || "user", // Set user_role to "user" if it is not provided
         });
+
         logger.info(
-            `New user created: user_id(${JSON.stringify(newUser.id)}) `,
-        ); // Log the new user
+            `[usersRoutesHandler.createUsers] => create user: success | ${JSON.stringify(
+                {
+                    userId: newUser.id,
+                },
+            )}`,
+        );
 
         await establishAuthenticatedSession(request, newUser);
 
@@ -77,7 +77,11 @@ const createUsers = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[usersRoutesHandler > Line 15 - createUsers] => Error creating user: ${error.message}`,
+            `[usersRoutesHandler.createUsers] => create user: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -85,21 +89,22 @@ const createUsers = async (request, response, next) => {
 
 const userLogin = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        ); // Log the request URL
-
         // Filter sensitive fields from the request body before logging
         const filteredBody = filterSensitiveFields(request.body, ["password"]);
-        logger.info(`Request body: ${JSON.stringify(filteredBody)}`); // Log filtered body
 
         const matchUser = await loginCheck({ ...request.body });
 
         // wrong credentials
         if (!matchUser) {
-            logger.error(
-                `[userHandlers > userLogin] User login failed: email or password is wrong!`,
+            logger.warn(
+                `[usersRoutesHandler.userLogin] => authenticate user: denied | ${JSON.stringify(
+                    {
+                        reason: "invalid_credentials",
+                        email: request.body?.email || null,
+                    },
+                )}`,
             );
+
             response.status(401).json({
                 success: false,
                 message: "Email or Password is wrong!",
@@ -117,9 +122,12 @@ const userLogin = async (request, response, next) => {
         }
 
         logger.info(
-            `User logged in successfully: user_id ${JSON.stringify(
-                matchUser.id,
-            )} user_role ${JSON.stringify(matchUser.user_role)}`,
+            `[usersRoutesHandler.userLogin] => authenticate user: success | ${JSON.stringify(
+                {
+                    userId: matchUser.id,
+                    role: matchUser.user_role,
+                },
+            )}`,
         );
 
         const rememberMe = Boolean(request.body?.rememberMe);
@@ -132,21 +140,29 @@ const userLogin = async (request, response, next) => {
             userData: serializeUserInfo(matchUser),
         });
     } catch (error) {
-        logger.error(`[userHandlers > userLogin] Error: ${error.message}`);
+        logger.error(
+            `[usersRoutesHandler.userLogin] => authenticate user: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
+        );
         next(error);
     }
 };
 
 const userLoggedOut = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
         request.session.destroy((error) => {
             if (error) {
                 logger.error(
-                    `[userHandlers > userLoggedOut] Error destroying session: ${error.message}`,
+                    `[usersRoutesHandler.userLoggedOut] => destroy session: failed | ${JSON.stringify(
+                        {
+                            error: error.message,
+                        },
+                    )}`,
                 );
+
                 return next(error); // Pass the error to the error handler middleware
             }
             const isProd = process.env.NODE_ENV === "production";
@@ -155,24 +171,29 @@ const userLoggedOut = async (request, response, next) => {
                 sameSite: "lax",
                 secure: isProd, // true in production behind HTTPS
             }); // Clear the session cookie
-            logger.info("Session cookie cleared");
+
+            logger.info(
+                `[usersRoutesHandler.userLoggedOut] => clear session cookie: success`,
+            );
+
             response
                 .status(200)
                 .json({ success: true, message: "logout successfull" });
         });
     } catch (error) {
-        logger.error(`[userHandlers > userLoggedOut] Error: ${error.message}`);
+        logger.error(
+            `[usersRoutesHandler.userLoggedOut] => logout user: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
+        );
         next(error);
     }
 };
 
 const getUserInfo = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        ); // Log the request URL
-        logger.info(`Request params: ${JSON.stringify(request.params)}`); // Log the request params
-
         const user = await getUserByIdQuery({ ...request.params });
         if (!user) {
             response
@@ -180,7 +201,15 @@ const getUserInfo = async (request, response, next) => {
                 .json({ success: false, message: "User not found" });
             return;
         }
-        logger.info(`User found by ID: ${JSON.stringify(user.id)}`); // Log the user object
+
+        logger.info(
+            `[usersRoutesHandler.getUserInfo] => fetch user by id: success | ${JSON.stringify(
+                {
+                    userId: user.id,
+                },
+            )}`,
+        );
+
         response.status(200).json({
             success: true,
             message: "User found",
@@ -188,7 +217,12 @@ const getUserInfo = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[usersRoutesHandler > Line 38 - getUserInfo] => Error getting user info: ${error.message}`,
+            `[usersRoutesHandler.getUserInfo] => fetch user by id: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                    userId: request.params?.id || null,
+                },
+            )}`,
         );
         next(error);
     }
@@ -196,9 +230,6 @@ const getUserInfo = async (request, response, next) => {
 
 const getAllProfiles = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        ); // Log the request URL
         const users = await getAllUsersQuery();
         if (!users) {
             response
@@ -206,11 +237,15 @@ const getAllProfiles = async (request, response, next) => {
                 .json({ success: false, message: "No users retrieved" });
             return;
         }
+
         logger.info(
-            `[usersRoutesHandler - getAllProfiles]: ${JSON.stringify(
-                serializeUserInfo(users),
+            `[usersRoutesHandler.getAllProfiles] => fetch all profiles: success | ${JSON.stringify(
+                {
+                    count: Array.isArray(users) ? users.length : 0,
+                },
             )}`,
-        ); // Log the users array
+        );
+
         response.status(200).json({
             success: true,
             message: "Users found",
@@ -218,7 +253,11 @@ const getAllProfiles = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[usersRoutesHandler - getAllProfiles] => Error fetching users: ${error.message}`,
+            `[usersRoutesHandler.getAllProfiles] => fetch all profiles: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -226,10 +265,6 @@ const getAllProfiles = async (request, response, next) => {
 
 const getCurrentUser = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         // Check if there is a user in the session
         if (!request.session || !request.session.user) {
             return response.status(401).json({
@@ -247,7 +282,15 @@ const getCurrentUser = async (request, response, next) => {
                 message: "User not found",
             });
         }
-        logger.info(`User is Logged-in with id : ${id} `);
+
+        logger.info(
+            `[usersRoutesHandler.getCurrentUser] => fetch current user: success | ${JSON.stringify(
+                {
+                    userId: id,
+                },
+            )}`,
+        );
+
         const userData = serializeUserInfo(user);
 
         return response.status(200).json({
@@ -257,7 +300,12 @@ const getCurrentUser = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[usersRoutesHandler > getCurrentUser] => Error getting current user: ${error.message}`,
+            `[usersRoutesHandler.getCurrentUser] => fetch current user: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                    sessionUserId: request.session?.user?.id || null,
+                },
+            )}`,
         );
         next(error);
     }
@@ -265,11 +313,15 @@ const getCurrentUser = async (request, response, next) => {
 
 const updateCurrentUser = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         if (!request.session || !request.session.user) {
+            logger.warn(
+                `[usersRoutesHandler.updateCurrentUser] => authorize update current user: denied | ${JSON.stringify(
+                    {
+                        reason: "not_authenticated",
+                    },
+                )}`,
+            );
+
             return response.status(401).json({
                 success: false,
                 message: "Not authenticated",
@@ -289,6 +341,15 @@ const updateCurrentUser = async (request, response, next) => {
         }
 
         if (first_name === undefined && last_name === undefined) {
+            logger.warn(
+                `[usersRoutesHandler.updateCurrentUser] => validate update payload: denied | ${JSON.stringify(
+                    {
+                        sessionUserId: id,
+                        reason: "no_fields_provided",
+                    },
+                )}`,
+            );
+
             return response.status(400).json({
                 success: false,
                 message: "No fields provided to update",
@@ -296,6 +357,15 @@ const updateCurrentUser = async (request, response, next) => {
         }
 
         if (first_name !== undefined && !isValidName(first_name)) {
+            logger.warn(
+                `[usersRoutesHandler.updateCurrentUser] => validate update payload: denied | ${JSON.stringify(
+                    {
+                        sessionUserId: id,
+                        field: "first_name",
+                    },
+                )}`,
+            );
+
             return response.status(400).json({
                 success: false,
                 message: "Invalid first name",
@@ -303,6 +373,15 @@ const updateCurrentUser = async (request, response, next) => {
         }
 
         if (last_name !== undefined && !isValidName(last_name)) {
+            logger.warn(
+                `[usersRoutesHandler.updateCurrentUser] => validate update payload: denied | ${JSON.stringify(
+                    {
+                        sessionUserId: id,
+                        field: "last_name",
+                    },
+                )}`,
+            );
+
             return response.status(400).json({
                 success: false,
                 message: "Invalid last name",
@@ -321,7 +400,15 @@ const updateCurrentUser = async (request, response, next) => {
             const existing = await getUserByEmailQuery({ email: email.trim() });
             // Only return error if email exists and belongs to a different user
             if (existing && String(existing.id) !== String(id)) {
-                logger.warn(`Email already in use by another user: ${email}`);
+                logger.warn(
+                    `[usersRoutesHandler.updateCurrentUser] => validate email uniqueness: denied | ${JSON.stringify(
+                        {
+                            sessionUserId: id,
+                            email,
+                        },
+                    )}`,
+                );
+
                 return response.status(409).json({
                     success: false,
                     message: "Email already in use",
@@ -348,6 +435,14 @@ const updateCurrentUser = async (request, response, next) => {
         // Keep session email in sync (prevents stale session display)
         request.session.user.email = userData.email;
 
+        logger.info(
+            `[usersRoutesHandler.updateCurrentUser] => update current user: success | ${JSON.stringify(
+                {
+                    userId: updatedUser.id,
+                },
+            )}`,
+        );
+
         return response.status(200).json({
             success: true,
             message: "Profile updated",
@@ -355,7 +450,12 @@ const updateCurrentUser = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[usersRoutesHandler > updateCurrentUser] => Error updating current user: ${error.message}`,
+            `[usersRoutesHandler.updateCurrentUser] => update current user: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                    sessionUserId: request.session?.user?.id || null,
+                },
+            )}`,
         );
         next(error);
     }
@@ -365,6 +465,14 @@ const getMyPreferences = async (request, response, next) => {
     try {
         const user = request.session?.user;
         if (!user?.id) {
+            logger.warn(
+                `[usersRoutesHandler.getMyPreferences] => authorize fetch preferences: denied | ${JSON.stringify(
+                    {
+                        reason: "missing_session_user",
+                    },
+                )}`,
+            );
+
             return response
                 .status(401)
                 .json({ success: false, message: "Unauthorized" });
@@ -373,13 +481,28 @@ const getMyPreferences = async (request, response, next) => {
         const stored = await getUserPreferencesByIdQuery({ id: user.id });
         const merged = mergePreferences(stored);
 
+        logger.info(
+            `[usersRoutesHandler.getMyPreferences] => fetch preferences: success | ${JSON.stringify(
+                {
+                    userId: user.id,
+                },
+            )}`,
+        );
+
         return response.status(200).json({
             success: true,
             message: "Preferences loaded",
             preferences: merged,
         });
     } catch (error) {
-        logger.error(`[getMyPreferences] => ${error.message}`);
+        logger.error(
+            `[usersRoutesHandler.getMyPreferences] => fetch preferences: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                    sessionUserId: request.session?.user?.id || null,
+                },
+            )}`,
+        );
         next(error);
     }
 };
@@ -389,6 +512,14 @@ const patchMyPreferences = async (request, response, next) => {
     try {
         const user = request.session?.user;
         if (!user?.id) {
+            logger.warn(
+                `[usersRoutesHandler.patchMyPreferences] => authorize update preferences: denied | ${JSON.stringify(
+                    {
+                        reason: "missing_session_user",
+                    },
+                )}`,
+            );
+
             return response
                 .status(401)
                 .json({ success: false, message: "Unauthorized" });
@@ -396,6 +527,15 @@ const patchMyPreferences = async (request, response, next) => {
 
         const patch = request.body || {};
         if (typeof patch !== "object" || Array.isArray(patch)) {
+            logger.warn(
+                `[usersRoutesHandler.patchMyPreferences] => validate preferences payload: denied | ${JSON.stringify(
+                    {
+                        sessionUserId: request.session?.user?.id || null,
+                        reason: "invalid_payload",
+                    },
+                )}`,
+            );
+
             return response
                 .status(400)
                 .json({ success: false, message: "Invalid payload" });
@@ -423,13 +563,28 @@ const patchMyPreferences = async (request, response, next) => {
             preferences: nextPrefs,
         });
 
+        logger.info(
+            `[usersRoutesHandler.patchMyPreferences] => update preferences: success | ${JSON.stringify(
+                {
+                    userId: user.id,
+                },
+            )}`,
+        );
+
         return response.status(200).json({
             success: true,
             message: "Preferences updated",
             preferences: mergePreferences(saved),
         });
     } catch (error) {
-        logger.error(`[patchMyPreferences] => ${error.message}`);
+        logger.error(
+            `[usersRoutesHandler.patchMyPreferences] => update preferences: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                    sessionUserId: request.session?.user?.id || null,
+                },
+            )}`,
+        );
         next(error);
     }
 };
@@ -446,12 +601,15 @@ const REAUTH_WINDOW_MS = 1000 * 60 * 5; // 5 minutes (tweakable)
 */
 const reauthCurrentUser = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const sessionUser = request.session?.user;
         if (!sessionUser?.id) {
+            logger.warn(
+                `[usersRoutesHandler.reauthCurrentUser] => authorize reauthenticate user: denied | ${JSON.stringify(
+                    {
+                        reason: "missing_session_user",
+                    },
+                )}`,
+            );
             return response.status(401).json({
                 success: false,
                 message: "Unauthorized access. Please log in.",
@@ -460,6 +618,14 @@ const reauthCurrentUser = async (request, response, next) => {
 
         const { password } = request.body || {};
         if (!password || typeof password !== "string" || password.length < 1) {
+            logger.warn(
+                `[usersRoutesHandler.reauthCurrentUser] => validate reauth payload: denied | ${JSON.stringify(
+                    {
+                        sessionUserId: sessionUser?.id || null,
+                        reason: "missing_password",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Password is required.",
@@ -476,6 +642,14 @@ const reauthCurrentUser = async (request, response, next) => {
 
         // Reject password reauth when password sign-in is not enabled
         if (!user.hashed_password) {
+            logger.warn(
+                `[usersRoutesHandler.reauthCurrentUser] => validate reauth method: denied | ${JSON.stringify(
+                    {
+                        sessionUserId: sessionUser.id,
+                        reason: "password_auth_unavailable",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message:
@@ -485,6 +659,14 @@ const reauthCurrentUser = async (request, response, next) => {
 
         const ok = await compare(password, user.hashed_password);
         if (!ok) {
+            logger.warn(
+                `[usersRoutesHandler.reauthCurrentUser] => reauthenticate user: denied | ${JSON.stringify(
+                    {
+                        sessionUserId: sessionUser.id,
+                        reason: "invalid_password",
+                    },
+                )}`,
+            );
             return response.status(401).json({
                 success: false,
                 message: "Password is incorrect.",
@@ -497,6 +679,14 @@ const reauthCurrentUser = async (request, response, next) => {
         return request.session.save((err) => {
             if (err) return next(err);
 
+            logger.info(
+                `[usersRoutesHandler.reauthCurrentUser] => reauthenticate user: success | ${JSON.stringify(
+                    {
+                        userId: sessionUser.id,
+                        reauthenticatedAt: now,
+                    },
+                )}`,
+            );
             return response.status(200).json({
                 success: true,
                 message: "Re-authenticated.",
@@ -505,7 +695,14 @@ const reauthCurrentUser = async (request, response, next) => {
             });
         });
     } catch (error) {
-        logger.error(`[reauthCurrentUser] => Error: ${error.message}`);
+        logger.error(
+            `[usersRoutesHandler.reauthCurrentUser] => reauthenticate user: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                    sessionUserId: request.session?.user?.id || null,
+                },
+            )}`,
+        );
         next(error);
     }
 };
@@ -520,12 +717,15 @@ const reauthCurrentUser = async (request, response, next) => {
 */
 const unlinkMyGoogle = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const sessionUser = request.session?.user;
         if (!sessionUser?.id) {
+            logger.warn(
+                `[usersRoutesHandler.unlinkMyGoogle] => authorize unlink google auth: denied | ${JSON.stringify(
+                    {
+                        reason: "not_authenticated",
+                    },
+                )}`,
+            );
             return response.status(401).json({
                 success: false,
                 message: "Not authenticated.",
@@ -534,6 +734,13 @@ const unlinkMyGoogle = async (request, response, next) => {
 
         const user = await getUserByIdQuery({ id: sessionUser.id });
         if (!user) {
+            logger.warn(
+                `[usersRoutesHandler.unlinkMyGoogle] => load unlink google user: denied | ${JSON.stringify(
+                    {
+                        sessionUserId: sessionUser?.id || null,
+                    },
+                )}`,
+            );
             return response.status(404).json({
                 success: false,
                 message: "User not found.",
@@ -541,6 +748,14 @@ const unlinkMyGoogle = async (request, response, next) => {
         }
 
         if (!user.google_sub) {
+            logger.warn(
+                `[usersRoutesHandler.unlinkMyGoogle] => validate google linkage: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        reason: "google_not_linked",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Google sign-in is not linked to this account.",
@@ -549,6 +764,14 @@ const unlinkMyGoogle = async (request, response, next) => {
 
         // Prevent removing the only available sign-in method
         if (!user.hashed_password) {
+            logger.warn(
+                `[usersRoutesHandler.unlinkMyGoogle] => validate unlink google auth: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        reason: "password_required_before_unlink",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message:
@@ -559,13 +782,27 @@ const unlinkMyGoogle = async (request, response, next) => {
         const updated = await unlinkGoogleByIdQuery({ id: user.id });
         request.session.reauthenticatedAt = null;
 
+        logger.info(
+            `[usersRoutesHandler.unlinkMyGoogle] => unlink google auth: success | ${JSON.stringify(
+                {
+                    userId: updated.id,
+                },
+            )}`,
+        );
         return response.status(200).json({
             success: true,
             message: "Google sign-in removed successfully.",
             userData: serializeUserInfo(updated),
         });
     } catch (error) {
-        logger.error(`[unlinkMyGoogle] => Error: ${error.message}`);
+        logger.error(
+            `[usersRoutesHandler.unlinkMyGoogle] => unlink google auth: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                    sessionUserId: request.session?.user?.id || null,
+                },
+            )}`,
+        );
         next(error);
     }
 };
@@ -574,6 +811,13 @@ const deleteMe = async (request, response, next) => {
     const sessionUser = request.session?.user;
 
     if (!sessionUser?.id) {
+        logger.warn(
+            `[usersRoutesHandler.deleteMe] => authorize delete account: denied | ${JSON.stringify(
+                {
+                    reason: "missing_session_user",
+                },
+            )}`,
+        );
         return response.status(401).json({
             success: false,
             message: "Unauthorized access. Please log in.",
@@ -639,12 +883,24 @@ const deleteMe = async (request, response, next) => {
                 await client.query("ROLLBACK");
             } catch (rollbackErr) {
                 logger.error(
-                    `[deleteMe] rollback failed: ${rollbackErr.message}`,
+                    `[usersRoutesHandler.deleteMe] => rollback account deletion: failed | ${JSON.stringify(
+                        {
+                            error: rollbackErr.message,
+                            userId,
+                        },
+                    )}`,
                 );
             }
         }
 
-        logger.error(`[deleteMe] DB transaction failed: ${error.message}`);
+        logger.error(
+            `[usersRoutesHandler.deleteMe] => delete account transaction: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                    userId,
+                },
+            )}`,
+        );
         return next(error);
     } finally {
         if (client) client.release();
@@ -658,7 +914,13 @@ const deleteMe = async (request, response, next) => {
             deleteTranscriptionTxtFile(fileName);
         } catch (e) {
             logger.warn(
-                `[deleteMe] Failed deleting transcription txt for ${fileName}: ${e.message}`,
+                `[usersRoutesHandler.deleteMe] => delete transcription text cleanup: failed | ${JSON.stringify(
+                    {
+                        userId,
+                        fileName,
+                        error: e.message,
+                    },
+                )}`,
             );
         }
 
@@ -666,7 +928,13 @@ const deleteMe = async (request, response, next) => {
             deleteAudioFileCopy(fileName);
         } catch (e) {
             logger.warn(
-                `[deleteMe] Failed deleting audio copy for ${fileName}: ${e.message}`,
+                `[usersRoutesHandler.deleteMe] => delete audio cleanup: failed | ${JSON.stringify(
+                    {
+                        userId,
+                        fileName,
+                        error: e.message,
+                    },
+                )}`,
             );
         }
     }
@@ -674,7 +942,14 @@ const deleteMe = async (request, response, next) => {
     // Destroy session + clear cookie
     request.session.destroy((err) => {
         if (err) {
-            logger.error(`[deleteMe] session destroy failed: ${err.message}`);
+            logger.error(
+                `[usersRoutesHandler.deleteMe] => destroy deleted-user session: failed | ${JSON.stringify(
+                    {
+                        userId,
+                        error: err.message,
+                    },
+                )}`,
+            );
             // Account is already deleted; return success but warn.
             response.clearCookie("sessionId");
             return response.status(200).json({
@@ -684,6 +959,14 @@ const deleteMe = async (request, response, next) => {
             });
         }
 
+        logger.info(
+            `[usersRoutesHandler.deleteMe] => delete account: success | ${JSON.stringify(
+                {
+                    userId,
+                    deletedFileCount: uniqueFileNames.length,
+                },
+            )}`,
+        );
         response.clearCookie("sessionId");
         return response.status(200).json({
             success: true,
@@ -703,12 +986,15 @@ const deleteMe = async (request, response, next) => {
 */
 const changeMyPassword = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const sessionUser = request.session?.user;
         if (!sessionUser?.id) {
+            logger.warn(
+                `[usersRoutesHandler.changeMyPassword] => authorize change password: denied | ${JSON.stringify(
+                    {
+                        reason: "missing_session_user",
+                    },
+                )}`,
+            );
             return response.status(401).json({
                 success: false,
                 message: "Unauthorized access. Please log in.",
@@ -722,6 +1008,14 @@ const changeMyPassword = async (request, response, next) => {
             typeof new_password !== "string" ||
             new_password.trim().length < 6
         ) {
+            logger.warn(
+                `[usersRoutesHandler.changeMyPassword] => validate password payload: denied | ${JSON.stringify(
+                    {
+                        sessionUserId: sessionUser?.id || null,
+                        reason: "invalid_new_password",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "New password must be at least 6 characters",
@@ -730,6 +1024,13 @@ const changeMyPassword = async (request, response, next) => {
 
         const user = await getUserByIdQuery({ id: sessionUser.id });
         if (!user) {
+            logger.warn(
+                `[usersRoutesHandler.changeMyPassword] => load password user: denied | ${JSON.stringify(
+                    {
+                        sessionUserId: sessionUser.id,
+                    },
+                )}`,
+            );
             return response.status(404).json({
                 success: false,
                 message: "User not found",
@@ -745,6 +1046,14 @@ const changeMyPassword = async (request, response, next) => {
                 typeof current_password !== "string" ||
                 !current_password.trim()
             ) {
+                logger.warn(
+                    `[usersRoutesHandler.changeMyPassword] => validate current password payload: denied | ${JSON.stringify(
+                        {
+                            sessionUserId: sessionUser.id,
+                            reason: "missing_current_password",
+                        },
+                    )}`,
+                );
                 return response.status(400).json({
                     success: false,
                     message: "Current password is required.",
@@ -757,6 +1066,14 @@ const changeMyPassword = async (request, response, next) => {
             );
 
             if (!matchesCurrent) {
+                logger.warn(
+                    `[usersRoutesHandler.changeMyPassword] => verify current password: denied | ${JSON.stringify(
+                        {
+                            sessionUserId: sessionUser.id,
+                            reason: "incorrect_current_password",
+                        },
+                    )}`,
+                );
                 return response.status(401).json({
                     success: false,
                     message: "Current password is incorrect.",
@@ -766,6 +1083,13 @@ const changeMyPassword = async (request, response, next) => {
             // Prevent reusing the existing password
             const isSame = await compare(new_password, user.hashed_password);
             if (isSame) {
+                logger.warn(
+                    `[usersRoutesHandler.changeMyPassword] => validate new password reuse: denied | ${JSON.stringify(
+                        {
+                            sessionUserId: sessionUser.id,
+                        },
+                    )}`,
+                );
                 return response.status(400).json({
                     success: false,
                     message:
@@ -788,25 +1112,43 @@ const changeMyPassword = async (request, response, next) => {
             });
         }
 
+        logger.info(
+            `[usersRoutesHandler.changeMyPassword] => change password: success | ${JSON.stringify(
+                {
+                    userId: updated.id,
+                    action: hasPassword ? "updated" : "created",
+                },
+            )}`,
+        );
         return response.status(200).json({
             success: true,
             message: hasPassword ? "Password updated" : "Password created",
             userData: serializeUserInfo(updated),
         });
     } catch (error) {
-        logger.error(`[changeMyPassword] => Error: ${error.message}`);
+        logger.error(
+            `[usersRoutesHandler.changeMyPassword] => change password: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                    sessionUserId: request.session?.user?.id || null,
+                },
+            )}`,
+        );
         next(error);
     }
 };
 
 const requestCurrentEmailConfirmation = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const sessionUser = request.session?.user;
         if (!sessionUser?.id) {
+            logger.warn(
+                `[usersRoutesHandler.requestCurrentEmailConfirmation] => authorize current email confirmation: denied | ${JSON.stringify(
+                    {
+                        reason: "not_authenticated",
+                    },
+                )}`,
+            );
             return response.status(401).json({
                 success: false,
                 message: "Not authenticated.",
@@ -815,6 +1157,13 @@ const requestCurrentEmailConfirmation = async (request, response, next) => {
 
         const user = await getUserByIdQuery({ id: sessionUser.id });
         if (!user) {
+            logger.warn(
+                `[usersRoutesHandler.requestCurrentEmailConfirmation] => load confirmation user: denied | ${JSON.stringify(
+                    {
+                        sessionUserId: sessionUser?.id || null,
+                    },
+                )}`,
+            );
             return response.status(404).json({
                 success: false,
                 message: "User not found.",
@@ -822,6 +1171,14 @@ const requestCurrentEmailConfirmation = async (request, response, next) => {
         }
 
         if (user.pending_email) {
+            logger.warn(
+                `[usersRoutesHandler.requestCurrentEmailConfirmation] => validate current email confirmation state: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        reason: "pending_email_exists",
+                    },
+                )}`,
+            );
             return response.status(409).json({
                 success: false,
                 message:
@@ -830,6 +1187,14 @@ const requestCurrentEmailConfirmation = async (request, response, next) => {
         }
 
         if (user.isconfirmed) {
+            logger.info(
+                `[usersRoutesHandler.requestCurrentEmailConfirmation] => request current email confirmation: skipped | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        reason: "already_confirmed",
+                    },
+                )}`,
+            );
             return response.status(200).json({
                 success: true,
                 message: "Your current email is already confirmed.",
@@ -857,13 +1222,25 @@ const requestCurrentEmailConfirmation = async (request, response, next) => {
             `,
         });
 
+        logger.info(
+            `[usersRoutesHandler.requestCurrentEmailConfirmation] => request current email confirmation: success | ${JSON.stringify(
+                {
+                    userId: user.id,
+                },
+            )}`,
+        );
         return response.status(200).json({
             success: true,
             message: "Confirmation email sent to your current email address.",
         });
     } catch (error) {
         logger.error(
-            `[requestCurrentEmailConfirmation] => Error: ${error.message}`,
+            `[usersRoutesHandler.requestCurrentEmailConfirmation] => request current email confirmation: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                    sessionUserId: request.session?.user?.id || null,
+                },
+            )}`,
         );
         next(error);
     }
@@ -871,12 +1248,15 @@ const requestCurrentEmailConfirmation = async (request, response, next) => {
 
 const requestEmailChange = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const sessionUser = request.session?.user;
         if (!sessionUser?.id) {
+            logger.warn(
+                `[usersRoutesHandler.requestEmailChange] => authorize email change: denied | ${JSON.stringify(
+                    {
+                        reason: "not_authenticated",
+                    },
+                )}`,
+            );
             return response.status(401).json({
                 success: false,
                 message: "Not authenticated.",
@@ -885,6 +1265,13 @@ const requestEmailChange = async (request, response, next) => {
 
         const user = await getUserByIdQuery({ id: sessionUser.id });
         if (!user) {
+            logger.warn(
+                `[usersRoutesHandler.requestEmailChange] => load email change user: denied | ${JSON.stringify(
+                    {
+                        sessionUserId: sessionUser.id,
+                    },
+                )}`,
+            );
             return response.status(404).json({
                 success: false,
                 message: "User not found.",
@@ -893,6 +1280,14 @@ const requestEmailChange = async (request, response, next) => {
 
         const newEmailRaw = request.body?.new_email;
         if (!newEmailRaw || !isValidEmail(newEmailRaw)) {
+            logger.warn(
+                `[usersRoutesHandler.requestEmailChange] => validate new email payload: denied | ${JSON.stringify(
+                    {
+                        sessionUserId: sessionUser?.id || null,
+                        reason: "invalid_new_email",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Enter a valid email address.",
@@ -902,6 +1297,14 @@ const requestEmailChange = async (request, response, next) => {
         const new_email = String(newEmailRaw).trim().toLowerCase();
 
         if (new_email === String(user.email).trim().toLowerCase()) {
+            logger.warn(
+                `[usersRoutesHandler.requestEmailChange] => validate new email uniqueness: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        reason: "same_as_current_email",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Enter a different email address.",
@@ -918,6 +1321,14 @@ const requestEmailChange = async (request, response, next) => {
 
         const existing = await getUserByEmailQuery({ email: new_email });
         if (existing && String(existing.id) !== String(sessionUser.id)) {
+            logger.warn(
+                `[usersRoutesHandler.requestEmailChange] => validate new email uniqueness: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        reason: "email_already_in_use",
+                    },
+                )}`,
+            );
             return response.status(409).json({
                 success: false,
                 message: "That email is already in use.",
@@ -946,25 +1357,43 @@ const requestEmailChange = async (request, response, next) => {
             `,
         });
 
+        logger.info(
+            `[usersRoutesHandler.requestEmailChange] => request email change: success | ${JSON.stringify(
+                {
+                    userId: user.id,
+                    pendingEmail: new_email,
+                },
+            )}`,
+        );
         return response.status(200).json({
             success: true,
             message: "Confirmation email sent to your new email address.",
             pending_email: new_email,
         });
     } catch (error) {
-        logger.error(`[requestEmailChange] => Error: ${error.message}`);
+        logger.error(
+            `[usersRoutesHandler.requestEmailChange] => request email change: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                    sessionUserId: request.session?.user?.id || null,
+                },
+            )}`,
+        );
         next(error);
     }
 };
 
 const confirmEmail = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const token = String(request.query?.token || "").trim();
         if (!token) {
+            logger.warn(
+                `[usersRoutesHandler.confirmEmail] => validate confirmation token: denied | ${JSON.stringify(
+                    {
+                        reason: "missing_token",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Missing confirmation token.",
@@ -979,6 +1408,13 @@ const confirmEmail = async (request, response, next) => {
         const updated = await confirmEmailByTokenHashQuery({ token_hash });
 
         if (!updated) {
+            logger.warn(
+                `[usersRoutesHandler.confirmEmail] => confirm email: denied | ${JSON.stringify(
+                    {
+                        reason: "invalid_or_expired_token",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "This confirmation link is invalid or has expired.",
@@ -992,23 +1428,35 @@ const confirmEmail = async (request, response, next) => {
             request.session.user.email = updated.email;
         }
 
+        logger.info(
+            `[usersRoutesHandler.confirmEmail] => confirm email: success | ${JSON.stringify(
+                {
+                    userId: updated.id,
+                    sessionSynced:
+                        request.session?.user?.id &&
+                        String(request.session.user.id) === String(updated.id),
+                },
+            )}`,
+        );
         return response.status(200).json({
             success: true,
             message: "Email confirmed successfully.",
             userData: serializeUserInfo(updated),
         });
     } catch (error) {
-        logger.error(`[confirmEmail] => Error: ${error.message}`);
+        logger.error(
+            `[usersRoutesHandler.confirmEmail] => confirm email: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
+        );
         next(error);
     }
 };
 
 const requestPasswordReset = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const emailRaw = request.body?.email;
 
         // Keep generic success response to prevent account enumeration
@@ -1021,13 +1469,32 @@ const requestPasswordReset = async (request, response, next) => {
 
         if (!emailRaw || !isValidEmail(emailRaw)) {
             // Still return generic success to avoid enumeration via validation
+            logger.info(
+                `[usersRoutesHandler.requestPasswordReset] => request password reset: completed | ${JSON.stringify(
+                    {
+                        result: "generic_response",
+                        reason: "missing_or_invalid_email",
+                    },
+                )}`,
+            );
             return genericResponse();
         }
 
         const email = String(emailRaw).trim().toLowerCase();
 
         const user = await getUserByEmailQuery({ email });
-        if (!user) return genericResponse();
+        if (!user) {
+            logger.info(
+                `[usersRoutesHandler.requestPasswordReset] => request password reset: completed | ${JSON.stringify(
+                    {
+                        result: "generic_response",
+                        email,
+                        reason: "user_not_found",
+                    },
+                )}`,
+            );
+            return genericResponse();
+        }
 
         const token = crypto.randomBytes(32).toString("hex");
         const token_hash = crypto
@@ -1056,10 +1523,22 @@ const requestPasswordReset = async (request, response, next) => {
             `,
         });
 
+        logger.info(
+            `[usersRoutesHandler.requestPasswordReset] => request password reset: success | ${JSON.stringify(
+                {
+                    userId: user.id,
+                    email,
+                },
+            )}`,
+        );
         return genericResponse();
     } catch (error) {
         logger.error(
-            `[usersRoutesHandler > requestPasswordReset] => Error: ${error.message}`,
+            `[usersRoutesHandler.requestPasswordReset] => request password reset: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -1067,14 +1546,19 @@ const requestPasswordReset = async (request, response, next) => {
 
 const resetPassword = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const token = String(request.body?.token || "").trim();
         const new_password = String(request.body?.new_password || "");
 
         if (!token || !new_password) {
+            logger.warn(
+                `[usersRoutesHandler.resetPassword] => validate reset payload: denied | ${JSON.stringify(
+                    {
+                        reason: "missing_token_or_new_password",
+                        hasToken: Boolean(token),
+                        hasNewPassword: Boolean(new_password),
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Token and new password are required",
@@ -1088,6 +1572,13 @@ const resetPassword = async (request, response, next) => {
 
         const user = await getUserByPasswordResetTokenHashQuery({ token_hash });
         if (!user) {
+            logger.warn(
+                `[usersRoutesHandler.resetPassword] => reset password: denied | ${JSON.stringify(
+                    {
+                        reason: "invalid_or_expired_token",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Invalid or expired reset token",
@@ -1101,6 +1592,14 @@ const resetPassword = async (request, response, next) => {
         if (!expiresAt || Date.now() > expiresAt) {
             // Clear stale token
             await clearPasswordResetTokenByIdQuery({ id: user.id });
+            logger.warn(
+                `[usersRoutesHandler.resetPassword] => reset password: denied | ${JSON.stringify(
+                    {
+                        userId: user.id,
+                        reason: "expired_token_cleared",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Invalid or expired reset token",
@@ -1116,13 +1615,24 @@ const resetPassword = async (request, response, next) => {
 
         await clearPasswordResetTokenByIdQuery({ id: user.id });
 
+        logger.info(
+            `[usersRoutesHandler.resetPassword] => reset password: success | ${JSON.stringify(
+                {
+                    userId: user.id,
+                },
+            )}`,
+        );
         return response.status(200).json({
             success: true,
             message: "Password updated successfully",
         });
     } catch (error) {
         logger.error(
-            `[usersRoutesHandler > resetPassword] => Error: ${error.message}`,
+            `[usersRoutesHandler.resetPassword] => reset password: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }
@@ -1168,12 +1678,15 @@ const serializeAssemblyConnection = (connection) => {
 
 const getMyAssemblyConnections = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const sessionUser = request.session?.user;
         if (!sessionUser?.id) {
+            logger.warn(
+                `[usersRoutesHandler.getMyAssemblyConnections] => load assembly connections: denied | ${JSON.stringify(
+                    {
+                        reason: "missing_session_user",
+                    },
+                )}`,
+            );
             return response.status(401).json({
                 success: false,
                 message: "Unauthorized access. Please log in.",
@@ -1191,22 +1704,28 @@ const getMyAssemblyConnections = async (request, response, next) => {
             connections: connections.map(serializeAssemblyConnection),
         });
     } catch (error) {
-        logger.error(`[getMyAssemblyConnections] => Error: ${error.message}`);
+        logger.error(
+            `[usersRoutesHandler.getMyAssemblyConnections] => load assembly connections: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
+        );
         next(error);
     }
 };
 
 const createAssemblyConnection = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
-        const filteredBody = filterSensitiveFields(request.body, ["api_key"]);
-        logger.info(`Request body: ${JSON.stringify(filteredBody)}`);
-
         const sessionUser = request.session?.user;
         if (!sessionUser?.id) {
+            logger.warn(
+                `[usersRoutesHandler.createAssemblyConnection] => create assembly connection: denied | ${JSON.stringify(
+                    {
+                        reason: "missing_session_user",
+                    },
+                )}`,
+            );
             return response.status(401).json({
                 success: false,
                 message: "Unauthorized access. Please log in.",
@@ -1218,6 +1737,14 @@ const createAssemblyConnection = async (request, response, next) => {
         const wantsDefault = Boolean(request.body?.is_default);
 
         if (!label) {
+            logger.warn(
+                `[usersRoutesHandler.createAssemblyConnection] => validate connection label: denied | ${JSON.stringify(
+                    {
+                        userId: sessionUser.id,
+                        reason: "missing_label",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Connection label is required.",
@@ -1225,6 +1752,14 @@ const createAssemblyConnection = async (request, response, next) => {
         }
 
         if (label.length > MAX_CONNECTION_LABEL_LENGTH) {
+            logger.warn(
+                `[usersRoutesHandler.createAssemblyConnection] => validate connection label: denied | ${JSON.stringify(
+                    {
+                        userId: sessionUser.id,
+                        reason: "label_too_long",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: `Connection label must be ${MAX_CONNECTION_LABEL_LENGTH} characters or fewer.`,
@@ -1232,6 +1767,14 @@ const createAssemblyConnection = async (request, response, next) => {
         }
 
         if (!apiKey) {
+            logger.warn(
+                `[usersRoutesHandler.createAssemblyConnection] => validate api key: denied | ${JSON.stringify(
+                    {
+                        userId: sessionUser.id,
+                        reason: "missing_api_key",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "AssemblyAI API key is required.",
@@ -1240,6 +1783,14 @@ const createAssemblyConnection = async (request, response, next) => {
 
         const validation = await validateAssemblyApiKey(apiKey);
         if (!validation.valid) {
+            logger.warn(
+                `[usersRoutesHandler.createAssemblyConnection] => validate api key: denied | ${JSON.stringify(
+                    {
+                        userId: sessionUser.id,
+                        reason: validation.message || "invalid_api_key",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: validation.message || "Invalid AssemblyAI API key.",
@@ -1272,28 +1823,43 @@ const createAssemblyConnection = async (request, response, next) => {
               })
             : created;
 
+        logger.info(
+            `[usersRoutesHandler.createAssemblyConnection] => create assembly connection: success | ${JSON.stringify(
+                {
+                    userId: sessionUser.id,
+                    resourceId: connection.id,
+                },
+            )}`,
+        );
+
         return response.status(201).json({
             success: true,
             message: "AssemblyAI connection saved.",
             connection: serializeAssemblyConnection(connection),
         });
     } catch (error) {
-        logger.error(`[createAssemblyConnection] => Error: ${error.message}`);
+        logger.error(
+            `[usersRoutesHandler.createAssemblyConnection] => create assembly connection: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
+        );
         next(error);
     }
 };
 
 const updateAssemblyConnection = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
-        const filteredBody = filterSensitiveFields(request.body, ["api_key"]);
-        logger.info(`Request body: ${JSON.stringify(filteredBody)}`);
-
         const sessionUser = request.session?.user;
         if (!sessionUser?.id) {
+            logger.warn(
+                `[usersRoutesHandler.updateAssemblyConnection] => update assembly connection: denied | ${JSON.stringify(
+                    {
+                        reason: "missing_session_user",
+                    },
+                )}`,
+            );
             return response.status(401).json({
                 success: false,
                 message: "Unauthorized access. Please log in.",
@@ -1302,6 +1868,14 @@ const updateAssemblyConnection = async (request, response, next) => {
 
         const connectionId = parsePositiveInteger(request.params?.id);
         if (!connectionId) {
+            logger.warn(
+                `[usersRoutesHandler.updateAssemblyConnection] => validate connection id: denied | ${JSON.stringify(
+                    {
+                        userId: sessionUser.id,
+                        reason: "invalid_connection_id",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Invalid connection id.",
@@ -1315,6 +1889,15 @@ const updateAssemblyConnection = async (request, response, next) => {
         });
 
         if (!existing) {
+            logger.warn(
+                `[usersRoutesHandler.updateAssemblyConnection] => load assembly connection: denied | ${JSON.stringify(
+                    {
+                        userId: sessionUser.id,
+                        resourceId: connectionId,
+                        reason: "connection_not_found",
+                    },
+                )}`,
+            );
             return response.status(404).json({
                 success: false,
                 message: "AssemblyAI connection not found.",
@@ -1322,6 +1905,15 @@ const updateAssemblyConnection = async (request, response, next) => {
         }
 
         if (request.body?.is_default !== undefined) {
+            logger.warn(
+                `[usersRoutesHandler.updateAssemblyConnection] => update assembly connection: denied | ${JSON.stringify(
+                    {
+                        userId: sessionUser.id,
+                        resourceId: connectionId,
+                        reason: "default_change_not_allowed",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Use the set-default endpoint for default changes.",
@@ -1332,6 +1924,15 @@ const updateAssemblyConnection = async (request, response, next) => {
         const hasApiKeyField = request.body?.api_key !== undefined;
 
         if (!hasLabelField && !hasApiKeyField) {
+            logger.warn(
+                `[usersRoutesHandler.updateAssemblyConnection] => update assembly connection: denied | ${JSON.stringify(
+                    {
+                        userId: sessionUser.id,
+                        resourceId: connectionId,
+                        reason: "missing_update_fields",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "No fields provided to update.",
@@ -1343,6 +1944,15 @@ const updateAssemblyConnection = async (request, response, next) => {
             label = normalizeConnectionLabel(request.body?.label);
 
             if (!label) {
+                logger.warn(
+                    `[usersRoutesHandler.updateAssemblyConnection] => validate connection label: denied | ${JSON.stringify(
+                        {
+                            userId: sessionUser.id,
+                            resourceId: connectionId,
+                            reason: "empty_label",
+                        },
+                    )}`,
+                );
                 return response.status(400).json({
                     success: false,
                     message: "Connection label cannot be empty.",
@@ -1350,6 +1960,15 @@ const updateAssemblyConnection = async (request, response, next) => {
             }
 
             if (label.length > MAX_CONNECTION_LABEL_LENGTH) {
+                logger.warn(
+                    `[usersRoutesHandler.updateAssemblyConnection] => validate connection label: denied | ${JSON.stringify(
+                        {
+                            userId: sessionUser.id,
+                            resourceId: connectionId,
+                            reason: "label_too_long",
+                        },
+                    )}`,
+                );
                 return response.status(400).json({
                     success: false,
                     message: `Connection label must be ${MAX_CONNECTION_LABEL_LENGTH} characters or fewer.`,
@@ -1364,6 +1983,15 @@ const updateAssemblyConnection = async (request, response, next) => {
 
         if (hasApiKeyField) {
             if (!hasRecentReauth(request)) {
+                logger.warn(
+                    `[usersRoutesHandler.updateAssemblyConnection] => validate reauthentication: denied | ${JSON.stringify(
+                        {
+                            userId: sessionUser.id,
+                            resourceId: connectionId,
+                            reason: "missing_recent_reauth",
+                        },
+                    )}`,
+                );
                 return response.status(403).json({
                     success: false,
                     message: "Re-authentication required",
@@ -1373,6 +2001,15 @@ const updateAssemblyConnection = async (request, response, next) => {
             const apiKey = normalizeApiKey(request.body?.api_key);
 
             if (!apiKey) {
+                logger.warn(
+                    `[usersRoutesHandler.updateAssemblyConnection] => validate api key: denied | ${JSON.stringify(
+                        {
+                            userId: sessionUser.id,
+                            resourceId: connectionId,
+                            reason: "empty_api_key",
+                        },
+                    )}`,
+                );
                 return response.status(400).json({
                     success: false,
                     message: "AssemblyAI API key cannot be empty.",
@@ -1381,6 +2018,15 @@ const updateAssemblyConnection = async (request, response, next) => {
 
             const validation = await validateAssemblyApiKey(apiKey);
             if (!validation.valid) {
+                logger.warn(
+                    `[usersRoutesHandler.updateAssemblyConnection] => validate api key: denied | ${JSON.stringify(
+                        {
+                            userId: sessionUser.id,
+                            resourceId: connectionId,
+                            reason: validation.message || "invalid_api_key",
+                        },
+                    )}`,
+                );
                 return response.status(400).json({
                     success: false,
                     message:
@@ -1404,25 +2050,43 @@ const updateAssemblyConnection = async (request, response, next) => {
             last_validated_at: lastValidatedAt,
         });
 
+        logger.info(
+            `[usersRoutesHandler.updateAssemblyConnection] => update assembly connection: success | ${JSON.stringify(
+                {
+                    userId: sessionUser.id,
+                    resourceId: connectionId,
+                },
+            )}`,
+        );
+
         return response.status(200).json({
             success: true,
             message: "AssemblyAI connection updated.",
             connection: serializeAssemblyConnection(updated),
         });
     } catch (error) {
-        logger.error(`[updateAssemblyConnection] => Error: ${error.message}`);
+        logger.error(
+            `[usersRoutesHandler.updateAssemblyConnection] => update assembly connection: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
+        );
         next(error);
     }
 };
 
 const deleteAssemblyConnection = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const sessionUser = request.session?.user;
         if (!sessionUser?.id) {
+            logger.warn(
+                `[usersRoutesHandler.deleteAssemblyConnection] => delete assembly connection: denied | ${JSON.stringify(
+                    {
+                        reason: "missing_session_user",
+                    },
+                )}`,
+            );
             return response.status(401).json({
                 success: false,
                 message: "Unauthorized access. Please log in.",
@@ -1431,6 +2095,14 @@ const deleteAssemblyConnection = async (request, response, next) => {
 
         const connectionId = parsePositiveInteger(request.params?.id);
         if (!connectionId) {
+            logger.warn(
+                `[usersRoutesHandler.deleteAssemblyConnection] => validate connection id: denied | ${JSON.stringify(
+                    {
+                        userId: sessionUser.id,
+                        reason: "invalid_connection_id",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Invalid connection id.",
@@ -1444,6 +2116,15 @@ const deleteAssemblyConnection = async (request, response, next) => {
         });
 
         if (!existing) {
+            logger.warn(
+                `[usersRoutesHandler.deleteAssemblyConnection] => load assembly connection: denied | ${JSON.stringify(
+                    {
+                        userId: sessionUser.id,
+                        resourceId: connectionId,
+                        reason: "connection_not_found",
+                    },
+                )}`,
+            );
             return response.status(404).json({
                 success: false,
                 message: "AssemblyAI connection not found.",
@@ -1456,25 +2137,43 @@ const deleteAssemblyConnection = async (request, response, next) => {
             provider: ASSEMBLYAI_PROVIDER,
         });
 
+        logger.info(
+            `[usersRoutesHandler.deleteAssemblyConnection] => delete assembly connection: success | ${JSON.stringify(
+                {
+                    userId: sessionUser.id,
+                    resourceId: connectionId,
+                },
+            )}`,
+        );
+
         return response.status(200).json({
             success: true,
             message: "AssemblyAI connection removed.",
             connection: serializeAssemblyConnection(deleted),
         });
     } catch (error) {
-        logger.error(`[deleteAssemblyConnection] => Error: ${error.message}`);
+        logger.error(
+            `[usersRoutesHandler.deleteAssemblyConnection] => delete assembly connection: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
+        );
         next(error);
     }
 };
 
 const setDefaultAssemblyConnection = async (request, response, next) => {
     try {
-        logger.info(
-            `Incoming request to ${request.method} ${request.originalUrl}`,
-        );
-
         const sessionUser = request.session?.user;
         if (!sessionUser?.id) {
+            logger.warn(
+                `[usersRoutesHandler.setDefaultAssemblyConnection] => set default assembly connection: denied | ${JSON.stringify(
+                    {
+                        reason: "missing_session_user",
+                    },
+                )}`,
+            );
             return response.status(401).json({
                 success: false,
                 message: "Unauthorized access. Please log in.",
@@ -1483,6 +2182,14 @@ const setDefaultAssemblyConnection = async (request, response, next) => {
 
         const connectionId = parsePositiveInteger(request.params?.id);
         if (!connectionId) {
+            logger.warn(
+                `[usersRoutesHandler.setDefaultAssemblyConnection] => validate connection id: denied | ${JSON.stringify(
+                    {
+                        userId: sessionUser.id,
+                        reason: "invalid_connection_id",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Invalid connection id.",
@@ -1496,6 +2203,15 @@ const setDefaultAssemblyConnection = async (request, response, next) => {
         });
 
         if (!existing) {
+            logger.warn(
+                `[usersRoutesHandler.setDefaultAssemblyConnection] => load assembly connection: denied | ${JSON.stringify(
+                    {
+                        userId: sessionUser.id,
+                        resourceId: connectionId,
+                        reason: "connection_not_found",
+                    },
+                )}`,
+            );
             return response.status(404).json({
                 success: false,
                 message: "AssemblyAI connection not found.",
@@ -1503,6 +2219,15 @@ const setDefaultAssemblyConnection = async (request, response, next) => {
         }
 
         if (existing.status !== "active") {
+            logger.warn(
+                `[usersRoutesHandler.setDefaultAssemblyConnection] => set default assembly connection: denied | ${JSON.stringify(
+                    {
+                        userId: sessionUser.id,
+                        resourceId: connectionId,
+                        reason: "connection_not_active",
+                    },
+                )}`,
+            );
             return response.status(400).json({
                 success: false,
                 message: "Only active connections can be set as default.",
@@ -1515,6 +2240,15 @@ const setDefaultAssemblyConnection = async (request, response, next) => {
             provider: ASSEMBLYAI_PROVIDER,
         });
 
+        logger.info(
+            `[usersRoutesHandler.setDefaultAssemblyConnection] => set default assembly connection: success | ${JSON.stringify(
+                {
+                    userId: sessionUser.id,
+                    resourceId: connectionId,
+                },
+            )}`,
+        );
+
         return response.status(200).json({
             success: true,
             message: "Default AssemblyAI connection updated.",
@@ -1522,7 +2256,11 @@ const setDefaultAssemblyConnection = async (request, response, next) => {
         });
     } catch (error) {
         logger.error(
-            `[setDefaultAssemblyConnection] => Error: ${error.message}`,
+            `[usersRoutesHandler.setDefaultAssemblyConnection] => set default assembly connection: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         next(error);
     }

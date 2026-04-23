@@ -329,7 +329,11 @@ const fetchAssemblyHistory = async ({ user }) => {
         return buildHistoryResponseFromBackups({ historyIds, backups });
     } catch (error) {
         logger.error(
-            `[assemblyaiHistory] Error building AssemblyAI history: ${error.message}`,
+            `[assemblyaiHistory.fetchAssemblyHistory] => building AssemblyAI history: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }

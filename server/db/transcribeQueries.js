@@ -67,7 +67,13 @@ const insertTranscriptionBackupQuery = async ({
         return result.rows[0];
     } catch (error) {
         logger.error(
-            `[transcriptionBackupsQueries > insertTranscriptionBackupQuery] Error: ${error.message}`,
+            `[transcribeQueries.insertTranscriptionBackupQuery] => insert transcription backup: failed | ${JSON.stringify(
+                {
+                    userId: user_id,
+                    resourceId: transcript_id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -119,7 +125,12 @@ const getBackupsByTranscriptIdsQuery = async ({
         return rows;
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getBackupsByTranscriptIdsQuery] => Error fetching backups: ${error.message}`,
+            `[transcribeQueries.getBackupsByTranscriptIdsQuery] => fetch transcription backups: failed | ${JSON.stringify(
+                {
+                    userId: user_id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -154,7 +165,12 @@ const getBackupWithRawByTranscriptIdQuery = async (transcript_id) => {
         return rows[0] || null;
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getBackupWithRawByTranscriptIdQuery] => Error: ${error.message}`,
+            `[transcribeQueries.getBackupWithRawByTranscriptIdQuery] => fetch transcription backup: failed | ${JSON.stringify(
+                {
+                    resourceId: transcript_id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -213,7 +229,13 @@ const insertTranscriptionQuery = async ({
         return insertedTranscription.rows[0];
     } catch (error) {
         logger.error(
-            `[transcribeQueries > insertTranscription] => Error inserting transcription: ${error.message}`,
+            `[transcribeQueries.insertTranscriptionQuery] => insert transcription: failed | ${JSON.stringify(
+                {
+                    userId: user_id,
+                    resourceId: transcript_id,
+                    error: error.message,
+                },
+            )}`,
         );
 
         throw error;
@@ -222,8 +244,6 @@ const insertTranscriptionQuery = async ({
 
 const getAllTranscriptionsQuery = async () => {
     try {
-        logger.info("[transcribeQueries > getAllTranscriptionsQuery] - Start");
-
         const fetchQuery = `SELECT id,
             *,
             to_char(audio_duration, 'HH24:MI:SS') AS audio_duration
@@ -232,19 +252,23 @@ const getAllTranscriptionsQuery = async () => {
 
         if (rows.length === 0) {
             logger.error(
-                "[transcribeQueries > getAllTranscriptions] => No transcriptions found",
+                `[transcribeQueries.getAllTranscriptionsQuery] => fetch all transcriptions: denied | ${JSON.stringify(
+                    {
+                        reason: "transcriptions_not_found",
+                    },
+                )}`,
             );
             return [];
         }
 
-        logger.info(
-            `[transcribeQueries > getAllTranscriptionsQuery] - Fetched ${rows.length} transcriptions`,
-        );
-
         return rows;
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getAllTranscriptions] => Error getting all transcriptions: ${error.message}`,
+            `[transcribeQueries.getAllTranscriptionsQuery] => fetch all transcriptions: failed | ${JSON.stringify(
+                {
+                    error: error.message,
+                },
+            )}`,
         );
 
         throw error;
@@ -262,9 +286,6 @@ const getAllTranscriptionsQuery = async () => {
 */
 const getFilteredTranscriptionsQuery = async (filters) => {
     try {
-        logger.info(
-            "[transcribeQueries > getFilteredTranscriptionsQuery] - Start",
-        );
         const params = [];
         const where = [];
 
@@ -344,14 +365,15 @@ const getFilteredTranscriptionsQuery = async (filters) => {
 
         const { rows } = await pool.query(fetchQuery, params);
 
-        logger.info(
-            `[transcribeQueries > getFilteredTranscriptionsQuery] - Fetched ${rows.length} transcriptions with filters`,
-        );
-
         return rows;
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getFilteredTranscriptions] => Error getting filtered transcriptions: ${error.message}`,
+            `[transcribeQueries.getFilteredTranscriptionsQuery] => fetch filtered transcriptions: failed | ${JSON.stringify(
+                {
+                    userId: filters.user_id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -369,7 +391,12 @@ const getTranscriptionByApiTranscriptIdQuery = async (transcriptId) => {
 
         if (transcription.rows.length === 0) {
             logger.error(
-                `[transcribeQueries > getTranscriptionByApiTranscriptId] => Transcription not found with ID: ${transcriptId}`,
+                `[transcribeQueries.getTranscriptionByApiTranscriptIdQuery] => fetch transcription by api id: denied | ${JSON.stringify(
+                    {
+                        resourceId: transcriptId,
+                        reason: "transcription_not_found",
+                    },
+                )}`,
             );
             return false;
         }
@@ -377,7 +404,12 @@ const getTranscriptionByApiTranscriptIdQuery = async (transcriptId) => {
         return transcription.rows[0];
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getTranscriptionByApiTranscriptId] => Error getting transcription by ID: ${error.message}`,
+            `[transcribeQueries.getTranscriptionByApiTranscriptIdQuery] => fetch transcription by api id: failed | ${JSON.stringify(
+                {
+                    resourceId: transcriptId,
+                    error: error.message,
+                },
+            )}`,
         );
 
         throw error;
@@ -396,7 +428,12 @@ const getTranscriptionByIdQuery = async (id) => {
 
         if (transcription.rows.length === 0) {
             logger.error(
-                `[transcribeQueries > getTranscriptionByIdQuery] => Transcription not found with ID: ${id}`,
+                `[transcribeQueries.getTranscriptionByIdQuery] => fetch transcription by id: denied | ${JSON.stringify(
+                    {
+                        resourceId: id,
+                        reason: "transcription_not_found",
+                    },
+                )}`,
             );
             return false;
         }
@@ -404,7 +441,12 @@ const getTranscriptionByIdQuery = async (id) => {
         return transcription.rows[0];
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getTranscriptionByIdQuery] => Error getting transcription by ID: ${error.message}`,
+            `[transcribeQueries.getTranscriptionByIdQuery] => fetch transcription by id: failed | ${JSON.stringify(
+                {
+                    resourceId: id,
+                    error: error.message,
+                },
+            )}`,
         );
 
         throw error;
@@ -417,7 +459,12 @@ const deleteTranscriptionByIdQuery = async (id) => {
         return true;
     } catch (error) {
         logger.error(
-            `[transcribeQueries > getTranscriptionByIdQuery] => Error getting transcription by ID: ${error.message}`,
+            `[transcribeQueries.deleteTranscriptionByIdQuery] => delete transcription by id: failed | ${JSON.stringify(
+                {
+                    resourceId: id,
+                    error: error.message,
+                },
+            )}`,
         );
 
         throw error;
@@ -435,7 +482,12 @@ const deleteTranscriptionsByUserIdQuery = async ({ user_id }) => {
         return rows || [];
     } catch (error) {
         logger.error(
-            `[transcribeQueries > deleteTranscriptionsByUserIdQuery] => Error: ${error.message}`,
+            `[transcribeQueries.deleteTranscriptionsByUserIdQuery] => delete transcriptions by user id: failed | ${JSON.stringify(
+                {
+                    userId: user_id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -452,7 +504,12 @@ const deleteTranscriptionBackupsByUserIdQuery = async ({ user_id }) => {
         return rows || [];
     } catch (error) {
         logger.error(
-            `[transcribeQueries > deleteTranscriptionBackupsByUserIdQuery] => Error: ${error.message}`,
+            `[transcribeQueries.deleteTranscriptionBackupsByUserIdQuery] => delete transcription backups by user id: failed | ${JSON.stringify(
+                {
+                    userId: user_id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }

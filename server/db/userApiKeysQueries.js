@@ -38,7 +38,12 @@ const getUserApiKeysQuery = async ({ user_id, provider = PROVIDER }) => {
         return rows.map(mapRow);
     } catch (error) {
         logger.error(
-            `[userApiKeysQueries > getUserApiKeysQuery] => Error: ${error.message}`,
+            `[userApiKeysQueries.getUserApiKeysQuery] => fetch user api keys: failed | ${JSON.stringify(
+                {
+                    userId: user_id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -70,7 +75,13 @@ const getUserApiKeyByIdQuery = async ({ id, user_id, provider = PROVIDER }) => {
         return mapRow(rows[0] || null);
     } catch (error) {
         logger.error(
-            `[userApiKeysQueries > getUserApiKeyByIdQuery] => Error: ${error.message}`,
+            `[userApiKeysQueries.getUserApiKeyByIdQuery] => fetch user api key by id: failed | ${JSON.stringify(
+                {
+                    userId: user_id,
+                    resourceId: id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -126,7 +137,12 @@ const createUserApiKeyQuery = async ({
         return mapRow(rows[0]);
     } catch (error) {
         logger.error(
-            `[userApiKeysQueries > createUserApiKeyQuery] => Error: ${error.message}`,
+            `[userApiKeysQueries.createUserApiKeyQuery] => create user api key: failed | ${JSON.stringify(
+                {
+                    userId: user_id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -198,7 +214,13 @@ const updateUserApiKeyQuery = async ({
         return mapRow(rows[0] || null);
     } catch (error) {
         logger.error(
-            `[userApiKeysQueries > updateUserApiKeyQuery] => Error: ${error.message}`,
+            `[userApiKeysQueries.updateUserApiKeyQuery] => update user api key: failed | ${JSON.stringify(
+                {
+                    userId: user_id,
+                    resourceId: id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -224,7 +246,12 @@ const clearDefaultUserApiKeysQuery = async ({
         return rows;
     } catch (error) {
         logger.error(
-            `[userApiKeysQueries > clearDefaultUserApiKeysQuery] => Error: ${error.message}`,
+            `[userApiKeysQueries.clearDefaultUserApiKeysQuery] => clear default user api keys: failed | ${JSON.stringify(
+                {
+                    userId: user_id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -282,7 +309,13 @@ const setDefaultUserApiKeyQuery = async ({
     } catch (error) {
         await client.query("ROLLBACK");
         logger.error(
-            `[userApiKeysQueries > setDefaultUserApiKeyQuery] => Error: ${error.message}`,
+            `[userApiKeysQueries.setDefaultUserApiKeyQuery] => set default user api key: failed | ${JSON.stringify(
+                {
+                    userId: user_id,
+                    resourceId: id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     } finally {
@@ -314,7 +347,13 @@ const deleteUserApiKeyQuery = async ({ id, user_id, provider = PROVIDER }) => {
         return mapRow(rows[0] || null);
     } catch (error) {
         logger.error(
-            `[userApiKeysQueries > deleteUserApiKeyQuery] => Error: ${error.message}`,
+            `[userApiKeysQueries.deleteUserApiKeyQuery] => delete user api key: failed | ${JSON.stringify(
+                {
+                    userId: user_id,
+                    resourceId: id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }
@@ -333,7 +372,12 @@ const countUserApiKeysQuery = async ({ user_id, provider = PROVIDER }) => {
         return rows[0]?.total || 0;
     } catch (error) {
         logger.error(
-            `[userApiKeysQueries > countUserApiKeysQuery] => Error: ${error.message}`,
+            `[userApiKeysQueries.countUserApiKeysQuery] => count user api keys: failed | ${JSON.stringify(
+                {
+                    userId: user_id,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }

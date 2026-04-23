@@ -4,6 +4,11 @@ const axios = require("axios");
 const fs = require("fs").promises;
 const logger = require("./logger");
 
+/*
+- purpose: upload an audio file to AssemblyAI and return the remote upload url
+- inputs: local file path and optional AssemblyAI api key
+- outputs: AssemblyAI upload url string
+*/
 const uploadAudioFile = async (filePath, apiKey) => {
     const baseUrl = "https://api.eu.assemblyai.com/v2/upload";
     const resolvedApiKey = String(
@@ -28,12 +33,22 @@ const uploadAudioFile = async (filePath, apiKey) => {
         }
 
         logger.info(
-            `[uploadAudioFile] => Upload successful: ${response.data.upload_url}`,
+            `[assemblyaiUploader.uploadAudioFile] => upload audio: success | ${JSON.stringify(
+                {
+                    filePath,
+                },
+            )}`,
         );
+
         return response.data.upload_url;
     } catch (error) {
         logger.error(
-            `[uploadAudioFile] => Error uploading file: ${error.message}`,
+            `[assemblyaiUploader.uploadAudioFile] => upload audio: failed | ${JSON.stringify(
+                {
+                    filePath,
+                    error: error.message,
+                },
+            )}`,
         );
         throw error;
     }

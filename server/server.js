@@ -47,5 +47,11 @@ app.use("/auth", oauthRoutes);
 // Start the server
 const PORT = process.env.PORT || 5002;
 app.listen(PORT, () => {
-    logger.info(`Server is running on port ${PORT}`);
+    logger.info(
+        `[server.listen] => start server: success | ${JSON.stringify(
+            {
+                port: PORT,
+            },
+        )}`,
+    );
 });
