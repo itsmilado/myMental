@@ -1,7 +1,8 @@
 // src/features/account/pages/AccountPage.tsx
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+    useTheme,
     Alert,
     Avatar,
     Box,
@@ -60,34 +61,23 @@ const isValidName = (value: string) => {
 const sectionCardSx = {
     p: { xs: 2, md: 3 },
     borderRadius: 3,
+    backgroundColor: "background.paper",
+    border: "1px solid",
+    borderColor: "divider",
 };
 
-type ReauthAction =
-    | "delete"
-    | "email"
-    | "link"
-    | "unlink"
-    | "password"
-    | "assembly_connection"
-    | null;
+type ReauthAction = "delete" | "email" | "link" | "unlink" | null;
 
 type GoogleReauthIntent =
     | "link"
     | "reauth_email"
     | "reauth_delete"
-    | "reauth_unlink"
-    | "reauth_assembly_connection";
+    | "reauth_unlink";
 
 type ConnectionDialogMode = "create" | "edit_label" | "replace_key" | null;
 
-type PendingAssemblyConnectionReauth =
-    | { kind: "create" }
-    | { kind: "replace_key"; connectionId: number }
-    | { kind: "delete"; connectionId: number };
-
-const ASSEMBLY_CONNECTION_REAUTH_STORAGE_KEY = "assemblyai-connection-reauth";
-
 const AccountPage = () => {
+    const theme = useTheme();
     const user = useAuthStore((s) => s.user);
     const setUser = useAuthStore((s) => s.setUser);
     const clearUser = useAuthStore((s) => s.clearUser);
@@ -145,10 +135,6 @@ const AccountPage = () => {
         null,
     );
 
-    const pendingProtectedActionRef = useRef<null | (() => Promise<void>)>(
-        null,
-    );
-
     const [toast, setToast] = useState<{
         open: boolean;
         message: string;
@@ -194,54 +180,6 @@ const AccountPage = () => {
     ) => {
         setToast({ open: true, message, severity });
     };
-
-    const savePendingAssemblyConnectionReauth = (
-        context: PendingAssemblyConnectionReauth,
-    ) => {
-        sessionStorage.setItem(
-            ASSEMBLY_CONNECTION_REAUTH_STORAGE_KEY,
-            JSON.stringify(context),
-        );
-    };
-
-    const consumePendingAssemblyConnectionReauth =
-        (): PendingAssemblyConnectionReauth | null => {
-            const raw = sessionStorage.getItem(
-                ASSEMBLY_CONNECTION_REAUTH_STORAGE_KEY,
-            );
-
-            if (!raw) {
-                return null;
-            }
-
-            sessionStorage.removeItem(ASSEMBLY_CONNECTION_REAUTH_STORAGE_KEY);
-
-            try {
-                const parsed = JSON.parse(
-                    raw,
-                ) as PendingAssemblyConnectionReauth;
-
-                if (!parsed || typeof parsed !== "object") {
-                    return null;
-                }
-
-                if (parsed.kind === "create") {
-                    return parsed;
-                }
-
-                if (
-                    (parsed.kind === "replace_key" ||
-                        parsed.kind === "delete") &&
-                    typeof parsed.connectionId === "number"
-                ) {
-                    return parsed;
-                }
-
-                return null;
-            } catch {
-                return null;
-            }
-        };
 
     const formatConnectionDate = (value: string | null) => {
         if (!value) return "Not validated yet";
@@ -311,129 +249,12 @@ const AccountPage = () => {
     };
 
     const startCreateConnectionFlow = () => {
-        if (hasGoogleConnection) {
-            savePendingAssemblyConnectionReauth({ kind: "create" });
-
-            openGoogleReauth(
-                "assembly_connection",
-                "Confirm AssemblyAI connection change",
-                "Continue with Google to verify your identity before adding an AssemblyAI connection.",
-                "reauth_assembly_connection",
-            );
-            return;
-        }
-
-        setReauthAction("assembly_connection");
-        setReauthMode("password");
-        setReauthTitle("Confirm AssemblyAI connection change");
-        setReauthDescription(
-            "Enter your current password before adding an AssemblyAI connection.",
-        );
-        setReauthGoogleIntent("reauth_email");
-        pendingProtectedActionRef.current = async () => {
-            openCreateConnectionDialog();
-        };
-        setReauthOpen(true);
+        openCreateConnectionDialog();
     };
 
     useEffect(() => {
         void loadAssemblyConnections();
     }, [loadAssemblyConnections]);
-
-    const resumeAssemblyConnectionAfterGoogleReauth = async () => {
-        const pending = consumePendingAssemblyConnectionReauth();
-
-        if (!pending) {
-            openToast(
-                "Identity confirmed. Continue with your AssemblyAI connection change.",
-                "success",
-            );
-            return;
-        }
-
-        if (pending.kind === "create") {
-            openCreateConnectionDialog();
-            openToast(
-                "Identity confirmed. Re-enter the AssemblyAI key to finish saving the connection.",
-                "success",
-            );
-            return;
-        }
-
-        const connections = await loadAssemblyConnections();
-        const target = connections.find(
-            (connection) => connection.id === pending.connectionId,
-        );
-
-        if (!target) {
-            openToast(
-                "Identity confirmed, but the selected AssemblyAI connection could not be found.",
-                "error",
-            );
-            return;
-        }
-
-        if (pending.kind === "replace_key") {
-            openReplaceConnectionDialog(target);
-            openToast(
-                "Identity confirmed. Re-enter the replacement key to continue.",
-                "success",
-            );
-            return;
-        }
-
-        setConnectionDeleteTarget(target);
-        openToast(
-            "Identity confirmed. Confirm the removal to continue.",
-            "success",
-        );
-    };
-
-    const handleProtectedConnectionAction = async (
-        action: () => Promise<void>,
-        description: string,
-        pendingContext: PendingAssemblyConnectionReauth,
-    ) => {
-        try {
-            await action();
-        } catch (e: any) {
-            const message = String(e?.message || "");
-
-            if (
-                message.toLowerCase().includes("re-authentication required") ||
-                message.toLowerCase().includes("reauthentication required")
-            ) {
-                if (hasGoogleConnection) {
-                    savePendingAssemblyConnectionReauth(pendingContext);
-
-                    if (pendingContext.kind === "delete") {
-                        setConnectionDeleteTarget(null);
-                    } else {
-                        resetConnectionDialogState();
-                    }
-
-                    openGoogleReauth(
-                        "assembly_connection",
-                        "Confirm AssemblyAI connection change",
-                        description,
-                        "reauth_assembly_connection",
-                    );
-                    return;
-                }
-
-                pendingProtectedActionRef.current = action;
-                setReauthAction("assembly_connection");
-                setReauthMode("password");
-                setReauthTitle("Confirm AssemblyAI connection change");
-                setReauthDescription(description);
-                setReauthGoogleIntent("reauth_email");
-                setReauthOpen(true);
-                return;
-            }
-
-            throw e;
-        }
-    };
 
     const handleSaveConnection = async () => {
         const trimmedLabel = connectionLabel.trim();
@@ -519,22 +340,10 @@ const AccountPage = () => {
 
             try {
                 setConnectionsSaving(true);
-
-                await handleProtectedConnectionAction(
-                    async () => {
-                        await updateMyAssemblyConnection(
-                            connectionTarget.id,
-                            payload,
-                        );
-                        await loadAssemblyConnections();
-                        resetConnectionDialogState();
-                        openToast("AssemblyAI key replaced.", "success");
-                    },
-                    hasGoogleConnection
-                        ? "Continue with Google to verify your identity before replacing this AssemblyAI key."
-                        : "Enter your current password to continue replacing this AssemblyAI key.",
-                    { kind: "replace_key", connectionId: connectionTarget.id },
-                );
+                await updateMyAssemblyConnection(connectionTarget.id, payload);
+                await loadAssemblyConnections();
+                resetConnectionDialogState();
+                openToast("AssemblyAI key replaced.", "success");
             } catch (e: any) {
                 openToast(
                     e?.message || "Failed to replace AssemblyAI key.",
@@ -555,18 +364,10 @@ const AccountPage = () => {
         try {
             setConnectionsSaving(true);
 
-            await handleProtectedConnectionAction(
-                async () => {
-                    await deleteMyAssemblyConnection(connectionDeleteTarget.id);
-                    await loadAssemblyConnections();
-                    setConnectionDeleteTarget(null);
-                    openToast("AssemblyAI connection removed.", "success");
-                },
-                hasGoogleConnection
-                    ? "Continue with Google to verify your identity before removing this AssemblyAI connection."
-                    : "Enter your current password to continue removing this AssemblyAI connection.",
-                { kind: "delete", connectionId: connectionDeleteTarget.id },
-            );
+            await deleteMyAssemblyConnection(connectionDeleteTarget.id);
+            await loadAssemblyConnections();
+            setConnectionDeleteTarget(null);
+            openToast("AssemblyAI connection removed.", "success");
         } catch (e: any) {
             openToast(
                 e?.message || "Failed to remove AssemblyAI connection.",
@@ -665,14 +466,9 @@ const AccountPage = () => {
                             setRemovingGoogle(true);
                             await handleFinishGoogleUnlink();
                         }
-                    } else if (intent === "reauth_assembly_connection") {
-                        await resumeAssemblyConnectionAfterGoogleReauth();
                     }
 
-                    if (
-                        intent !== "unlink" &&
-                        intent !== "reauth_assembly_connection"
-                    ) {
+                    if (intent !== "unlink") {
                         openToast(message || "Identity confirmed.", "success");
                     }
                 }
@@ -924,28 +720,13 @@ const AccountPage = () => {
     };
 
     /*
-    - purpose: start the password-management flow for the current account
-    - outputs: opens the reauthentication dialog or password dialog with the correct mode
-    - important behavior:
-     - requires password reauthentication only when password sign-in already exists
-     - allows Google-only accounts to open initial password setup without a missing current-password prompt
-    */
-
+- purpose: open the password-management dialog for the current account
+- behavior:
+  - existing password users confirm their current password inside the dialog
+  - Google-only users can create an initial password without a current-password prompt
+*/
     const startChangePasswordFlow = () => {
-        // Skip reauth for Google-only accounts so they can create an initial password
-        if (!hasPassword) {
-            setChangePwOpen(true);
-            return;
-        }
-
-        setReauthAction("password");
-        setReauthMode("password");
-        setReauthTitle("Confirm password change");
-        setReauthDescription(
-            "Please confirm your current password before changing it.",
-        );
-        setReauthGoogleIntent("reauth_email");
-        setReauthOpen(true);
+        setChangePwOpen(true);
     };
 
     const handlePasswordReauthSuccess = () => {
@@ -965,38 +746,11 @@ const AccountPage = () => {
             return;
         }
 
-        if (reauthAction === "password") {
-            setChangePwOpen(true);
-            setReauthAction(null);
-            openToast("Identity confirmed.", "success");
-            return;
-        }
-
         if (reauthAction === "link") {
             setReauthAction(null);
             startGoogleOAuth("link");
             return;
         }
-
-        if (reauthAction === "assembly_connection") {
-            const pendingAction = pendingProtectedActionRef.current;
-            pendingProtectedActionRef.current = null;
-            setReauthAction(null);
-
-            if (pendingAction) {
-                void pendingAction().catch((e: any) => {
-                    openToast(
-                        e?.message || "AssemblyAI action failed.",
-                        "error",
-                    );
-                });
-            }
-
-            return;
-        }
-
-        setReauthAction(null);
-        openToast("Identity confirmed.", "success");
     };
 
     if (!user) {
@@ -1135,7 +889,7 @@ const AccountPage = () => {
                                 </Box>
 
                                 {pendingEmail ? (
-                                    <Alert severity="info">
+                                    <Alert severity="info" variant="outlined">
                                         Pending confirmation for{" "}
                                         <strong>{pendingEmail}</strong>. Check
                                         that inbox and click the confirmation
@@ -1199,7 +953,7 @@ const AccountPage = () => {
 
                                 {!editingProfile ? (
                                     <Button
-                                        variant="contained"
+                                        variant="outlined"
                                         onClick={() => setEditingProfile(true)}
                                     >
                                         Edit profile
@@ -1538,13 +1292,12 @@ const AccountPage = () => {
                                         color="text.secondary"
                                     >
                                         Manage the AssemblyAI API keys saved to
-                                        your account. Protected changes require
-                                        recent re-authentication.
+                                        your account.
                                     </Typography>
                                 </Box>
 
                                 <Button
-                                    variant="contained"
+                                    variant="outlined"
                                     onClick={startCreateConnectionFlow}
                                 >
                                     Add connection
@@ -1552,14 +1305,6 @@ const AccountPage = () => {
                             </Stack>
 
                             <Divider />
-
-                            {isGooglePrimaryAccount ? (
-                                <Alert severity="info">
-                                    Protected AssemblyAI connection changes use
-                                    Google re-authentication for Google-based
-                                    accounts.
-                                </Alert>
-                            ) : null}
 
                             {connectionsError ? (
                                 <Alert severity="error">
@@ -1590,6 +1335,13 @@ const AccountPage = () => {
                                             sx={{
                                                 p: 2,
                                                 borderRadius: 2,
+                                                borderColor: "divider",
+                                                transition:
+                                                    "border-color 0.2s ease",
+                                                "&:hover": {
+                                                    borderColor:
+                                                        "text.secondary",
+                                                },
                                             }}
                                         >
                                             <Stack
@@ -1734,8 +1486,7 @@ const AccountPage = () => {
                     <Paper
                         sx={{
                             ...sectionCardSx,
-                            border: (theme) =>
-                                `1px solid ${theme.palette.error.light}`,
+                            borderColor: "error.main",
                         }}
                     >
                         <Stack spacing={2.5}>
@@ -1803,7 +1554,6 @@ const AccountPage = () => {
                     loading={changingPw}
                     onClose={() => setChangePwOpen(false)}
                     onSubmit={handleChangePassword}
-                    // Require current password whenever password sign-in already exists.
                     requireCurrentPassword={hasPassword}
                 />
 
@@ -1839,7 +1589,11 @@ const AccountPage = () => {
                               : "Replace AssemblyAI key"}
                     </DialogTitle>
 
-                    <DialogContent>
+                    <DialogContent
+                        sx={{
+                            color: "text.primary",
+                        }}
+                    >
                         <Stack spacing={2} sx={{ pt: 1 }}>
                             {connectionDialogMode !== "replace_key" ? (
                                 <TextField
@@ -1978,8 +1732,17 @@ const AccountPage = () => {
                     <Alert
                         severity={toast.severity}
                         onClose={() => setToast((t) => ({ ...t, open: false }))}
-                        variant="filled"
-                        sx={{ width: "100%" }}
+                        variant={
+                            theme.palette.mode === "dark"
+                                ? "filled"
+                                : "outlined"
+                        }
+                        sx={{
+                            width: "100%",
+                            ...(theme.palette.mode === "light" && {
+                                backgroundColor: "background.paper",
+                            }),
+                        }}
                     >
                         {toast.message}
                     </Alert>
