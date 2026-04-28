@@ -49,7 +49,7 @@ const DeleteAccountConfirmDialog = ({
 
             <DialogContent dividers>
                 <Stack spacing={2}>
-                    <Alert severity="warning">
+                    <Alert severity="warning" variant="outlined">
                         This permanently deletes your account and all associated
                         data. This action cannot be undone.
                     </Alert>

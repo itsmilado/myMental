@@ -112,11 +112,13 @@ const ChangeEmailDialog = ({ open, onClose, onInfo, currentEmail }: Props) => {
                             />
 
                             {error ? (
-                                <Alert severity="error">{error}</Alert>
+                                <Alert severity="error" variant="outlined">
+                                    {error}
+                                </Alert>
                             ) : null}
                         </>
                     ) : (
-                        <Alert severity="success">
+                        <Alert severity="success" variant="outlined">
                             We sent a confirmation link to your new email
                             address. Your account email will update after you
                             click that link.

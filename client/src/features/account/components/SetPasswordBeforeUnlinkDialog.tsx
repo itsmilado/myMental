@@ -66,12 +66,16 @@ const SetPasswordBeforeUnlinkDialog = ({
 
             <DialogContent dividers>
                 <Stack spacing={2}>
-                    <Alert severity="info">
+                    <Alert severity="info" variant="outlined">
                         To remove Google sign-in, first create a password for
                         this account.
                     </Alert>
 
-                    {error ? <Alert severity="error">{error}</Alert> : null}
+                    {error ? (
+                        <Alert severity="error" variant="outlined">
+                            {error}
+                        </Alert>
+                    ) : null}
 
                     <TextField
                         label="New password"

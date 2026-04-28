@@ -26,7 +26,6 @@ import {
     ExpandMore,
     BarChart as BarChartIcon,
     Assessment as AssessmentIcon,
-    Settings as SettingsIcon,
     Tune as TuneIcon,
     Upload as UploadIcon,
     History as HistoryIcon,
@@ -48,6 +47,15 @@ const Sidebar = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [isCollapsed, setIsCollapsed] = useState(false);
+
+    const sidebarBackground = theme.palette.background.paper;
+    const sidebarBorder = theme.palette.divider;
+    const dividerColor = theme.palette.divider;
+    const collapseButtonColor = theme.palette.text.primary;
+    const collapseButtonBorderColor = theme.palette.divider;
+    const collapseButtonHoverBackground = theme.palette.action.hover;
+    const profileAvatarText = theme.palette.secondary.contrastText;
+    const profileTextColor = theme.palette.text.primary;
 
     const menuItems: SidebarItemProps[] = [
         {
@@ -98,11 +106,6 @@ const Sidebar = () => {
                     text: "History",
                     path: "/dashboard/transcriptions/history",
                     icon: <HistoryIcon />,
-                },
-                {
-                    text: "Defaults",
-                    path: "/dashboard/preferences",
-                    icon: <TuneIcon />,
                 },
             ],
         },
@@ -178,11 +181,20 @@ const Sidebar = () => {
         <Box
             width={isCollapsed ? "80px" : "260px"}
             display="flex"
+            position="sticky"
+            top={64}
             flexDirection="column"
-            bgcolor={colors.primary[400]}
-            sx={{ borderRight: `1px solid ${colors.grey[100]}`, px: 2, py: 3 }}
+            bgcolor={sidebarBackground}
+            sx={{
+                borderRight: `1px solid ${sidebarBorder}`,
+                px: 2,
+                py: 3,
+                height: "calc(100vh - 64px)",
+                overflowY: "auto",
+                overflowX: "hidden",
+                zIndex: 1200,
+            }}
         >
-            {/* Collapse Button */}
             <Box
                 display="flex"
                 alignItems="center"
@@ -198,21 +210,19 @@ const Sidebar = () => {
                         size="small"
                         sx={{
                             borderRadius: "999px",
-                            border: `1px solid ${colors.grey[300]}`,
-                            backgroundColor: colors.primary[400],
-                            "&:hover": { backgroundColor: colors.primary[300] },
+                            border: `1px solid ${collapseButtonBorderColor}`,
+                            color: collapseButtonColor,
+                            backgroundColor: "transparent",
+                            "&:hover": {
+                                backgroundColor: collapseButtonHoverBackground,
+                            },
                         }}
                     >
-                        {isCollapsed ? (
-                            <ChevronRight sx={{ color: colors.grey[100] }} />
-                        ) : (
-                            <ChevronLeft sx={{ color: colors.grey[100] }} />
-                        )}
+                        {isCollapsed ? <ChevronRight /> : <ChevronLeft />}
                     </IconButton>
                 </Tooltip>
             </Box>
 
-            {/* Avatar and Username */}
             {!isCollapsed && (
                 <Box
                     display="flex"
@@ -220,16 +230,23 @@ const Sidebar = () => {
                     alignItems="center"
                     mb={4}
                 >
-                    <Avatar sx={{ width: 64, height: 64, mb: 1 }} />
-                    <Typography variant="h5" color={colors.grey[100]}>
+                    <Avatar
+                        sx={{
+                            width: 64,
+                            height: 64,
+                            mb: 1,
+                            bgcolor: colors.greenAccent[500],
+                            color: profileAvatarText,
+                        }}
+                    />
+                    <Typography variant="h5" color={profileTextColor}>
                         User Name
                     </Typography>
                 </Box>
             )}
 
-            <Divider sx={{ mb: 2, bgcolor: colors.grey[600] }} />
+            <Divider sx={{ mb: 2, bgcolor: dividerColor }} />
 
-            {/* Menu */}
             <List disablePadding>
                 {menuItems.map((item) => (
                     <SidebarItemComponent
@@ -258,18 +275,28 @@ const SidebarItemComponent = ({
 }) => {
     const [expandSubMenu, setExpandSubMenu] = useState(false);
     const theme = useTheme();
-    const colors = tokens(theme.palette.mode);
 
     const isActive =
         location.pathname === item.path ||
         (!!item.subMenu &&
             item.subMenu.some((s) => location.pathname.startsWith(s.path)));
 
+    const activeItemBackground = theme.palette.action.selected;
+    const hoverItemBackground = theme.palette.action.hover;
+
+    const itemTextColor = theme.palette.text.primary;
+    const itemMutedTextColor = theme.palette.text.secondary;
+
+    const itemIconColor = theme.palette.text.primary;
+    const itemActiveIconColor = theme.palette.secondary.main;
+
     useEffect(() => {
         if (!item.subMenu) return;
+
         const shouldExpand = item.subMenu.some((s) =>
             location.pathname.startsWith(s.path),
         );
+
         setExpandSubMenu(shouldExpand);
     }, [item.subMenu, location.pathname]);
 
@@ -287,12 +314,19 @@ const SidebarItemComponent = ({
                     my: 0.5,
                     borderRadius: "8px",
                     backgroundColor: isActive
-                        ? "rgba(0, 0, 0, 0.1)"
+                        ? activeItemBackground
                         : "transparent",
-                    "&:hover": { backgroundColor: "rgba(0, 0, 0, 0.2)" },
+                    "&:hover": {
+                        backgroundColor: hoverItemBackground,
+                    },
                 }}
             >
-                <ListItemIcon sx={{ color: colors.grey[100], minWidth: 40 }}>
+                <ListItemIcon
+                    sx={{
+                        color: isActive ? itemActiveIconColor : itemIconColor,
+                        minWidth: 40,
+                    }}
+                >
                     {item.icon}
                 </ListItemIcon>
 
@@ -300,8 +334,8 @@ const SidebarItemComponent = ({
                     <ListItemText
                         primary={
                             <Typography
-                                color={colors.grey[100]}
-                                fontWeight={isActive ? "bold" : "normal"}
+                                color={itemTextColor}
+                                fontWeight={isActive ? 700 : 500}
                             >
                                 {item.text}
                             </Typography>
@@ -309,49 +343,72 @@ const SidebarItemComponent = ({
                     />
                 )}
 
-                {item.subMenu &&
-                    !isCollapsed &&
-                    (expandSubMenu ? <ExpandLess /> : <ExpandMore />)}
+                {item.subMenu && !isCollapsed ? (
+                    expandSubMenu ? (
+                        <ExpandLess sx={{ color: itemMutedTextColor }} />
+                    ) : (
+                        <ExpandMore sx={{ color: itemMutedTextColor }} />
+                    )
+                ) : null}
             </ListItemButton>
 
             {item.subMenu && (
                 <Collapse in={expandSubMenu} timeout="auto" unmountOnExit>
-                    <List component="div" disablePadding>
+                    <List
+                        component="div"
+                        disablePadding
+                        sx={{
+                            pl: isCollapsed ? 0 : 2,
+                        }}
+                    >
                         {item.subMenu.map((subItem) => {
                             const isSubActive =
-                                location.pathname === subItem.path ||
-                                location.pathname.startsWith(
-                                    subItem.path + "/",
-                                );
+                                location.pathname === subItem.path;
 
                             return (
                                 <ListItemButton
                                     key={subItem.text}
                                     onClick={() => navigate(subItem.path)}
                                     sx={{
-                                        pl: 4,
+                                        my: 0.25,
+                                        justifyContent: isCollapsed
+                                            ? "center"
+                                            : "flex-start",
+                                        borderRadius: "8px",
                                         backgroundColor: isSubActive
-                                            ? "rgba(0, 0, 0, 0.08)"
+                                            ? activeItemBackground
                                             : "transparent",
                                         "&:hover": {
                                             backgroundColor:
-                                                "rgba(0, 0, 0, 0.1)",
+                                                hoverItemBackground,
                                         },
                                     }}
                                 >
-                                    <ListItemIcon sx={{ color: "gray" }}>
-                                        {subItem.icon}
-                                    </ListItemIcon>
-
+                                    {subItem.icon ? (
+                                        <ListItemIcon
+                                            sx={{
+                                                color: isSubActive
+                                                    ? itemActiveIconColor
+                                                    : itemMutedTextColor,
+                                                minWidth: isCollapsed ? 0 : 36,
+                                                justifyContent: "center",
+                                            }}
+                                        >
+                                            {subItem.icon}
+                                        </ListItemIcon>
+                                    ) : null}
                                     {!isCollapsed && (
                                         <ListItemText
                                             primary={
                                                 <Typography
-                                                    color={colors.grey[100]}
-                                                    fontWeight={
+                                                    color={
                                                         isSubActive
-                                                            ? "bold"
-                                                            : "normal"
+                                                            ? itemTextColor
+                                                            : itemMutedTextColor
+                                                    }
+                                                    fontSize={14}
+                                                    fontWeight={
+                                                        isSubActive ? 700 : 500
                                                     }
                                                 >
                                                     {subItem.text}

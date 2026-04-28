@@ -90,7 +90,7 @@ const ReauthDialog = ({
 
             <DialogContent dividers>
                 <Stack spacing={2}>
-                    <Alert severity="info">
+                    <Alert severity="info" variant="outlined">
                         {description ||
                             (mode === "google"
                                 ? "Please continue with Google to verify your identity before this action."
@@ -109,7 +109,11 @@ const ReauthDialog = ({
                         />
                     ) : null}
 
-                    {error ? <Alert severity="error">{error}</Alert> : null}
+                    {error ? (
+                        <Alert severity="error" variant="outlined">
+                            {error}
+                        </Alert>
+                    ) : null}
                 </Stack>
             </DialogContent>
 

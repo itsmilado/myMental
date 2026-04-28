@@ -99,7 +99,11 @@ const ChangePasswordDialog = ({
 
             <DialogContent>
                 <Stack spacing={2} sx={{ mt: 1 }}>
-                    {error ? <Alert severity="error">{error}</Alert> : null}
+                    {error ? (
+                        <Alert severity="error" variant="outlined">
+                            {error}
+                        </Alert>
+                    ) : null}
 
                     {requireCurrentPassword ? (
                         <TextField
@@ -146,7 +150,7 @@ const ChangePasswordDialog = ({
                     variant="contained"
                     disabled={loading}
                 >
-                    {requireCurrentPassword ? "Save" : "Set password"}
+                    {requireCurrentPassword ? "Save" : "Update password"}
                 </Button>
             </DialogActions>
         </Dialog>

@@ -63,8 +63,30 @@ const ConfirmEmailPage = () => {
     }, [token, setUser]);
 
     return (
-        <Box sx={{ display: "flex", justifyContent: "center", mt: 6, px: 2 }}>
-            <Paper sx={{ p: 3, maxWidth: 560, width: "100%", borderRadius: 3 }}>
+        <Box
+            sx={{
+                minHeight: "100vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "background.default",
+                color: "text.primary",
+                px: 2,
+                py: 6,
+            }}
+        >
+            <Paper
+                elevation={0}
+                sx={{
+                    width: "100%",
+                    maxWidth: 460,
+                    p: { xs: 2.5, sm: 3 },
+                    borderRadius: 4,
+                    backgroundColor: "background.paper",
+                    border: "1px solid",
+                    borderColor: "divider",
+                }}
+            >
                 <Stack spacing={2}>
                     <Typography variant="h5" fontWeight="bold">
                         Confirm email
@@ -76,22 +98,53 @@ const ConfirmEmailPage = () => {
                     </Typography>
 
                     {loading ? (
-                        <Stack direction="row" spacing={2} alignItems="center">
-                            <CircularProgress size={22} />
-                            <Typography color="text.secondary">
+                        <Stack
+                            spacing={2}
+                            alignItems="center"
+                            sx={{
+                                py: 2,
+                                color: "text.secondary",
+                            }}
+                        >
+                            <CircularProgress size={28} />
+                            <Typography variant="body2" textAlign="center">
                                 Verifying your email…
                             </Typography>
                         </Stack>
                     ) : null}
 
                     {!loading && success ? (
-                        <Alert severity="success">
+                        <Alert
+                            severity="success"
+                            variant="outlined"
+                            sx={{
+                                backgroundColor: "transparent",
+                                borderColor: "success.main",
+                                color: "text.primary",
+                                "& .MuiAlert-icon": {
+                                    color: "success.main",
+                                },
+                            }}
+                        >
                             Your email has been confirmed successfully.
                         </Alert>
                     ) : null}
 
                     {!loading && !success && error ? (
-                        <Alert severity="error">{error}</Alert>
+                        <Alert
+                            severity="error"
+                            variant="outlined"
+                            sx={{
+                                backgroundColor: "transparent",
+                                borderColor: "error.main",
+                                color: "text.primary",
+                                "& .MuiAlert-icon": {
+                                    color: "error.main",
+                                },
+                            }}
+                        >
+                            {error}
+                        </Alert>
                     ) : null}
 
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
