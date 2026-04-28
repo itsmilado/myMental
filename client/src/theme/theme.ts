@@ -1,12 +1,14 @@
-import { useContext } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { createTheme } from "@mui/material/styles";
-import { createContext, useState, useMemo } from "react";
+import { createContext } from "react";
 import type {
     ColorMode,
+    ColorModeContextValue,
     ColorTokens,
     ThemeSettings,
-    ColorModeContextValue,
+    ThemePreference,
 } from "../types/types";
+import { usePreferencesStore } from "../store/usePreferencesStore";
 
 export const tokens = (mode: ColorMode): ColorTokens => ({
     ...(mode === "dark"
@@ -126,20 +128,26 @@ export const tokens = (mode: ColorMode): ColorTokens => ({
           }),
 });
 
-// mui theme setings
+// mui theme settings
 export const themeSettings = (mode: ColorMode): ThemeSettings => {
     const colors = tokens(mode);
+
     return {
         palette: {
-            mode: mode,
+            mode,
             ...(mode === "dark"
                 ? {
-                      // palette values for dark mode
                       primary: {
-                          main: colors.primary[500],
+                          main: colors.blueAccent[500],
+                          light: colors.blueAccent[400],
+                          dark: colors.blueAccent[700],
+                          contrastText: colors.grey[100],
                       },
                       secondary: {
                           main: colors.greenAccent[500],
+                          light: colors.greenAccent[400],
+                          dark: colors.greenAccent[700],
+                          contrastText: colors.grey[900],
                       },
                       neutral: {
                           dark: colors.grey[700],
@@ -148,23 +156,52 @@ export const themeSettings = (mode: ColorMode): ThemeSettings => {
                       },
                       background: {
                           default: colors.primary[500],
+                          paper: colors.primary[400],
+                      },
+                      text: {
+                          primary: colors.grey[100],
+                          secondary: colors.grey[300],
+                      },
+                      divider: colors.primary[300],
+                      action: {
+                          hover: "rgba(255, 255, 255, 0.08)",
+                          selected: "rgba(255, 255, 255, 0.12)",
+                          disabled: colors.grey[600],
+                          disabledBackground: colors.primary[600],
                       },
                   }
                 : {
-                      // palette values for light mode
                       primary: {
-                          main: colors.primary[100],
+                          main: colors.primary[600],
+                          light: colors.primary[700],
+                          dark: colors.primary[500],
+                          contrastText: colors.grey[900],
                       },
                       secondary: {
                           main: colors.greenAccent[500],
+                          light: colors.greenAccent[400],
+                          dark: colors.greenAccent[700],
+                          contrastText: colors.grey[100],
                       },
                       neutral: {
-                          dark: colors.grey[700],
+                          dark: colors.grey[300],
                           main: colors.grey[500],
-                          light: colors.grey[100],
+                          light: colors.grey[800],
                       },
                       background: {
-                          default: "#fcfcfc",
+                          default: "#f6f8fb",
+                          paper: "#ffffff",
+                      },
+                      text: {
+                          primary: "#172033",
+                          secondary: "#5f6b7a",
+                      },
+                      divider: "#d8dee8",
+                      action: {
+                          hover: "#eef2f7",
+                          selected: "#e4eaf2",
+                          disabled: "#9aa6b2",
+                          disabledBackground: "#edf1f5",
                       },
                   }),
         },
@@ -199,27 +236,121 @@ export const themeSettings = (mode: ColorMode): ThemeSettings => {
     };
 };
 
-// context for color mode
-// function allows to use color mode in entire app, without having to pass props, like a trigger
 export const ColorModeContext = createContext<ColorModeContextValue>({
     toggleColorMode: () => {},
 });
 
-//
+const getSystemMode = (): ColorMode => {
+    if (
+        typeof window !== "undefined" &&
+        typeof window.matchMedia === "function"
+    ) {
+        return window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+    }
+
+    return "dark";
+};
+
+const resolveThemeMode = (
+    storedPreference: ThemePreference | null | undefined,
+): ColorMode => {
+    if (storedPreference === "light" || storedPreference === "dark") {
+        return storedPreference;
+    }
+
+    return getSystemMode();
+};
+
 export const useMode = (): [
     ReturnType<typeof createTheme>,
-    ColorModeContextValue
+    ColorModeContextValue,
 ] => {
-    const [mode, setMode] = useState<ColorMode>("dark");
-    const colorMode = useMemo<ColorModeContextValue>(
-        () => ({
-            toggleColorMode: () =>
-                setMode((prev) => (prev === "light" ? "dark" : "light")),
-        }),
-        []
+    const preferences = usePreferencesStore((state) => state.preferences);
+    const loadPreferences = usePreferencesStore((state) => state.load);
+    const patchPreferences = usePreferencesStore((state) => state.patch);
+
+    const [systemMode, setSystemMode] = useState<ColorMode>(() =>
+        getSystemMode(),
     );
 
-    const theme = useMemo(() => createTheme(themeSettings(mode)), [mode]);
+    /*
+    - purpose: hydrate preferences for the active theme provider on app startup
+    - behavior:
+      - ensures stored theme preference is available before downstream theme use
+      - keeps theme.ts as the single active runtime theme source
+    */
+    useEffect(() => {
+        void loadPreferences();
+    }, [loadPreferences]);
+
+    /*
+    - purpose: track OS color scheme changes while the user is on system mode
+    - behavior:
+      - updates instantly when the operating system theme changes
+      - safely no-ops in environments without matchMedia support
+    */
+    useEffect(() => {
+        if (
+            typeof window === "undefined" ||
+            typeof window.matchMedia !== "function"
+        ) {
+            return;
+        }
+
+        const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+        const handleChange = (event: MediaQueryListEvent) => {
+            setSystemMode(event.matches ? "dark" : "light");
+        };
+
+        setSystemMode(mediaQuery.matches ? "dark" : "light");
+
+        mediaQuery.addEventListener("change", handleChange);
+
+        return () => {
+            mediaQuery.removeEventListener("change", handleChange);
+        };
+    }, []);
+
+    const resolvedMode = useMemo<ColorMode>(() => {
+        const preference = preferences?.appearance?.theme;
+
+        if (preference === "system") {
+            return systemMode;
+        }
+
+        return resolveThemeMode(preference);
+    }, [preferences?.appearance?.theme, systemMode]);
+
+    const colorMode = useMemo<ColorModeContextValue>(
+        () => ({
+            /*
+            - purpose: preserve the existing topbar toggle API while writing through preferences
+            - behavior:
+              - converts system mode into a concrete light/dark toggle target
+              - updates global preferences so theme changes persist and propagate instantly
+            */
+            toggleColorMode: () => {
+                const nextMode: ColorMode =
+                    resolvedMode === "light" ? "dark" : "light";
+
+                void patchPreferences({
+                    appearance: {
+                        theme: nextMode,
+                    },
+                });
+            },
+        }),
+        [patchPreferences, resolvedMode],
+    );
+
+    const theme = useMemo(
+        () => createTheme(themeSettings(resolvedMode)),
+        [resolvedMode],
+    );
+
     return [theme, colorMode];
 };
 
