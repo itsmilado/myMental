@@ -126,7 +126,6 @@ usersRoutes.get(
 usersRoutes.post(
     "/me/assemblyai-connections",
     isAuthenticated,
-    requireRecentReauth(),
     createAssemblyConnection,
     errorHandler,
 );
@@ -141,7 +140,6 @@ usersRoutes.patch(
 usersRoutes.delete(
     "/me/assemblyai-connections/:id",
     isAuthenticated,
-    requireRecentReauth(),
     deleteAssemblyConnection,
     errorHandler,
 );
