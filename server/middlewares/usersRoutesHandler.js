@@ -1982,22 +1982,6 @@ const updateAssemblyConnection = async (request, response, next) => {
         let lastValidatedAt;
 
         if (hasApiKeyField) {
-            if (!hasRecentReauth(request)) {
-                logger.warn(
-                    `[usersRoutesHandler.updateAssemblyConnection] => validate reauthentication: denied | ${JSON.stringify(
-                        {
-                            userId: sessionUser.id,
-                            resourceId: connectionId,
-                            reason: "missing_recent_reauth",
-                        },
-                    )}`,
-                );
-                return response.status(403).json({
-                    success: false,
-                    message: "Re-authentication required",
-                });
-            }
-
             const apiKey = normalizeApiKey(request.body?.api_key);
 
             if (!apiKey) {
