@@ -87,7 +87,7 @@ export const loginUser = async (
             password,
             rememberMe,
         });
-        return response.data as AuthResponse;
+        return response.data;
     } catch (error) {
         throw new Error(getApiErrorMessage(error, "Login failed."));
     }
