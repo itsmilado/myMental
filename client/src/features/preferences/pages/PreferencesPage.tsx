@@ -17,7 +17,11 @@ import {
     TextField,
     Typography,
     Divider,
+    useTheme,
 } from "@mui/material";
+
+// import { useTheme } from "@mui/material/styles";
+import type { SxProps, Theme } from "@mui/material/styles";
 
 import GlobalLoader from "../../../components/global/GlobalLoader";
 import DocumentTitle from "../../../components/global/DocumentTitle";
@@ -31,10 +35,16 @@ import type {
     UserPreferences,
 } from "../../../types/types";
 
-const sectionCardSx = {
+const sectionCardSx = (theme: Theme): SxProps<Theme> => ({
     p: { xs: 2, md: 3 },
     borderRadius: 3,
-};
+    bgcolor: "background.paper",
+    border: `1px solid ${theme.palette.divider}`,
+    boxShadow:
+        theme.palette.mode === "dark"
+            ? "0 16px 40px rgba(0, 0, 0, 0.24)"
+            : "0 10px 30px rgba(23, 32, 51, 0.08)",
+});
 
 const AUTO_LANGUAGE_CODE = "auto";
 
@@ -102,37 +112,42 @@ const SettingsSection = ({
     description: string;
     children: React.ReactNode;
     chip?: string;
-}) => (
-    <Paper sx={sectionCardSx}>
-        <Stack spacing={2.5}>
-            <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={2}
-                alignItems={{ xs: "flex-start", sm: "center" }}
-                justifyContent="space-between"
-            >
-                <Box>
-                    <Typography variant="h6" fontWeight={700}>
-                        {title}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        {description}
-                    </Typography>
-                </Box>
+}) => {
+    const theme = useTheme();
 
-                {chip ? (
-                    <Chip label={chip} size="small" variant="outlined" />
-                ) : null}
+    return (
+        <Paper sx={sectionCardSx(theme)}>
+            <Stack spacing={2.5}>
+                <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={2}
+                    alignItems={{ xs: "flex-start", sm: "center" }}
+                    justifyContent="space-between"
+                >
+                    <Box>
+                        <Typography variant="h6" fontWeight={700}>
+                            {title}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            {description}
+                        </Typography>
+                    </Box>
+
+                    {chip ? (
+                        <Chip label={chip} size="small" variant="outlined" />
+                    ) : null}
+                </Stack>
+
+                <Divider />
+
+                {children}
             </Stack>
-
-            <Divider />
-
-            {children}
-        </Stack>
-    </Paper>
-);
+        </Paper>
+    );
+};
 
 const PreferencesPage = () => {
+    const theme = useTheme();
     const { preferences, loading, error, load, patch } = usePreferencesStore();
 
     const [toast, setToast] = useState<{
@@ -203,7 +218,9 @@ const PreferencesPage = () => {
     if (!preferences || !transcription || !ai) {
         return (
             <Box sx={{ maxWidth: 980, mx: "auto", pb: 4 }}>
-                <Alert severity="error">Unable to load preferences.</Alert>
+                <Alert severity="error" variant="outlined">
+                    Unable to load preferences.
+                </Alert>
             </Box>
         );
     }
@@ -802,7 +819,7 @@ const PreferencesPage = () => {
                         description="Document defaults will live here once document workflows are enabled."
                         chip="Planned"
                     >
-                        <Alert severity="info">
+                        <Alert severity="info" variant="outlined">
                             Reserve this section for document upload, sharing,
                             and archive defaults.
                         </Alert>
@@ -813,7 +830,7 @@ const PreferencesPage = () => {
                         description="Task-related defaults can be added here as task flows become available."
                         chip="Planned"
                     >
-                        <Alert severity="info">
+                        <Alert severity="info" variant="outlined">
                             Reserve this section for task list defaults,
                             assignment views, and completion preferences.
                         </Alert>
@@ -824,13 +841,17 @@ const PreferencesPage = () => {
                         description="Calendar display and scheduling defaults can be grouped here later."
                         chip="Planned"
                     >
-                        <Alert severity="info">
+                        <Alert severity="info" variant="outlined">
                             Reserve this section for calendar view defaults,
                             reminders, and event settings.
                         </Alert>
                     </SettingsSection>
 
-                    {error ? <Alert severity="error">{error}</Alert> : null}
+                    {error ? (
+                        <Alert severity="error" variant="outlined">
+                            {error}
+                        </Alert>
+                    ) : null}
                 </Stack>
 
                 <Snackbar
@@ -841,6 +862,11 @@ const PreferencesPage = () => {
                 >
                     <Alert
                         severity={toast.severity}
+                        variant={
+                            theme.palette.mode === "dark"
+                                ? "filled"
+                                : "outlined"
+                        }
                         onClose={() => setToast((t) => ({ ...t, open: false }))}
                     >
                         {toast.message}
