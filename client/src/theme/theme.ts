@@ -189,8 +189,8 @@ export const themeSettings = (mode: ColorMode): ThemeSettings => {
                           light: colors.grey[800],
                       },
                       background: {
-                          default: "#f6f8fb",
-                          paper: "#ffffff",
+                          default: "#eff3fa",
+                          paper: "#f8f7f7",
                       },
                       text: {
                           primary: "#172033",
