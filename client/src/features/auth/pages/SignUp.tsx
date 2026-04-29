@@ -1,22 +1,24 @@
 // src/features/auth/pages/SignUp.tsx
 
-import * as React from "react";
+import { FC, FormEvent, MouseEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Checkbox from "@mui/material/Checkbox";
-import Divider from "@mui/material/Divider";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import FormLabel from "@mui/material/FormLabel";
-import FormControl from "@mui/material/FormControl";
-import Link from "@mui/material/Link";
-import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
-import Stack from "@mui/material/Stack";
-import MuiCard from "@mui/material/Card";
-import Alert from "@mui/material/Alert";
-import CircularProgress from "@mui/material/CircularProgress";
-import Chip from "@mui/material/Chip";
+import {
+    Alert,
+    Box,
+    Button,
+    Card as MuiCard,
+    Checkbox,
+    Chip,
+    CircularProgress,
+    Divider,
+    FormControl,
+    FormControlLabel,
+    FormLabel,
+    Link,
+    Stack,
+    TextField,
+    Typography,
+} from "@mui/material";
 import { styled } from "@mui/material/styles";
 
 import { GoogleIcon } from "../../../components/CustomIcons";
@@ -28,50 +30,43 @@ const Card = styled(MuiCard)(({ theme }) => ({
     maxWidth: 560,
     borderRadius: 24,
     padding: theme.spacing(3),
+    backgroundColor: theme.palette.background.paper,
     border: `1px solid ${theme.palette.divider}`,
     boxShadow:
-        "hsla(220, 30%, 5%, 0.06) 0px 8px 22px 0px, hsla(220, 25%, 10%, 0.06) 0px 24px 44px -12px",
-    ...theme.applyStyles("dark", {
-        boxShadow:
-            "hsla(220, 30%, 5%, 0.45) 0px 8px 22px 0px, hsla(220, 25%, 10%, 0.16) 0px 24px 44px -12px",
-    }),
+        theme.palette.mode === "dark"
+            ? "0 18px 40px rgba(0, 0, 0, 0.28)"
+            : "0 14px 36px rgba(15, 23, 42, 0.1)",
 }));
 
 const isValidEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
 
 type Props = { disableCustomTheme?: boolean };
 
-const SignUp: React.FC<Props> = () => {
+const SignUp: FC<Props> = () => {
     const navigate = useNavigate();
 
     const user = useAuthStore((s) => s.user);
     const setUser = useAuthStore((s) => s.setUser);
 
-    const [firstName, setFirstName] = React.useState("");
-    const [lastName, setLastName] = React.useState("");
-    const [email, setEmail] = React.useState(user?.email ?? "");
-    const [password, setPassword] = React.useState("");
-    const [repeatPassword, setRepeatPassword] = React.useState("");
-    const [allowExtraEmails, setAllowExtraEmails] = React.useState(false);
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
+    const [email, setEmail] = useState(user?.email ?? "");
+    const [password, setPassword] = useState("");
+    const [repeatPassword, setRepeatPassword] = useState("");
+    const [allowExtraEmails, setAllowExtraEmails] = useState(false);
 
-    const [firstNameError, setFirstNameError] = React.useState<string | null>(
-        null,
-    );
-    const [lastNameError, setLastNameError] = React.useState<string | null>(
-        null,
-    );
-    const [emailError, setEmailError] = React.useState<string | null>(null);
-    const [passwordError, setPasswordError] = React.useState<string | null>(
-        null,
-    );
-    const [repeatPasswordError, setRepeatPasswordError] = React.useState<
+    const [firstNameError, setFirstNameError] = useState<string | null>(null);
+    const [lastNameError, setLastNameError] = useState<string | null>(null);
+    const [emailError, setEmailError] = useState<string | null>(null);
+    const [passwordError, setPasswordError] = useState<string | null>(null);
+    const [repeatPasswordError, setRepeatPasswordError] = useState<
         string | null
     >(null);
-    const [formError, setFormError] = React.useState<string | null>(null);
+    const [formError, setFormError] = useState<string | null>(null);
 
-    const [loading, setLoading] = React.useState(false);
+    const [loading, setLoading] = useState(false);
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (user) navigate("/dashboard", { replace: true });
     }, [user, navigate]);
 
@@ -113,7 +108,7 @@ const SignUp: React.FC<Props> = () => {
         return ok;
     };
 
-    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setFormError(null);
 
@@ -129,12 +124,6 @@ const SignUp: React.FC<Props> = () => {
                 repeatPassword,
             );
 
-            if (!res?.success) {
-                setFormError(res?.message || "Sign up failed.");
-                setLoading(false);
-                return;
-            }
-
             if (res.userData) {
                 setUser(res.userData);
                 navigate("/dashboard", { replace: true });
@@ -143,15 +132,12 @@ const SignUp: React.FC<Props> = () => {
 
             navigate("/", { replace: true });
         } catch (err: any) {
-            setFormError(
-                err?.response?.data?.message ||
-                    "Sign up failed. Please try again.",
-            );
+            setFormError(err.message || "Sign up failed. Please try again.");
             setLoading(false);
         }
     };
 
-    const goToSignIn = (e: React.MouseEvent) => {
+    const goToSignIn = (e: MouseEvent) => {
         e.preventDefault();
         navigate("/sign-in", { replace: true });
     };
@@ -184,7 +170,11 @@ const SignUp: React.FC<Props> = () => {
                     </Typography>
                 </Stack>
 
-                {formError && <Alert severity="error">{formError}</Alert>}
+                {formError && (
+                    <Alert severity="error" variant="outlined">
+                        {formError}
+                    </Alert>
+                )}
 
                 <Box
                     component="form"
