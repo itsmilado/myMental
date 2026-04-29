@@ -52,7 +52,25 @@ const createUsers = async (request, response, next) => {
             "repeat_password",
         ]);
 
-        const { password, user_role } = request.body;
+        const { password, user_role, email } = request.body;
+        const existingUser = await getUserByEmailQuery({ email });
+
+        if (existingUser) {
+            logger.warn(
+                `[usersRoutesHandler.createUsers] => validate signup email uniqueness: denied | ${JSON.stringify(
+                    {
+                        reason: "email_already_exists",
+                        email,
+                    },
+                )}`,
+            );
+
+            return response.status(409).json({
+                success: false,
+                message:
+                    "An account already exists with this email. Please sign in instead.",
+            });
+        }
         const hashed_password = await hashPassword(password);
         const newUser = await createUserQuery({
             ...request.body,
