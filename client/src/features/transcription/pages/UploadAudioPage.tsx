@@ -2948,7 +2948,7 @@ export const UploadAudioPage = () => {
                         flexDirection: "column",
                         height: {
                             xs: "auto",
-                            xl: "calc(100vh - 125px)",
+                            xl: "calc(100vh - 140px)",
                         },
                         minHeight: {
                             xs: 260,
