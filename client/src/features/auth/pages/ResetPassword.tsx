@@ -48,18 +48,14 @@ const ResetPassword: React.FC = () => {
         setLoading(true);
         try {
             const res = await resetPassword(token, password);
-            if (!res?.success) {
-                setError(res?.message || "Password reset failed.");
-                setLoading(false);
-                return;
-            }
+
             setSuccess(res.message || "Password updated. You can now sign in.");
             setLoading(false);
 
             // Redirect to sign-in shortly after success
             setTimeout(() => navigate("/sign-in", { replace: true }), 800);
         } catch (err: any) {
-            setError(err?.response?.data?.message || "Password reset failed.");
+            setError(err.message || "Password reset failed.");
             setLoading(false);
         }
     };
@@ -67,7 +63,6 @@ const ResetPassword: React.FC = () => {
     return (
         <Box
             sx={{
-                minHeight: "100dvh",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
