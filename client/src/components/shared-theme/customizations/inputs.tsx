@@ -1,6 +1,7 @@
 import * as React from "react";
 import { alpha, Theme, Components } from "@mui/material/styles";
 import { outlinedInputClasses } from "@mui/material/OutlinedInput";
+import { inputLabelClasses } from "@mui/material/InputLabel";
 import { svgIconClasses } from "@mui/material/SvgIcon";
 import { toggleButtonGroupClasses } from "@mui/material/ToggleButtonGroup";
 import { toggleButtonClasses } from "@mui/material/ToggleButton";
@@ -23,7 +24,7 @@ export const inputsCustomizations: Components<Theme> = {
                 "&:focus-visible": {
                     outline: `3px solid ${alpha(
                         theme.palette.primary.main,
-                        0.5
+                        0.5,
                     )}`,
                     outlineOffset: "2px",
                 },
@@ -100,11 +101,11 @@ export const inputsCustomizations: Components<Theme> = {
                             backgroundColor: brand[300],
                             backgroundImage: `linear-gradient(to bottom, ${alpha(
                                 brand[400],
-                                0.8
+                                0.8,
                             )}, ${brand[500]})`,
                             boxShadow: `inset 0 2px 0 ${alpha(
                                 brand[200],
-                                0.2
+                                0.2,
                             )}, inset 0 -2px 0 ${alpha(brand[700], 0.4)}`,
                             border: `1px solid ${brand[500]}`,
                             "&:hover": {
@@ -250,14 +251,14 @@ export const inputsCustomizations: Components<Theme> = {
                     backgroundColor: gray[200],
                 },
                 ...theme.applyStyles("dark", {
-                    backgroundColor: gray[800],
+                    backgroundColor: "transparent",
                     borderColor: gray[700],
                     "&:hover": {
-                        backgroundColor: gray[900],
+                        backgroundColor: theme.palette.action.hover,
                         borderColor: gray[600],
                     },
                     "&:active": {
-                        backgroundColor: gray[900],
+                        backgroundColor: theme.palette.action.selected,
                     },
                 }),
                 variants: [
@@ -392,25 +393,31 @@ export const inputsCustomizations: Components<Theme> = {
     MuiOutlinedInput: {
         styleOverrides: {
             input: {
-                padding: 0,
+                padding: "13px 12px",
             },
             root: ({ theme }) => ({
-                padding: "8px 12px",
+                padding: 0,
                 color: theme.palette.text.primary,
                 borderRadius: theme.shape.borderRadius,
-                border: `1px solid ${theme.palette.divider}`,
+                border: "none",
                 backgroundColor: theme.palette.background.default,
-                transition: "border 120ms ease-in",
+                transition: "box-shadow 120ms ease-in",
                 "&:hover": {
-                    borderColor: gray[400],
+                    [`& .${outlinedInputClasses.notchedOutline}`]: {
+                        borderColor: gray[400],
+                    },
                 },
                 [`&.${outlinedInputClasses.focused}`]: {
-                    outline: `3px solid ${alpha(brand[500], 0.5)}`,
-                    borderColor: brand[400],
+                    boxShadow: `0 0 0 3px ${alpha(brand[500], 0.5)}`,
+                    [`& .${outlinedInputClasses.notchedOutline}`]: {
+                        borderColor: brand[400],
+                    },
                 },
                 ...theme.applyStyles("dark", {
                     "&:hover": {
-                        borderColor: gray[500],
+                        [`& .${outlinedInputClasses.notchedOutline}`]: {
+                            borderColor: gray[500],
+                        },
                     },
                 }),
                 variants: [
@@ -419,7 +426,10 @@ export const inputsCustomizations: Components<Theme> = {
                             size: "small",
                         },
                         style: {
-                            height: "2.25rem",
+                            height: "2.5rem",
+                            [`& .${outlinedInputClasses.input}`]: {
+                                padding: "8px 12px",
+                            },
                         },
                     },
                     {
@@ -427,14 +437,42 @@ export const inputsCustomizations: Components<Theme> = {
                             size: "medium",
                         },
                         style: {
-                            height: "2.5rem",
+                            height: "3rem",
                         },
                     },
                 ],
             }),
-            notchedOutline: {
-                border: "none",
-            },
+            notchedOutline: ({ theme }) => ({
+                border: `1px solid ${theme.palette.divider}`,
+                transition: "border-color 120ms ease-in",
+            }),
+        },
+    },
+    MuiInputLabel: {
+        styleOverrides: {
+            root: ({ theme }) => ({
+                marginBottom: 0,
+                ...theme.typography.body1,
+                color: theme.palette.text.secondary,
+                zIndex: 1,
+                [`&.${inputLabelClasses.focused}`]: {
+                    color: brand[400],
+                },
+            }),
+            outlined: ({ theme }) => ({
+                transform: "translate(14px, 12px) scale(1)",
+                [`&.${inputLabelClasses.shrink}`]: {
+                    transform: "translate(14px, -9px) scale(0.75)",
+                    backgroundColor: theme.palette.background.default,
+                    paddingInline: 6,
+                    borderRadius: 4,
+                },
+                ...theme.applyStyles("dark", {
+                    [`&.${inputLabelClasses.shrink}`]: {
+                        backgroundColor: theme.palette.background.default,
+                    },
+                }),
+            }),
         },
     },
     MuiInputAdornment: {
