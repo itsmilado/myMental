@@ -77,10 +77,10 @@ const TopBar = () => {
     };
 
     /*
-    - purpose: route the top bar theme control through the centralized theme.ts toggle API
+    - purpose: route the top bar theme control through AppTheme and saved preferences
     - behavior:
       - preserves the existing icon button UX
-      - relies on preferences-backed global theme updates from useColorMode
+      - keeps optimistic MUI color-scheme switching even if persistence fails
     */
     const handleThemeToggle = (): void => {
         const resolvedMode = systemMode || mode || theme.palette.mode;
@@ -91,6 +91,8 @@ const TopBar = () => {
             appearance: {
                 theme: nextMode,
             },
+        }).catch((error) => {
+            console.error("Failed to save theme preference:", error);
         });
     };
 
