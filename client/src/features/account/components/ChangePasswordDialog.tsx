@@ -11,6 +11,11 @@ import {
     Stack,
 } from "@mui/material";
 import { useEffect, useState } from "react";
+import {
+    appDialogActionsSx,
+    appDialogContentSx,
+    appDialogPaperSx,
+} from "../../styles/surfaces";
 
 type ChangePasswordPayload = {
     currentPassword?: string;
@@ -92,12 +97,18 @@ const ChangePasswordDialog = ({
     };
 
     return (
-        <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs">
+        <Dialog
+            open={open}
+            onClose={handleClose}
+            fullWidth
+            maxWidth="xs"
+            PaperProps={{ sx: appDialogPaperSx }}
+        >
             <DialogTitle>
                 {requireCurrentPassword ? "Change password" : "Set password"}
             </DialogTitle>
 
-            <DialogContent>
+            <DialogContent sx={appDialogContentSx}>
                 <Stack spacing={2} sx={{ mt: 1 }}>
                     {error ? (
                         <Alert severity="error" variant="outlined">
@@ -141,7 +152,7 @@ const ChangePasswordDialog = ({
                 </Stack>
             </DialogContent>
 
-            <DialogActions>
+            <DialogActions sx={appDialogActionsSx}>
                 <Button onClick={handleClose} disabled={loading}>
                     Cancel
                 </Button>

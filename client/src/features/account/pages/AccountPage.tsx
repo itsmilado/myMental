@@ -31,6 +31,14 @@ import DeleteAccountConfirmDialog from "../components/DeleteAccountConfirmDialog
 import ChangePasswordDialog from "../components/ChangePasswordDialog";
 import ChangeEmailDialog from "../components/ChangeEmailDialog";
 import SetPasswordBeforeUnlinkDialog from "../components/SetPasswordBeforeUnlinkDialog";
+import {
+    appDialogActionsSx,
+    appDialogContentSx,
+    appDangerCardSx,
+    appDialogPaperSx,
+    appNestedCardSx,
+    appSectionCardSx,
+} from "../../styles/surfaces";
 
 import {
     changeMyPassword,
@@ -56,14 +64,6 @@ const isValidName = (value: string) => {
     const v = value.trim();
     if (v.length < 1 || v.length > 30) return false;
     return /^[A-Za-zÀ-ÖØ-öø-ÿ -]+$/.test(v);
-};
-
-const sectionCardSx = {
-    p: { xs: 2, md: 3 },
-    borderRadius: 3,
-    backgroundColor: "background.paper",
-    border: "1px solid",
-    borderColor: "divider",
 };
 
 type ReauthAction = "delete" | "email" | "link" | "unlink" | null;
@@ -641,7 +641,7 @@ const AccountPage = () => {
             openGoogleReauth(
                 "email",
                 "Confirm email change",
-                "Continue with Google to verify your identity before changing your email.",
+                "Continue with Google to verify your identity.",
                 "reauth_email",
             );
             return;
@@ -650,7 +650,7 @@ const AccountPage = () => {
         openPasswordReauth(
             "email",
             "Confirm email change",
-            "Enter your current password to continue with the email change.",
+            "Enter your current password to continue.",
         );
     };
 
@@ -668,7 +668,7 @@ const AccountPage = () => {
             openGoogleReauth(
                 "delete",
                 "Confirm account deletion",
-                "Continue with Google to verify your identity before deleting your account.",
+                "Continue with Google to verify your identity.",
                 "reauth_delete",
             );
             return;
@@ -677,7 +677,7 @@ const AccountPage = () => {
         openPasswordReauth(
             "delete",
             "Confirm account deletion",
-            "Enter your current password before deleting your account.",
+            "Enter your current password.",
         );
     };
 
@@ -702,7 +702,7 @@ const AccountPage = () => {
         openPasswordReauth(
             "link",
             "Confirm Google linking",
-            "Enter your password before linking Google sign-in to this account.",
+            "Enter your password.",
         );
     };
 
@@ -714,7 +714,7 @@ const AccountPage = () => {
             "Confirm Google removal",
             isGooglePrimaryAccount
                 ? "Continue with Google to verify your identity. After that, you'll set a password and remove Google sign-in."
-                : "Continue with Google to verify your identity before removing Google sign-in.",
+                : "Continue with Google to verify your identity.",
             "reauth_unlink",
         );
     };
@@ -772,7 +772,12 @@ const AccountPage = () => {
             <Box sx={{ maxWidth: 980, mx: "auto", pb: 4 }}>
                 <Stack spacing={3}>
                     <Box>
-                        <Typography variant="h4" fontWeight={700} gutterBottom>
+                        <Typography
+                            variant="h4"
+                            color="text.primary"
+                            fontWeight={700}
+                            gutterBottom
+                        >
                             Account
                         </Typography>
                         <Typography color="text.secondary">
@@ -781,7 +786,7 @@ const AccountPage = () => {
                         </Typography>
                     </Box>
 
-                    <Paper sx={sectionCardSx}>
+                    <Paper sx={appSectionCardSx}>
                         <Stack
                             direction={{ xs: "column", md: "row" }}
                             spacing={3}
@@ -870,7 +875,7 @@ const AccountPage = () => {
                     </Paper>
 
                     {!isEmailConfirmed || pendingEmail ? (
-                        <Paper sx={sectionCardSx}>
+                        <Paper sx={appSectionCardSx}>
                             <Stack spacing={2}>
                                 <Box>
                                     <Typography variant="h6" fontWeight={700}>
@@ -930,7 +935,7 @@ const AccountPage = () => {
                         </Paper>
                     ) : null}
 
-                    <Paper sx={sectionCardSx}>
+                    <Paper sx={appSectionCardSx}>
                         <Stack spacing={2.5}>
                             <Stack
                                 direction={{ xs: "column", sm: "row" }}
@@ -1060,7 +1065,7 @@ const AccountPage = () => {
                         </Stack>
                     </Paper>
 
-                    <Paper sx={sectionCardSx}>
+                    <Paper sx={appSectionCardSx}>
                         <Stack spacing={2.5}>
                             <Stack
                                 direction={{ xs: "column", sm: "row" }}
@@ -1131,7 +1136,7 @@ const AccountPage = () => {
                     </Paper>
 
                     <>
-                        <Paper sx={sectionCardSx}>
+                        <Paper sx={appSectionCardSx}>
                             <Stack spacing={2.5}>
                                 <Box>
                                     <Typography variant="h6" fontWeight={700}>
@@ -1184,7 +1189,7 @@ const AccountPage = () => {
                             </Stack>
                         </Paper>
 
-                        <Paper sx={sectionCardSx}>
+                        <Paper sx={appSectionCardSx}>
                             <Stack spacing={2.5}>
                                 <Box>
                                     <Typography variant="h6" fontWeight={700}>
@@ -1275,7 +1280,7 @@ const AccountPage = () => {
                             </Stack>
                         </Paper>
                     </>
-                    <Paper sx={sectionCardSx}>
+                    <Paper sx={appSectionCardSx}>
                         <Stack spacing={2.5}>
                             <Stack
                                 direction={{ xs: "column", sm: "row" }}
@@ -1332,17 +1337,7 @@ const AccountPage = () => {
                                         <Paper
                                             key={connection.id}
                                             variant="outlined"
-                                            sx={{
-                                                p: 2,
-                                                borderRadius: 2,
-                                                borderColor: "divider",
-                                                transition:
-                                                    "border-color 0.2s ease",
-                                                "&:hover": {
-                                                    borderColor:
-                                                        "text.secondary",
-                                                },
-                                            }}
+                                            sx={appNestedCardSx}
                                         >
                                             <Stack
                                                 spacing={2}
@@ -1483,12 +1478,7 @@ const AccountPage = () => {
                             )}
                         </Stack>
                     </Paper>
-                    <Paper
-                        sx={{
-                            ...sectionCardSx,
-                            borderColor: "error.main",
-                        }}
-                    >
+                    <Paper sx={appDangerCardSx}>
                         <Stack spacing={2.5}>
                             <Box>
                                 <Typography
@@ -1580,6 +1570,7 @@ const AccountPage = () => {
                     }}
                     fullWidth
                     maxWidth="sm"
+                    PaperProps={{ sx: appDialogPaperSx }}
                 >
                     <DialogTitle>
                         {connectionDialogMode === "create"
@@ -1589,11 +1580,7 @@ const AccountPage = () => {
                               : "Replace AssemblyAI key"}
                     </DialogTitle>
 
-                    <DialogContent
-                        sx={{
-                            color: "text.primary",
-                        }}
-                    >
+                    <DialogContent sx={appDialogContentSx}>
                         <Stack spacing={2} sx={{ pt: 1 }}>
                             {connectionDialogMode !== "replace_key" ? (
                                 <TextField
@@ -1658,7 +1645,7 @@ const AccountPage = () => {
                         </Stack>
                     </DialogContent>
 
-                    <DialogActions sx={{ px: 3, pb: 3 }}>
+                    <DialogActions sx={appDialogActionsSx}>
                         <Button
                             onClick={resetConnectionDialogState}
                             disabled={connectionsSaving}
@@ -1689,10 +1676,11 @@ const AccountPage = () => {
                     }}
                     fullWidth
                     maxWidth="xs"
+                    PaperProps={{ sx: appDialogPaperSx }}
                 >
                     <DialogTitle>Delete AssemblyAI connection</DialogTitle>
 
-                    <DialogContent>
+                    <DialogContent sx={appDialogContentSx}>
                         <Typography variant="body2" color="text.secondary">
                             Remove{" "}
                             <strong>
@@ -1704,7 +1692,7 @@ const AccountPage = () => {
                         </Typography>
                     </DialogContent>
 
-                    <DialogActions sx={{ px: 3, pb: 3 }}>
+                    <DialogActions sx={appDialogActionsSx}>
                         <Button
                             onClick={() => setConnectionDeleteTarget(null)}
                             disabled={connectionsSaving}

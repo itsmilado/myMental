@@ -15,6 +15,11 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import { reauthCurrentUser, startGoogleOAuth } from "../../auth/api";
 import type { GoogleReauthIntent } from "../../../types/types";
+import {
+    appDialogActionsSx,
+    appDialogContentSx,
+    appDialogPaperSx,
+} from "../../styles/surfaces";
 
 type Props = {
     open: boolean;
@@ -75,6 +80,7 @@ const ReauthDialog = ({
             onClose={submitting ? undefined : onClose}
             fullWidth
             maxWidth="xs"
+            slotProps={{ paper: { sx: appDialogPaperSx } }}
         >
             <DialogTitle sx={{ pr: 6 }}>
                 {title}
@@ -88,7 +94,7 @@ const ReauthDialog = ({
                 </IconButton>
             </DialogTitle>
 
-            <DialogContent dividers>
+            <DialogContent dividers sx={appDialogContentSx}>
                 <Stack spacing={2}>
                     <Alert severity="info" variant="outlined">
                         {description ||
@@ -96,6 +102,11 @@ const ReauthDialog = ({
                                 ? "Please continue with Google to verify your identity before this action."
                                 : "Please confirm your password to continue.")}
                     </Alert>
+                    {error ? (
+                        <Alert severity="error" variant="outlined">
+                            {error}
+                        </Alert>
+                    ) : null}
 
                     {mode === "password" ? (
                         <TextField
@@ -108,16 +119,10 @@ const ReauthDialog = ({
                             autoFocus
                         />
                     ) : null}
-
-                    {error ? (
-                        <Alert severity="error" variant="outlined">
-                            {error}
-                        </Alert>
-                    ) : null}
                 </Stack>
             </DialogContent>
 
-            <DialogActions>
+            <DialogActions sx={appDialogActionsSx}>
                 <Button onClick={onClose} disabled={submitting}>
                     Cancel
                 </Button>

@@ -11,6 +11,11 @@ import {
     TextField,
 } from "@mui/material";
 import { useEffect, useState } from "react";
+import {
+    appDialogActionsSx,
+    appDialogContentSx,
+    appDialogPaperSx,
+} from "../../styles/surfaces";
 
 type Props = {
     open: boolean;
@@ -61,10 +66,11 @@ const SetPasswordBeforeUnlinkDialog = ({
             onClose={loading ? undefined : onClose}
             fullWidth
             maxWidth="xs"
+            slotProps={{ paper: { sx: appDialogPaperSx } }}
         >
             <DialogTitle>Set password before removing Google</DialogTitle>
 
-            <DialogContent dividers>
+            <DialogContent dividers sx={appDialogContentSx}>
                 <Stack spacing={2}>
                     <Alert severity="info" variant="outlined">
                         To remove Google sign-in, first create a password for
@@ -100,7 +106,7 @@ const SetPasswordBeforeUnlinkDialog = ({
                 </Stack>
             </DialogContent>
 
-            <DialogActions>
+            <DialogActions sx={appDialogActionsSx}>
                 <Button onClick={onClose} disabled={loading}>
                     Cancel
                 </Button>

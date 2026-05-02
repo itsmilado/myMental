@@ -13,6 +13,11 @@ import {
     Alert,
 } from "@mui/material";
 import { requestEmailChange } from "../../auth/api";
+import {
+    appDialogActionsSx,
+    appDialogContentSx,
+    appDialogPaperSx,
+} from "../../styles/surfaces";
 
 const isValidEmail = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -79,10 +84,11 @@ const ChangeEmailDialog = ({ open, onClose, onInfo, currentEmail }: Props) => {
             onClose={loading ? undefined : onClose}
             fullWidth
             maxWidth="sm"
+            PaperProps={{ sx: appDialogPaperSx }}
         >
             <DialogTitle>Change email</DialogTitle>
 
-            <DialogContent>
+            <DialogContent sx={appDialogContentSx}>
                 <Stack spacing={2} sx={{ mt: 1 }}>
                     {!done ? (
                         <>
@@ -127,7 +133,7 @@ const ChangeEmailDialog = ({ open, onClose, onInfo, currentEmail }: Props) => {
                 </Stack>
             </DialogContent>
 
-            <DialogActions>
+            <DialogActions sx={appDialogActionsSx}>
                 <Button onClick={onClose} disabled={loading}>
                     {done ? "Close" : "Cancel"}
                 </Button>

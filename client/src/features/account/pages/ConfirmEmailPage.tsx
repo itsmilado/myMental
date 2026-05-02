@@ -11,8 +11,29 @@ import {
     Alert,
     Stack,
 } from "@mui/material";
+import { styled } from "@mui/material/styles";
 import { confirmEmail } from "../../auth/api";
 import { useAuthStore } from "../../../store/useAuthStore";
+import DocumentTitle from "../../../components/global/DocumentTitle";
+import { appSectionCardSx } from "../../styles/surfaces";
+
+const PageRoot = styled(Box)(({ theme }) => ({
+    minHeight: "100dvh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f4f6fb",
+    backgroundImage:
+        "radial-gradient(ellipse at 35% 10%, rgba(99, 102, 241, 0.05), transparent 55%), radial-gradient(ellipse at 80% 0%, rgba(2, 132, 199, 0.04), transparent 45%)",
+    backgroundRepeat: "no-repeat",
+    color: theme.palette.text.primary,
+    padding: theme.spacing(6, 2),
+    ...theme.applyStyles("dark", {
+        backgroundColor: "#0b1120",
+        backgroundImage:
+            "radial-gradient(ellipse at 35% 10%, rgba(99, 102, 241, 0.16), transparent 55%), radial-gradient(ellipse at 80% 0%, rgba(2, 132, 199, 0.10), transparent 45%)",
+    }),
+}));
 
 const ConfirmEmailPage = () => {
     const [params] = useSearchParams();
@@ -63,29 +84,16 @@ const ConfirmEmailPage = () => {
     }, [token, setUser]);
 
     return (
-        <Box
-            sx={{
-                minHeight: "100vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: "background.default",
-                color: "text.primary",
-                px: 2,
-                py: 6,
-            }}
-        >
+        <PageRoot>
+            <DocumentTitle title="Confirm email" />
             <Paper
                 elevation={0}
-                sx={{
+                sx={(theme) => ({
+                    ...appSectionCardSx(theme),
                     width: "100%",
                     maxWidth: 460,
                     p: { xs: 2.5, sm: 3 },
-                    borderRadius: 4,
-                    backgroundColor: "background.paper",
-                    border: "1px solid",
-                    borderColor: "divider",
-                }}
+                })}
             >
                 <Stack spacing={2}>
                     <Typography variant="h5" fontWeight="bold">
@@ -114,35 +122,13 @@ const ConfirmEmailPage = () => {
                     ) : null}
 
                     {!loading && success ? (
-                        <Alert
-                            severity="success"
-                            variant="outlined"
-                            sx={{
-                                backgroundColor: "transparent",
-                                borderColor: "success.main",
-                                color: "text.primary",
-                                "& .MuiAlert-icon": {
-                                    color: "success.main",
-                                },
-                            }}
-                        >
+                        <Alert severity="success" variant="outlined">
                             Your email has been confirmed successfully.
                         </Alert>
                     ) : null}
 
                     {!loading && !success && error ? (
-                        <Alert
-                            severity="error"
-                            variant="outlined"
-                            sx={{
-                                backgroundColor: "transparent",
-                                borderColor: "error.main",
-                                color: "text.primary",
-                                "& .MuiAlert-icon": {
-                                    color: "error.main",
-                                },
-                            }}
-                        >
+                        <Alert severity="error" variant="outlined">
                             {error}
                         </Alert>
                     ) : null}
@@ -167,7 +153,7 @@ const ConfirmEmailPage = () => {
                     </Stack>
                 </Stack>
             </Paper>
-        </Box>
+        </PageRoot>
     );
 };
 

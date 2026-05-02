@@ -11,6 +11,11 @@ import {
     IconButton,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import {
+    appDialogActionsSx,
+    appDialogContentSx,
+    appDialogPaperSx,
+} from "../../styles/surfaces";
 
 type Props = {
     open: boolean;
@@ -35,7 +40,13 @@ const DeleteAccountConfirmDialog = ({
     const canConfirm = value.trim().toUpperCase() === "DELETE";
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+        <Dialog
+            open={open}
+            onClose={onClose}
+            fullWidth
+            maxWidth="xs"
+            PaperProps={{ sx: appDialogPaperSx }}
+        >
             <DialogTitle sx={{ pr: 6 }}>
                 Delete account
                 <IconButton
@@ -47,7 +58,7 @@ const DeleteAccountConfirmDialog = ({
                 </IconButton>
             </DialogTitle>
 
-            <DialogContent dividers>
+            <DialogContent dividers sx={appDialogContentSx}>
                 <Stack spacing={2}>
                     <Alert severity="warning" variant="outlined">
                         This permanently deletes your account and all associated
@@ -65,7 +76,7 @@ const DeleteAccountConfirmDialog = ({
                 </Stack>
             </DialogContent>
 
-            <DialogActions>
+            <DialogActions sx={appDialogActionsSx}>
                 <Button onClick={onClose} disabled={loading}>
                     Cancel
                 </Button>
