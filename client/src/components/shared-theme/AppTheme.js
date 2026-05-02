@@ -1,6 +1,6 @@
 import * as React from 'react';
 import PropTypes from 'prop-types';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { ThemeProvider, createTheme, useColorScheme } from '@mui/material/styles';
 
 import { inputsCustomizations } from './customizations/inputs';
 import { dataDisplayCustomizations } from './customizations/dataDisplay';
@@ -8,6 +8,28 @@ import { feedbackCustomizations } from './customizations/feedback';
 import { navigationCustomizations } from './customizations/navigation';
 import { surfacesCustomizations } from './customizations/surfaces';
 import { colorSchemes, typography, shadows, shape } from './themePrimitives';
+import { usePreferencesStore } from '../../store/usePreferencesStore';
+
+function ThemePreferenceSync() {
+  const preference = usePreferencesStore((state) => state.preferences?.appearance?.theme);
+  const { setMode } = useColorScheme();
+  const lastAppliedPreference = React.useRef(undefined);
+
+  React.useEffect(() => {
+    if (!preference) {
+      return;
+    }
+
+    if (lastAppliedPreference.current === preference) {
+      return;
+    }
+
+    lastAppliedPreference.current = preference;
+    setMode(preference);
+  }, [preference, setMode]);
+
+  return null;
+}
 
 function AppTheme(props) {
   const { children, disableCustomTheme, themeComponents } = props;
@@ -39,6 +61,7 @@ function AppTheme(props) {
   }
   return (
     <ThemeProvider theme={theme} disableTransitionOnChange>
+      <ThemePreferenceSync />
       {children}
     </ThemeProvider>
   );

@@ -3,30 +3,21 @@ import React from "react";
 import "./App.css";
 import { Box, CssBaseline } from "@mui/material";
 import AppRoutes from "./routes/AppRoutes";
-import { ThemeProvider } from "@mui/material";
-import { useMode, ColorModeContext } from "./theme/theme";
+import AppTheme from "./components/shared-theme/AppTheme";
 import { useAuthStore } from "./store/useAuthStore";
 import { usePreferencesStore } from "./store/usePreferencesStore";
 import { fetchCurrentUser } from "./features/auth/api";
 import GlobalLoader from "./components/global/GlobalLoader";
 
 function App() {
-    const [theme, colorMode] = useMode();
     const setUser = useAuthStore((state) => state.setUser);
     const clearUser = useAuthStore((state) => state.clearUser);
+    const user = useAuthStore((state) => state.user);
     const loadPreferences = usePreferencesStore((state) => state.load);
+    const resetPreferences = usePreferencesStore((state) => state.reset);
     const preferencesLoading = usePreferencesStore((state) => state.loading);
     const [checkingAuth, setCheckingAuth] = React.useState(true);
-
-    /*
-    - purpose: start preferences hydration as early as possible in the active app provider path
-    - behavior:
-      - keeps theme preference loading near the root app shell
-      - reduces visible theme mismatch before route content renders
-    */
-    React.useEffect(() => {
-        void loadPreferences();
-    }, [loadPreferences]);
+    const userId = user?.id ?? null;
 
     /*
     - purpose: restore authenticated user state on initial app load
@@ -49,12 +40,14 @@ function App() {
                     setUser(res.userData);
                 } else {
                     clearUser();
+                    resetPreferences();
                 }
             } catch (error) {
                 console.error("Error fetching current user:", error);
 
                 if (isMounted) {
                     clearUser();
+                    resetPreferences();
                 }
             } finally {
                 if (isMounted) {
@@ -66,28 +59,41 @@ function App() {
         return () => {
             isMounted = false;
         };
-    }, [setUser, clearUser]);
+    }, [setUser, clearUser, resetPreferences]);
+
+    /*
+    - purpose: hydrate preferences only after an authenticated user is known
+    - behavior:
+      - avoids marking preferences loaded from an unauthenticated request
+      - reloads preferences after login when auth state changes
+    */
+    React.useEffect(() => {
+        if (!userId) {
+            resetPreferences();
+            return;
+        }
+
+        void loadPreferences();
+    }, [userId, loadPreferences, resetPreferences]);
 
     const showAppLoader = checkingAuth || preferencesLoading;
 
     return (
-        <ColorModeContext.Provider value={colorMode}>
-            <ThemeProvider theme={theme}>
-                <CssBaseline enableColorScheme />
-                <Box display="flex">
-                    <Box flexGrow={1} p={0}>
-                        {showAppLoader ? (
-                            <GlobalLoader
-                                label="Loading your workspace..."
-                                minHeight="100vh"
-                            />
-                        ) : (
-                            <AppRoutes />
-                        )}
-                    </Box>
+        <AppTheme>
+            <CssBaseline enableColorScheme />
+            <Box display="flex">
+                <Box flexGrow={1} p={0}>
+                    {showAppLoader ? (
+                        <GlobalLoader
+                            label="Loading your workspace..."
+                            minHeight="100vh"
+                        />
+                    ) : (
+                        <AppRoutes />
+                    )}
                 </Box>
-            </ThemeProvider>
-        </ColorModeContext.Provider>
+            </Box>
+        </AppTheme>
     );
 }
 

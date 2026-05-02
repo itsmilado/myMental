@@ -15,6 +15,7 @@ type PreferencesState = {
 
     load: () => Promise<void>;
     patch: (patch: DeepPartial<UserPreferences>) => Promise<void>;
+    reset: () => void;
 };
 
 let preferencesLoadPromise: Promise<void> | null = null;
@@ -24,6 +25,16 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
     loading: false,
     loaded: false,
     error: null,
+
+    reset: () => {
+        preferencesLoadPromise = null;
+        set({
+            preferences: null,
+            loading: false,
+            loaded: false,
+            error: null,
+        });
+    },
 
     /*
     - purpose: hydrate preferences once and dedupe concurrent boot-time loads
