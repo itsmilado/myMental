@@ -20,11 +20,9 @@ import {
     useTheme,
 } from "@mui/material";
 
-// import { useTheme } from "@mui/material/styles";
-import type { SxProps, Theme } from "@mui/material/styles";
-
 import GlobalLoader from "../../../components/global/GlobalLoader";
 import DocumentTitle from "../../../components/global/DocumentTitle";
+import { appSectionCardSx } from "../../styles/surfaces";
 
 import { usePreferencesStore } from "../../../store/usePreferencesStore";
 import type {
@@ -34,17 +32,6 @@ import type {
     ThemePreference,
     UserPreferences,
 } from "../../../types/types";
-
-const sectionCardSx = (theme: Theme): SxProps<Theme> => ({
-    p: { xs: 2, md: 3 },
-    borderRadius: 3,
-    bgcolor: "background.paper",
-    border: `1px solid ${theme.palette.divider}`,
-    boxShadow:
-        theme.palette.mode === "dark"
-            ? "0 16px 40px rgba(0, 0, 0, 0.24)"
-            : "0 10px 30px rgba(23, 32, 51, 0.08)",
-});
 
 const AUTO_LANGUAGE_CODE = "auto";
 
@@ -113,10 +100,8 @@ const SettingsSection = ({
     children: React.ReactNode;
     chip?: string;
 }) => {
-    const theme = useTheme();
-
     return (
-        <Paper sx={sectionCardSx(theme)}>
+        <Paper sx={appSectionCardSx}>
             <Stack spacing={2.5}>
                 <Stack
                     direction={{ xs: "column", sm: "row" }}
@@ -232,7 +217,12 @@ const PreferencesPage = () => {
             <Box sx={{ maxWidth: 980, mx: "auto", pb: 4 }}>
                 <Stack spacing={3}>
                     <Box>
-                        <Typography variant="h4" fontWeight={700} gutterBottom>
+                        <Typography
+                            variant="h4"
+                            color="text.primary"
+                            fontWeight={700}
+                            gutterBottom
+                        >
                             Preferences
                         </Typography>
                         <Typography color="text.secondary">
