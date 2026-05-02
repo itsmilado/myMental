@@ -18,6 +18,7 @@ import GlobalLoader from "../../../components/global/GlobalLoader";
 import DocumentTitle from "../../../components/global/DocumentTitle";
 import { fetchCurrentUser } from "../api";
 import { useAuthStore } from "../../../store/useAuthStore";
+import { appSectionCardSx } from "../../styles/surfaces";
 
 type OAuthUiState =
     | { status: "loading" }
@@ -29,23 +30,12 @@ type OAuthUiState =
           showAccountAction?: boolean;
       };
 
-const cardSx: SxProps<Theme> = {
+const cardSx: SxProps<Theme> = (theme) => ({
+    ...appSectionCardSx(theme),
     width: "100%",
     maxWidth: 560,
-    borderRadius: 6,
-    backgroundColor: (theme) =>
-        theme.palette.mode === "dark"
-            ? theme.palette.background.paper
-            : "#fbfbfd",
-    borderColor: (theme) =>
-        theme.palette.mode === "dark"
-            ? theme.palette.divider
-            : "rgba(15, 23, 42, 0.08)",
-    boxShadow: (theme) =>
-        theme.palette.mode === "dark"
-            ? "0 10px 30px rgba(0, 0, 0, 0.28)"
-            : "0 8px 30px rgba(15, 23, 42, 0.06)",
-};
+    p: 0,
+});
 
 const buildPostOAuthRedirect = (
     params: URLSearchParams,
@@ -245,7 +235,7 @@ const OAuthCallback = () => {
                                 Sign-in successful
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                Redirecting you to the right place…
+                                Redirecting you to Dashboard…
                             </Typography>
                         </Stack>
                     </CardContent>
@@ -280,7 +270,9 @@ const OAuthCallback = () => {
                             </div>
                         </Stack>
 
-                        <Alert severity="error">{uiState.message}</Alert>
+                        <Alert severity="error" variant="outlined">
+                            {uiState.message}
+                        </Alert>
 
                         <Stack
                             direction={{ xs: "column", sm: "row" }}

@@ -12,6 +12,11 @@ import {
     Stack,
 } from "@mui/material";
 import { requestPasswordReset } from "../api";
+import {
+    appDialogActionsSx,
+    appDialogContentSx,
+    appDialogPaperSx,
+} from "../../styles/surfaces";
 
 type Props = {
     open: boolean;
@@ -52,24 +57,40 @@ const ForgotPassword: React.FC<Props> = ({ open, handleClose }) => {
                 res?.message || "If an account exists, a reset link was sent.",
             );
         } catch (e: any) {
-            setError(
-                e?.response?.data?.message ||
-                    "Failed to request password reset.",
-            );
+            setError(e.message || "Failed to request password reset.");
         } finally {
             setSubmitting(false);
         }
     };
 
     return (
-        <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs">
+        <Dialog
+            open={open}
+            onClose={handleClose}
+            fullWidth
+            maxWidth="xs"
+            PaperProps={{
+                sx: appDialogPaperSx,
+            }}
+        >
             <DialogTitle>Reset password</DialogTitle>
-            <DialogContent dividers>
+            <DialogContent dividers sx={appDialogContentSx}>
                 <Stack spacing={2}>
-                    <Alert severity="info">
-                        Enter your email and we’ll send a password reset link if
+                    <Alert severity="info" variant="outlined">
+                        Enter your email and we'll send a password reset link if
                         an account exists.
                     </Alert>
+
+                    {successMessage && (
+                        <Alert severity="success" variant="outlined">
+                            {successMessage}
+                        </Alert>
+                    )}
+                    {error && (
+                        <Alert severity="error" variant="outlined">
+                            {error}
+                        </Alert>
+                    )}
 
                     <TextField
                         label="Email"
@@ -80,15 +101,10 @@ const ForgotPassword: React.FC<Props> = ({ open, handleClose }) => {
                         fullWidth
                         autoFocus
                     />
-
-                    {successMessage && (
-                        <Alert severity="success">{successMessage}</Alert>
-                    )}
-                    {error && <Alert severity="error">{error}</Alert>}
                 </Stack>
             </DialogContent>
 
-            <DialogActions>
+            <DialogActions sx={appDialogActionsSx}>
                 <Button onClick={handleClose} disabled={submitting}>
                     Close
                 </Button>
