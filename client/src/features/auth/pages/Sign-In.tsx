@@ -6,7 +6,7 @@ import {
     Alert,
     Box,
     Button,
-    Card as MuiCard,
+    Card,
     Checkbox,
     Chip,
     CircularProgress,
@@ -19,25 +19,12 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import { styled } from "@mui/material/styles";
 
 import ForgotPassword from "./ForgotPassword";
 import { GoogleIcon } from "../../../components/CustomIcons";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { loginUser, startGoogleOAuth } from "../api";
-
-const Card = styled(MuiCard)(({ theme }) => ({
-    width: "100%",
-    maxWidth: 480,
-    borderRadius: 24,
-    padding: theme.spacing(3),
-    backgroundColor: theme.palette.background.paper,
-    border: `1px solid ${theme.palette.divider}`,
-    boxShadow:
-        theme.palette.mode === "dark"
-            ? "0 18px 40px rgba(0, 0, 0, 0.28)"
-            : "0 14px 36px rgba(15, 23, 42, 0.1)",
-}));
+import { appSectionCardSx } from "../../styles/surfaces";
 
 const isValidEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
 
@@ -107,7 +94,14 @@ export default function SignIn() {
     };
 
     return (
-        <Card variant="outlined">
+        <Card
+            variant="outlined"
+            sx={(theme) => ({
+                ...appSectionCardSx(theme),
+                width: "100%",
+                maxWidth: 480,
+            })}
+        >
             <Stack spacing={2.5}>
                 <Stack spacing={1}>
                     <Chip

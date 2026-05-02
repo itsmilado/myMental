@@ -13,6 +13,7 @@ import {
     Stack,
 } from "@mui/material";
 import { resetPassword } from "../api";
+import { appSectionCardSx } from "../../styles/surfaces";
 
 const ResetPassword: React.FC = () => {
     const navigate = useNavigate();
@@ -70,12 +71,12 @@ const ResetPassword: React.FC = () => {
             }}
         >
             <Card
-                sx={{
+                sx={(theme) => ({
+                    ...appSectionCardSx(theme),
                     width: "100%",
                     maxWidth: 520,
                     p: { xs: 2, sm: 4 },
-                    borderRadius: 3,
-                }}
+                })}
             >
                 <Stack spacing={2}>
                     <Box>
@@ -90,8 +91,16 @@ const ResetPassword: React.FC = () => {
                         </Typography>
                     </Box>
 
-                    {error && <Alert severity="error">{error}</Alert>}
-                    {success && <Alert severity="success">{success}</Alert>}
+                    {error && (
+                        <Alert severity="error" variant="outlined">
+                            {error}
+                        </Alert>
+                    )}
+                    {success && (
+                        <Alert severity="success" variant="outlined">
+                            {success}
+                        </Alert>
+                    )}
 
                     <Box
                         component="form"
