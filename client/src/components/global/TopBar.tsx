@@ -1,6 +1,6 @@
 //src/components/global/TopBar.tsx
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     AppBar,
@@ -12,27 +12,61 @@ import {
     Typography,
     Menu,
     MenuItem,
+    useScrollTrigger,
 } from "@mui/material";
 import { LightMode, DarkMode } from "@mui/icons-material";
-import { useTheme } from "@mui/material/styles";
-import { useColorMode } from "../../theme/theme";
+import { useColorScheme, useTheme, styled } from "@mui/material/styles";
 import { logoutUser } from "../../features/auth/api";
 import { useAuthStore } from "../../store/useAuthStore";
+import { usePreferencesStore } from "../../store/usePreferencesStore";
+
+const FrostedTopBar = styled(AppBar)(({ theme }) => ({
+    top: 0,
+    zIndex: 1300,
+    backgroundColor: "transparent",
+    backgroundImage: "none",
+    boxShadow: "none",
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    color: theme.palette.text.primary,
+    transition: "background-color 200ms ease, border-color 200ms ease",
+    "&.scrolled": {
+        backgroundColor: "transparent",
+        backdropFilter: "blur(10px)",
+        borderBottom: `1px solid ${theme.palette.divider}`,
+    },
+    ...theme.applyStyles("dark", {
+        backgroundColor: "transparent",
+        backgroundImage: "none",
+        "&.scrolled": {
+            backgroundColor: "rgba(11, 17, 32, 0.72)",
+            backdropFilter: "blur(10px)",
+            borderBottom: `1px solid ${theme.palette.divider}`,
+        },
+    }),
+}));
 
 const TopBar = () => {
     const theme = useTheme();
 
-    const topBarBackground = theme.palette.background.paper;
-    const topBarBorder = theme.palette.divider;
-    const topBarText = theme.palette.text.primary;
-    const avatarBackground = theme.palette.secondary.main;
-    const avatarText = theme.palette.secondary.contrastText;
     const navigate = useNavigate();
-    const { toggleColorMode } = useColorMode();
+    const { mode, systemMode, setMode } = useColorScheme();
+    const appBarRef = useRef<HTMLDivElement | null>(null);
+    const [scrollTarget, setScrollTarget] = useState<HTMLElement | undefined>();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const open: boolean = Boolean(anchorEl);
 
     const user = useAuthStore((state) => state.user);
+    const patchPreferences = usePreferencesStore((state) => state.patch);
+
+    useEffect(() => {
+        setScrollTarget(appBarRef.current?.parentElement ?? undefined);
+    }, []);
+
+    const trigger = useScrollTrigger({
+        disableHysteresis: true,
+        threshold: 12,
+        target: scrollTarget,
+    });
 
     const handleMenuOpen = (event: React.MouseEvent<HTMLElement>): void => {
         setAnchorEl(event.currentTarget);
@@ -49,7 +83,15 @@ const TopBar = () => {
       - relies on preferences-backed global theme updates from useColorMode
     */
     const handleThemeToggle = (): void => {
-        toggleColorMode();
+        const resolvedMode = systemMode || mode || theme.palette.mode;
+        const nextMode = resolvedMode === "dark" ? "light" : "dark";
+
+        setMode(nextMode);
+        void patchPreferences({
+            appearance: {
+                theme: nextMode,
+            },
+        });
     };
 
     const handleLogout = async () => {
@@ -64,22 +106,14 @@ const TopBar = () => {
     };
 
     return (
-        <AppBar
+        <FrostedTopBar
+            ref={appBarRef}
             position="sticky"
+            className={trigger ? "scrolled" : ""}
             elevation={0}
-            sx={{
-                backgroundColor: topBarBackground,
-                borderBottom: `1px solid ${topBarBorder}`,
-                top: 0,
-                zIndex: 1300,
-            }}
         >
             <Toolbar sx={{ justifyContent: "space-between" }}>
-                <Typography
-                    variant="h6"
-                    fontWeight="bold"
-                    sx={{ color: topBarText }}
-                >
+                <Typography variant="h6" fontWeight="bold" color="text.primary">
                     {user?.first_name
                         ? `Welcome, ${user.first_name}!`
                         : "Welcome!"}
@@ -90,13 +124,15 @@ const TopBar = () => {
                         onClick={handleThemeToggle}
                         aria-label="Toggle theme"
                         sx={{
-                            color: topBarText,
+                            bgcolor: "none",
+                            border: "none",
                             "&:hover": {
-                                backgroundColor: theme.palette.action.hover,
+                                bgcolor: "action.hover",
                             },
                         }}
                     >
-                        {theme.palette.mode === "dark" ? (
+                        {(systemMode || mode || theme.palette.mode) ===
+                        "dark" ? (
                             <LightMode />
                         ) : (
                             <DarkMode />
@@ -106,8 +142,7 @@ const TopBar = () => {
                     <Tooltip title={user?.email ?? "User"}>
                         <Avatar
                             sx={{
-                                bgcolor: avatarBackground,
-                                color: avatarText,
+                                color: "primary.contrastText",
                                 cursor: "pointer",
                             }}
                             onClick={handleMenuOpen}
@@ -153,7 +188,7 @@ const TopBar = () => {
                     </Menu>
                 </Box>
             </Toolbar>
-        </AppBar>
+        </FrostedTopBar>
     );
 };
 

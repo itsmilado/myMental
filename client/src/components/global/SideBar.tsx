@@ -37,25 +37,40 @@ import {
     ChevronLeft,
     ChevronRight,
 } from "@mui/icons-material";
-import { tokens } from "../../theme/theme";
 import { useLocation, useNavigate } from "react-router-dom";
+import { alpha, styled } from "@mui/material/styles";
 import { SidebarItemProps } from "../../types/types";
+
+const StyledSideBar = styled(Box, {
+    shouldForwardProp: (prop) => prop !== "isCollapsed",
+})<{ isCollapsed: boolean }>(({ theme, isCollapsed }) => ({
+    width: isCollapsed ? "80px" : "260px",
+    display: "flex",
+    position: "sticky",
+    top: 64,
+    flexDirection: "column",
+    borderRight: `1px solid ${theme.palette.divider}`,
+    background: "transparent",
+    backdropFilter: "blur(12px)",
+    boxShadow: "hsla(220, 30%, 5%, 0.06) 0px 10px 30px -18px",
+    padding: theme.spacing(3, 2),
+    height: "calc(100vh - 64px)",
+    overflowY: "auto",
+    overflowX: "hidden",
+    zIndex: 1200,
+    transition:
+        "width 180ms ease, background-color 200ms ease, border-color 200ms ease",
+    ...theme.applyStyles("dark", {
+        background: "transparent",
+        boxShadow: "hsla(220, 30%, 2%, 0.46) 0px 10px 30px -18px",
+    }),
+}));
 
 const Sidebar = () => {
     const theme = useTheme();
-    const colors = tokens(theme.palette.mode as "light" | "dark");
     const navigate = useNavigate();
     const location = useLocation();
     const [isCollapsed, setIsCollapsed] = useState(false);
-
-    const sidebarBackground = theme.palette.background.paper;
-    const sidebarBorder = theme.palette.divider;
-    const dividerColor = theme.palette.divider;
-    const collapseButtonColor = theme.palette.text.primary;
-    const collapseButtonBorderColor = theme.palette.divider;
-    const collapseButtonHoverBackground = theme.palette.action.hover;
-    const profileAvatarText = theme.palette.secondary.contrastText;
-    const profileTextColor = theme.palette.text.primary;
 
     const menuItems: SidebarItemProps[] = [
         {
@@ -178,23 +193,7 @@ const Sidebar = () => {
     ];
 
     return (
-        <Box
-            width={isCollapsed ? "80px" : "260px"}
-            display="flex"
-            position="sticky"
-            top={64}
-            flexDirection="column"
-            bgcolor={sidebarBackground}
-            sx={{
-                borderRight: `1px solid ${sidebarBorder}`,
-                px: 2,
-                py: 3,
-                height: "calc(100vh - 64px)",
-                overflowY: "auto",
-                overflowX: "hidden",
-                zIndex: 1200,
-            }}
-        >
+        <StyledSideBar isCollapsed={isCollapsed}>
             <Box
                 display="flex"
                 alignItems="center"
@@ -210,11 +209,13 @@ const Sidebar = () => {
                         size="small"
                         sx={{
                             borderRadius: "999px",
-                            border: `1px solid ${collapseButtonBorderColor}`,
-                            color: collapseButtonColor,
-                            backgroundColor: "transparent",
+                            border: `1px solid ${theme.palette.divider}`,
+                            backgroundColor: alpha(
+                                theme.palette.background.paper,
+                                theme.palette.mode === "dark" ? 0.36 : 0.64,
+                            ),
                             "&:hover": {
-                                backgroundColor: collapseButtonHoverBackground,
+                                backgroundColor: theme.palette.action.hover,
                             },
                         }}
                     >
@@ -235,17 +236,13 @@ const Sidebar = () => {
                             width: 64,
                             height: 64,
                             mb: 1,
-                            bgcolor: colors.greenAccent[500],
-                            color: profileAvatarText,
                         }}
                     />
-                    <Typography variant="h5" color={profileTextColor}>
-                        User Name
-                    </Typography>
+                    <Typography variant="h5">User Name</Typography>
                 </Box>
             )}
 
-            <Divider sx={{ mb: 2, bgcolor: dividerColor }} />
+            <Divider sx={{ mb: 2, bgcolor: `${theme.palette.divider}` }} />
 
             <List disablePadding>
                 {menuItems.map((item) => (
@@ -258,7 +255,7 @@ const Sidebar = () => {
                     />
                 ))}
             </List>
-        </Box>
+        </StyledSideBar>
     );
 };
 
@@ -281,14 +278,16 @@ const SidebarItemComponent = ({
         (!!item.subMenu &&
             item.subMenu.some((s) => location.pathname.startsWith(s.path)));
 
-    const activeItemBackground = theme.palette.action.selected;
-    const hoverItemBackground = theme.palette.action.hover;
-
-    const itemTextColor = theme.palette.text.primary;
-    const itemMutedTextColor = theme.palette.text.secondary;
-
-    const itemIconColor = theme.palette.text.primary;
-    const itemActiveIconColor = theme.palette.secondary.main;
+    const activeItemBackground =
+        theme.palette.mode === "dark"
+            ? alpha(theme.palette.primary.main, 0.18)
+            : alpha(theme.palette.primary.main, 0.1);
+    const hoverItemBackground =
+        theme.palette.mode === "dark"
+            ? alpha(theme.palette.primary.main, 0.12)
+            : alpha(theme.palette.primary.main, 0.08);
+    const itemIconColor = theme.palette.text.secondary;
+    const itemActiveIconColor = theme.palette.primary.main;
 
     useEffect(() => {
         if (!item.subMenu) return;
@@ -313,6 +312,7 @@ const SidebarItemComponent = ({
                 sx={{
                     my: 0.5,
                     borderRadius: "8px",
+                    color: isActive ? "text.primary" : "text.secondary",
                     backgroundColor: isActive
                         ? activeItemBackground
                         : "transparent",
@@ -333,10 +333,7 @@ const SidebarItemComponent = ({
                 {!isCollapsed && (
                     <ListItemText
                         primary={
-                            <Typography
-                                color={itemTextColor}
-                                fontWeight={isActive ? 700 : 500}
-                            >
+                            <Typography fontWeight={isActive ? 700 : 500}>
                                 {item.text}
                             </Typography>
                         }
@@ -345,9 +342,9 @@ const SidebarItemComponent = ({
 
                 {item.subMenu && !isCollapsed ? (
                     expandSubMenu ? (
-                        <ExpandLess sx={{ color: itemMutedTextColor }} />
+                        <ExpandLess />
                     ) : (
-                        <ExpandMore sx={{ color: itemMutedTextColor }} />
+                        <ExpandMore />
                     )
                 ) : null}
             </ListItemButton>
@@ -375,6 +372,9 @@ const SidebarItemComponent = ({
                                             ? "center"
                                             : "flex-start",
                                         borderRadius: "8px",
+                                        color: isSubActive
+                                            ? "text.primary"
+                                            : "text.secondary",
                                         backgroundColor: isSubActive
                                             ? activeItemBackground
                                             : "transparent",
@@ -387,9 +387,6 @@ const SidebarItemComponent = ({
                                     {subItem.icon ? (
                                         <ListItemIcon
                                             sx={{
-                                                color: isSubActive
-                                                    ? itemActiveIconColor
-                                                    : itemMutedTextColor,
                                                 minWidth: isCollapsed ? 0 : 36,
                                                 justifyContent: "center",
                                             }}
@@ -401,11 +398,6 @@ const SidebarItemComponent = ({
                                         <ListItemText
                                             primary={
                                                 <Typography
-                                                    color={
-                                                        isSubActive
-                                                            ? itemTextColor
-                                                            : itemMutedTextColor
-                                                    }
                                                     fontSize={14}
                                                     fontWeight={
                                                         isSubActive ? 700 : 500

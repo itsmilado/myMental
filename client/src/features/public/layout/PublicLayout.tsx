@@ -5,7 +5,6 @@ import { styled } from "@mui/material/styles";
 
 import DocumentTitle from "../../../components/global/DocumentTitle";
 
-import AppTheme from "../../../components/shared-theme/AppTheme";
 import PublicTopBar from "../components/PublicTopBar";
 
 const LayoutRoot = styled(Box)(({ theme }) => ({
@@ -22,11 +21,7 @@ const LayoutRoot = styled(Box)(({ theme }) => ({
     }),
 }));
 
-type Props = {
-    disableCustomTheme?: boolean;
-};
-
-const PublicLayout: React.FC<Props> = (props) => {
+const PublicLayout: React.FC = () => {
     const location = useLocation();
 
     const isSignIn = location.pathname === "/sign-in";
@@ -49,7 +44,7 @@ const PublicLayout: React.FC<Props> = (props) => {
                   : undefined;
 
     return (
-        <AppTheme {...props}>
+        <>
             <DocumentTitle title={routeTitle} />
             <LayoutRoot>
                 <PublicTopBar
@@ -70,7 +65,7 @@ const PublicLayout: React.FC<Props> = (props) => {
                     <Outlet />
                 </Container>
             </LayoutRoot>
-        </AppTheme>
+        </>
     );
 };
 
