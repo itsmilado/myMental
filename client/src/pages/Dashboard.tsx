@@ -1,7 +1,6 @@
 import { Outlet } from "react-router-dom";
 import TopBar from "../components/global/TopBar";
 import Sidebar from "../components/global/SideBar";
-import CssBaseline from "@mui/material/CssBaseline";
 import Box from "@mui/material/Box";
 import { styled } from "@mui/material/styles";
 
@@ -30,7 +29,6 @@ const Dashboard = () => {
             height="100vh"
             sx={{ overflow: "auto" }}
         >
-            <CssBaseline enableColorScheme />
             <TopBar />
             <Box display="flex" flexGrow={1} minWidth={0}>
                 <Sidebar />
