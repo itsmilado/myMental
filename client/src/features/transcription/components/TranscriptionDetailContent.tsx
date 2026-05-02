@@ -24,6 +24,7 @@ import { AudioPlayer } from "./AudioPlayer";
 import { TranscriptText } from "./TranscriptText";
 import { useTranscriptPlaybackSync } from "../hooks/useTranscriptPlaybackSync";
 import { normalizeOfflineHistoryMetadata } from "../utils/transcriptionHistoryAdapters";
+import { appNestedCardSx } from "../../styles/surfaces";
 
 type DeleteArgs = {
     deleteFromAssembly: boolean;
@@ -129,12 +130,12 @@ export const TranscriptionDetailContent = ({
                     position: "sticky",
                     top: 0,
                     zIndex: 2,
-                    bgcolor: "background.paper",
+                    backgroundColor: "transparent",
+                    backdropFilter: "blur(10px)",
                     borderBottom: "1px solid",
                     borderColor: "divider",
                     px: 2.5,
                     py: 2,
-                    boxShadow: 1,
                 }}
             >
                 <Box
@@ -232,14 +233,12 @@ export const TranscriptionDetailContent = ({
                 <Accordion
                     disableGutters
                     defaultExpanded={false}
-                    sx={{
-                        borderRadius: 2,
+                    sx={(theme) => ({
+                        ...appNestedCardSx(theme),
+                        p: 0,
                         "&:before": { display: "none" },
-                        backgroundColor: "transparent",
                         boxShadow: "none",
-                        border: "1px solid",
-                        borderColor: "divider",
-                    }}
+                    })}
                 >
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                         <Typography
@@ -349,17 +348,16 @@ export const TranscriptionDetailContent = ({
 
                     <Paper
                         variant="outlined"
-                        sx={{
+                        sx={(theme) => ({
+                            ...appNestedCardSx(theme),
                             px: 2,
                             py: 1.5,
-                            borderRadius: 2,
-                            bgcolor: "action.hover",
                             display: "flex",
                             flexDirection: "column",
                             flex: 1,
                             minHeight: 0,
                             overflow: "hidden",
-                        }}
+                        })}
                     >
                         <TranscriptText
                             text={transcription.transcription}
@@ -382,16 +380,14 @@ export const TranscriptionDetailContent = ({
 
 const DetailRow = ({ label, value }: { label: string; value: any }) => (
     <Box
-        sx={{
+        sx={(theme) => ({
+            ...appNestedCardSx(theme),
             display: "flex",
             justifyContent: "space-between",
             gap: 2,
             px: 1.25,
             py: 1,
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 2,
-        }}
+        })}
     >
         <Typography variant="body2" color="text.secondary">
             {label}

@@ -14,6 +14,7 @@ import {
     OnlineTranscription,
     AssemblyAiConnection,
 } from "../../../types/types";
+import { appSectionCardSx } from "../../styles/surfaces";
 
 export const OnlineHistoryPage = () => {
     const { loadAssemblyTranscriptions } = useAssemblyTranscriptionList();
@@ -209,7 +210,12 @@ export const OnlineHistoryPage = () => {
     }, [filteredList, selected]);
 
     return (
-        <Paper sx={{ p: 3, borderRadius: 3, position: "relative" }}>
+        <Paper
+            sx={(theme) => ({
+                ...appSectionCardSx(theme),
+                position: "relative",
+            })}
+        >
             {/* Header */}
             <Box
                 display="flex"

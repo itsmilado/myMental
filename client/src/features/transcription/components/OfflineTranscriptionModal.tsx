@@ -4,6 +4,7 @@ import { Dialog, Snackbar, Alert } from "@mui/material";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { deleteTranscription } from "../../auth/api";
 import { TranscriptionDetailContent } from "./TranscriptionDetailContent";
+import { appDialogPaperSx } from "../../styles/surfaces";
 
 type Props = {
     open: boolean;
@@ -78,11 +79,11 @@ export const OfflineTranscriptionModal = ({
                 maxWidth="md"
                 slotProps={{
                     paper: {
-                        sx: {
-                            borderRadius: 3,
+                        sx: (theme) => ({
+                            ...appDialogPaperSx(theme),
                             overflow: "hidden",
                             height: { xs: "92vh", md: "80vh" },
-                        },
+                        }),
                     },
                 }}
             >

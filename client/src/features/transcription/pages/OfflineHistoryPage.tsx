@@ -9,6 +9,7 @@ import { TranscriptionTable } from "../components/TranscriptionTable";
 import { OfflineFilterControls } from "../components/FilterControls";
 import { OfflineTranscriptionModal } from "../components/OfflineTranscriptionModal";
 import type { TranscriptData } from "../../../types/types";
+import { appSectionCardSx } from "../../styles/surfaces";
 
 export const OfflineHistoryPage = () => {
     const { list, loading, error, setActive, filters, sort } =
@@ -140,7 +141,12 @@ export const OfflineHistoryPage = () => {
     }, [filteredList, selected]);
 
     return (
-        <Paper sx={{ p: 3, borderRadius: 3, position: "relative" }}>
+        <Paper
+            sx={(theme) => ({
+                ...appSectionCardSx(theme),
+                position: "relative",
+            })}
+        >
             <Box
                 display="flex"
                 alignItems="center"

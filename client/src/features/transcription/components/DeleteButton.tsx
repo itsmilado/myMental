@@ -13,7 +13,13 @@ import {
     FormControlLabel,
     Checkbox,
 } from "@mui/material";
+import type { SxProps, Theme } from "@mui/material/styles";
 import DeleteIcon from "@mui/icons-material/Delete";
+import {
+    appDialogActionsSx,
+    appDialogContentSx,
+    appDialogPaperSx,
+} from "../../styles/surfaces";
 
 export type DeleteTargets = {
     deleteFromDb: boolean; // always true for now
@@ -28,6 +34,7 @@ type Props = {
     defaultDeleteFromAssembly?: boolean;
 
     defaultDeleteServerFiles?: boolean;
+    iconButtonSx?: SxProps<Theme>;
 };
 
 export const DeleteButton = ({
@@ -35,6 +42,7 @@ export const DeleteButton = ({
     label = "Delete",
     defaultDeleteFromAssembly = false,
     defaultDeleteServerFiles = false,
+    iconButtonSx,
 }: Props) => {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -71,6 +79,7 @@ export const DeleteButton = ({
                     <IconButton
                         onClick={() => setOpen(true)}
                         disabled={loading}
+                        sx={iconButtonSx}
                     >
                         {loading ? (
                             <CircularProgress size={24} />
@@ -81,9 +90,13 @@ export const DeleteButton = ({
                 </span>
             </Tooltip>
 
-            <Dialog open={open} onClose={() => !loading && setOpen(false)}>
+            <Dialog
+                open={open}
+                onClose={() => !loading && setOpen(false)}
+                PaperProps={{ sx: appDialogPaperSx }}
+            >
                 <DialogTitle>Delete transcription</DialogTitle>
-                <DialogContent>
+                <DialogContent sx={appDialogContentSx}>
                     <DialogContentText sx={{ mb: 2 }}>
                         Choose what you want to delete. The record in the app
                         database will always be removed.
@@ -116,7 +129,7 @@ export const DeleteButton = ({
                         />
                     </FormGroup>
                 </DialogContent>
-                <DialogActions>
+                <DialogActions sx={appDialogActionsSx}>
                     <Button onClick={() => setOpen(false)} disabled={loading}>
                         Cancel
                     </Button>

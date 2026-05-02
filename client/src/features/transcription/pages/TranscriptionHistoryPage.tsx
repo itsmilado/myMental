@@ -3,12 +3,8 @@
 import * as React from "react";
 import { Box, Tabs, Tab } from "@mui/material";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
-import { useTheme } from "@mui/material/styles";
-import { tokens } from "../../../theme/theme";
 
 const TranscriptionHistoryPage = () => {
-    const theme = useTheme();
-    const colors = tokens(theme.palette.mode);
     const navigate = useNavigate();
     const location = useLocation();
     const tabConfig = [
@@ -51,36 +47,20 @@ const TranscriptionHistoryPage = () => {
                     value={value}
                     onChange={handleTabChange}
                     aria-label="history tabs"
-                    textColor="inherit" // let sx control the colors fully
-                    slotProps={{
-                        indicator: {
-                            sx: {
-                                backgroundColor: colors.greenAccent[500], // active underline color
-                                height: 3,
-                                borderRadius: 1,
-                            },
-                        },
-                    }}
+                    textColor="primary"
+                    indicatorColor="primary"
                     sx={{
-                        // base (inactive) tab label
                         "& .MuiTab-root": {
-                            color: colors.grey[100],
                             textTransform: "none",
                             fontWeight: 600,
-                            fontSize: "1rem", // larger text
-                            letterSpacing: "0.3px", // subtle spacing for readability
-                            minHeight: 48, // taller tabs for better touch area
-                            px: 3, // horizontal padding
+                            fontSize: "1rem",
+                            letterSpacing: "0.3px",
+                            minHeight: 48,
+                            px: 3,
                             py: 1,
                         },
-                        // active tab label
                         "& .MuiTab-root.Mui-selected": {
-                            color: colors.greenAccent[500],
                             fontWeight: 700,
-                        },
-                        // hover (optional)
-                        "& .MuiTab-root:hover": {
-                            color: colors.grey[200],
                         },
                     }}
                 >

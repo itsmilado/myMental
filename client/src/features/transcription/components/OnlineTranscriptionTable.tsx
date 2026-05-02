@@ -23,6 +23,7 @@ import {
     Select,
     MenuItem,
 } from "@mui/material";
+import type { SxProps, Theme } from "@mui/material/styles";
 import RestoreIcon from "@mui/icons-material/Restore";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
@@ -34,12 +35,29 @@ import { useTranscriptionStore } from "../../../store/useTranscriptionStore"; //
 import { useAssemblyTranscriptionStore } from "../../../store/useAssemblyTranscriptionStore";
 import { restoreTranscription } from "../../auth/api";
 import { deleteAssemblyTranscription } from "../../auth/api";
+import {
+    appDialogActionsSx,
+    appDialogContentSx,
+    appDialogPaperSx,
+} from "../../styles/surfaces";
 
 type Props = {
     data: OnlineTranscription[];
     onDetails: (t: OnlineTranscription) => void;
 };
 type StatusFilter = "all" | "completed" | "deleted";
+
+const tableIconButtonSx: SxProps<Theme> = {
+    border: "none",
+    backgroundColor: "transparent",
+    "&:hover": {
+        backgroundColor: "transparent",
+    },
+    "&.Mui-disabled": {
+        border: "none",
+        backgroundColor: "transparent",
+    },
+};
 
 export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
     // Offline (restored) list
@@ -371,6 +389,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                                             t.transcript_id,
                                                         )
                                                     }
+                                                    sx={tableIconButtonSx}
                                                 >
                                                     {copiedTranscriptId ===
                                                     t.transcript_id ? (
@@ -413,8 +432,8 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                                         "http://deleted_by_user"
                                                 }
                                                 sx={{
+                                                    ...tableIconButtonSx,
                                                     borderRadius: "6px",
-
                                                     padding: "2px",
                                                 }}
                                             >
@@ -433,6 +452,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                                     size="small"
                                                     disabled
                                                     sx={{
+                                                        ...tableIconButtonSx,
                                                         borderRadius: "6px",
                                                         color: "success.main",
                                                         padding: "2px",
@@ -461,6 +481,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                                     t.transcript_id
                                                 }
                                                 size="small"
+                                                sx={tableIconButtonSx}
                                             >
                                                 <DeleteIcon />
                                             </IconButton>
@@ -469,7 +490,11 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                 ) : (
                                     <Tooltip title="Already deleted">
                                         <span>
-                                            <IconButton disabled size="small">
+                                            <IconButton
+                                                disabled
+                                                size="small"
+                                                sx={tableIconButtonSx}
+                                            >
                                                 <DeleteIcon />
                                             </IconButton>
                                         </span>
@@ -481,6 +506,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
                                     size="small"
                                     onClick={() => onDetails(t)}
                                     aria-label="Show details"
+                                    sx={tableIconButtonSx}
                                 >
                                     <ChevronRightIcon />
                                 </IconButton>
@@ -501,13 +527,14 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
             <Dialog
                 open={deleteDialog.open}
                 onClose={() => setDeleteDialog({ open: false, t: null })}
+                PaperProps={{ sx: appDialogPaperSx }}
             >
                 <DialogTitle>Delete Transcription</DialogTitle>
-                <DialogContent>
+                <DialogContent sx={appDialogContentSx}>
                     Are you sure you want to delete this transcription? This
                     action cannot be undone.
                 </DialogContent>
-                <DialogActions>
+                <DialogActions sx={appDialogActionsSx}>
                     <Button
                         onClick={() =>
                             setDeleteDialog({ open: false, t: null })

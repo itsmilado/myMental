@@ -15,33 +15,6 @@ import {
 import FilterListIcon from "@mui/icons-material/FilterList";
 import ClearIcon from "@mui/icons-material/Clear";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
-import { useTheme } from "@mui/material/styles";
-import { tokens } from "../../../theme/theme";
-
-/*
-- Shared input styling for transcription history filters
-- Keeps offline and online filter controls visually aligned
-*/
-const buildFilterTextFieldSx = (colors: ReturnType<typeof tokens>) => ({
-    "& .MuiInputLabel-root": {
-        color: colors.grey[100],
-    },
-    "& .MuiInputLabel-root.Mui-focused": {
-        color: colors.greenAccent[500],
-    },
-    "& .MuiInputBase-input": {
-        color: colors.grey[100],
-    },
-    "& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline": {
-        borderColor: colors.grey[300],
-    },
-    "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline": {
-        borderColor: colors.grey[200],
-    },
-    "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
-        borderColor: colors.greenAccent[500],
-    },
-});
 
 type OfflineFilterControlsProps = {
     project: string;
@@ -66,10 +39,7 @@ export const OfflineFilterControls = ({
     onProjectApply,
     onCategoryApply,
 }: OfflineFilterControlsProps) => {
-    const theme = useTheme();
-    const colors = tokens(theme.palette.mode);
     const { filters, setFilters } = useTranscriptionStore();
-    const textFieldSx = buildFilterTextFieldSx(colors);
 
     const [projectAnchorEl, setProjectAnchorEl] = useState<HTMLElement | null>(
         null,
@@ -166,7 +136,6 @@ export const OfflineFilterControls = ({
                 onChange={(e) =>
                     setFilters({ ...filters, date_from: e.target.value })
                 }
-                sx={textFieldSx}
             />
 
             <TextField
@@ -178,7 +147,6 @@ export const OfflineFilterControls = ({
                 onChange={(e) =>
                     setFilters({ ...filters, date_to: e.target.value })
                 }
-                sx={textFieldSx}
             />
 
             <Button
@@ -190,14 +158,8 @@ export const OfflineFilterControls = ({
                     height: 40,
                     minHeight: 40,
                     px: 1.5,
-                    color: colors.grey[100],
-                    borderColor: colors.grey[300],
                     textTransform: "none",
                     alignSelf: "stretch",
-                    "&:hover": {
-                        borderColor: colors.grey[200],
-                        backgroundColor: theme.palette.action.hover,
-                    },
                 }}
             >
                 {`Project: ${project === "all" ? "All" : project}`}
@@ -262,14 +224,8 @@ export const OfflineFilterControls = ({
                     height: 40,
                     minHeight: 40,
                     px: 1.5,
-                    color: colors.grey[100],
-                    borderColor: colors.grey[300],
                     textTransform: "none",
                     alignSelf: "stretch",
-                    "&:hover": {
-                        borderColor: colors.grey[200],
-                        backgroundColor: theme.palette.action.hover,
-                    },
                 }}
             >
                 {`Category: ${category === "all" ? "All" : category}`}
@@ -328,7 +284,7 @@ export const OfflineFilterControls = ({
             <Divider
                 orientation="vertical"
                 flexItem
-                sx={{ borderColor: colors.grey[700], mx: 0.5 }}
+                sx={{ mx: 0.5 }}
             />
 
             <TextField
@@ -338,10 +294,7 @@ export const OfflineFilterControls = ({
                 onChange={(e) =>
                     setFilters({ ...filters, file_name: e.target.value })
                 }
-                sx={{
-                    minWidth: 220,
-                    ...textFieldSx,
-                }}
+                sx={{ minWidth: 220 }}
             />
 
             <TextField
@@ -351,10 +304,7 @@ export const OfflineFilterControls = ({
                 onChange={(e) =>
                     setFilters({ ...filters, transcript_id: e.target.value })
                 }
-                sx={{
-                    minWidth: 260,
-                    ...textFieldSx,
-                }}
+                sx={{ minWidth: 260 }}
                 slotProps={{
                     input: {
                         endAdornment: filters.transcript_id ? (
@@ -378,14 +328,6 @@ export const OfflineFilterControls = ({
             <Button
                 variant="outlined"
                 onClick={handleClearFilters}
-                sx={{
-                    color: colors.grey[100],
-                    borderColor: colors.grey[300],
-                    "&:hover": {
-                        borderColor: colors.grey[200],
-                        backgroundColor: theme.palette.action.hover,
-                    },
-                }}
             >
                 Clear
             </Button>
@@ -430,10 +372,6 @@ export const OnlineFilterControls = ({
     onClearSearchId,
     onClearFilters,
 }: OnlineFilterControlsProps) => {
-    const theme = useTheme();
-    const colors = tokens(theme.palette.mode);
-    const textFieldSx = buildFilterTextFieldSx(colors);
-
     const [projectAnchorEl, setProjectAnchorEl] = useState<HTMLElement | null>(
         null,
     );
@@ -515,7 +453,6 @@ export const OnlineFilterControls = ({
                 slotProps={{ inputLabel: { shrink: true } }}
                 value={dateFrom}
                 onChange={(e) => onDateFromChange(e.target.value)}
-                sx={textFieldSx}
             />
 
             <TextField
@@ -525,7 +462,6 @@ export const OnlineFilterControls = ({
                 slotProps={{ inputLabel: { shrink: true } }}
                 value={dateTo}
                 onChange={(e) => onDateToChange(e.target.value)}
-                sx={textFieldSx}
             />
 
             <Button
@@ -537,14 +473,8 @@ export const OnlineFilterControls = ({
                     height: 40,
                     minHeight: 40,
                     px: 1.5,
-                    color: colors.grey[100],
-                    borderColor: colors.grey[300],
                     textTransform: "none",
                     alignSelf: "stretch",
-                    "&:hover": {
-                        borderColor: colors.grey[200],
-                        backgroundColor: theme.palette.action.hover,
-                    },
                 }}
             >
                 {`Project: ${project === "all" ? "All" : project}`}
@@ -609,14 +539,8 @@ export const OnlineFilterControls = ({
                     height: 40,
                     minHeight: 40,
                     px: 1.5,
-                    color: colors.grey[100],
-                    borderColor: colors.grey[300],
                     textTransform: "none",
                     alignSelf: "stretch",
-                    "&:hover": {
-                        borderColor: colors.grey[200],
-                        backgroundColor: theme.palette.action.hover,
-                    },
                 }}
             >
                 {`Category: ${category === "all" ? "All" : category}`}
@@ -675,7 +599,7 @@ export const OnlineFilterControls = ({
             <Divider
                 orientation="vertical"
                 flexItem
-                sx={{ borderColor: colors.grey[700], mx: 0.5 }}
+                sx={{ mx: 0.5 }}
             />
 
             <TextField
@@ -683,10 +607,7 @@ export const OnlineFilterControls = ({
                 size="small"
                 value={searchId}
                 onChange={(e) => onSearchIdChange(e.target.value)}
-                sx={{
-                    minWidth: 260,
-                    ...textFieldSx,
-                }}
+                sx={{ minWidth: 260 }}
                 slotProps={{
                     input: {
                         endAdornment: searchId ? (
@@ -704,14 +625,6 @@ export const OnlineFilterControls = ({
             <Button
                 variant="outlined"
                 onClick={onClearFilters}
-                sx={{
-                    color: colors.grey[100],
-                    borderColor: colors.grey[300],
-                    "&:hover": {
-                        borderColor: colors.grey[200],
-                        backgroundColor: theme.palette.action.hover,
-                    },
-                }}
             >
                 Clear
             </Button>

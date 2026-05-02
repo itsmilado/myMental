@@ -26,6 +26,7 @@ import {
     normalizeOnlineHistoryMetadata,
     normalizeTranscriptTiming,
 } from "../utils/transcriptionHistoryAdapters";
+import { appDialogPaperSx, appNestedCardSx } from "../../styles/surfaces";
 
 /*
 - purpose: render one compact metadata field inside the online transcript sidebar
@@ -37,15 +38,12 @@ import {
 const DetailItem = ({ label, value }: { label: string; value: string }) => {
     return (
         <Box
-            sx={{
+            sx={(theme) => ({
+                ...appNestedCardSx(theme),
                 height: "100%",
                 px: 1.5,
                 py: 1.25,
-                borderRadius: 2,
-                border: "1px solid",
-                borderColor: "divider",
-                backgroundColor: "background.default",
-            }}
+            })}
         >
             <Typography
                 variant="caption"
@@ -142,12 +140,13 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
             onClose={onClose}
             slotProps={{
                 paper: {
-                    sx: {
+                    sx: (theme) => ({
+                        ...appDialogPaperSx(theme),
                         width: 500,
                         borderTopLeftRadius: 18,
                         borderBottomLeftRadius: 18,
                         p: 3,
-                    },
+                    }),
                 },
             }}
             ModalProps={{ keepMounted: true }}
@@ -220,16 +219,14 @@ export const OnlineTranscriptionSidebar: React.FC<Props> = ({
                     <Accordion
                         disableGutters
                         defaultExpanded={false}
-                        sx={{
+                        sx={(theme) => ({
+                            ...appNestedCardSx(theme),
                             mb: 1,
-                            borderRadius: 2,
+                            p: 0,
                             "&:before": { display: "none" },
-                            backgroundColor: "transparent",
                             boxShadow: "none",
-                            border: "1px solid",
-                            borderColor: "divider",
                             overflow: "hidden",
-                        }}
+                        })}
                     >
                         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                             <Typography

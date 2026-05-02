@@ -35,7 +35,6 @@ import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import { useTheme } from "@mui/material/styles";
-import { tokens } from "../../../theme/theme";
 
 import {
     deleteTranscription,
@@ -52,6 +51,7 @@ import { AudioPlayer } from "../components/AudioPlayer";
 
 import { DeleteButton } from "../components/DeleteButton";
 import { ExportButton } from "../components/ExportButton";
+import { appNestedCardSx, appSectionCardSx } from "../../styles/surfaces";
 
 import type {
     AssemblyAiConnection,
@@ -490,7 +490,7 @@ const TOOLTIP_SX = {
 
 const InfoLabel = ({ label, tooltip }: { label: string; tooltip?: string }) => (
     <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
-        <Typography variant="body2">{label}</Typography>
+        <Typography variant="caption">{label}</Typography>
 
         {tooltip ? (
             <Tooltip
@@ -507,6 +507,11 @@ const InfoLabel = ({ label, tooltip }: { label: string; tooltip?: string }) => (
                     sx={{
                         p: 0.25,
                         color: "text.secondary",
+                        border: "none",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                            backgroundColor: "transparent",
+                        },
                     }}
                 >
                     <InfoOutlinedIcon fontSize="inherit" />
@@ -518,7 +523,6 @@ const InfoLabel = ({ label, tooltip }: { label: string; tooltip?: string }) => (
 
 export const UploadAudioPage = () => {
     const theme = useTheme();
-    const colors = tokens(theme.palette.mode);
 
     const {
         preferences,
@@ -1520,24 +1524,23 @@ export const UploadAudioPage = () => {
                 disableElevation
                 sx={{
                     textTransform: "none",
-                    borderRadius: 2,
+                    borderRadius: 1,
                     px: 1.25,
                     py: 0.9,
                     minWidth: 0,
                     width: "fit-content",
                     borderColor: selected
-                        ? colors.greenAccent[500]
+                        ? theme.palette.primary.main
                         : theme.palette.divider,
                     color: "text.primary",
-                    backgroundColor: "transparent",
                     boxShadow: selected
                         ? `0 0 0 2px ${theme.palette.action.selected}`
                         : "none",
                     "&:hover": {
                         backgroundColor: theme.palette.action.hover,
                         borderColor: selected
-                            ? colors.greenAccent[500]
-                            : colors.grey[300],
+                            ? theme.palette.primary.main
+                            : theme.palette.divider,
                     },
                 }}
             >
@@ -1571,7 +1574,11 @@ export const UploadAudioPage = () => {
                             sx={{
                                 p: 0.25,
                                 ml: 0.25,
-                                color: "text.secondary",
+                                border: "none",
+                                backgroundColor: "transparent",
+                                "&:hover": {
+                                    backgroundColor: "transparent",
+                                },
                             }}
                         >
                             <InfoOutlinedIcon fontSize="inherit" />
@@ -1618,16 +1625,7 @@ export const UploadAudioPage = () => {
                             setHasLocalOptionEdits(true);
                             onChange(e.target.checked);
                         }}
-                        sx={{
-                            mr: 1,
-                            "& .MuiSwitch-switchBase.Mui-checked": {
-                                color: colors.greenAccent[500],
-                            },
-                            "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
-                                {
-                                    backgroundColor: colors.greenAccent[500],
-                                },
-                        }}
+                        sx={{ mr: 1 }}
                     />
                 }
                 label={<InfoLabel label={label} tooltip={effectiveTooltip} />}
@@ -1665,19 +1663,17 @@ export const UploadAudioPage = () => {
             >
                 {/* LEFT PANEL — upload controls / transcription options / start action */}
                 <Paper
-                    sx={{
-                        p: 3,
+                    sx={(surfaceTheme) => ({
+                        ...appSectionCardSx(surfaceTheme),
                         width: { xs: "100%", xl: 560 },
                         flex: { xl: "0 0 520px" },
                         minWidth: 0,
-                        borderRadius: 3,
-                        border: `1px solid ${theme.palette.divider}`,
                         display: "flex",
                         flexDirection: "column",
                         gap: 2,
                         transition: "box-shadow 150ms ease",
                         "&:hover": { boxShadow: 2 },
-                    }}
+                    })}
                 >
                     {/* LEFT PANEL HEADER — title / batch status / top-level feedback       */}
                     <Box>
@@ -1694,39 +1690,7 @@ export const UploadAudioPage = () => {
                     </Box>
 
                     <Box>
-                        <Stepper
-                            activeStep={activeStepIndex}
-                            alternativeLabel
-                            sx={{
-                                "& .MuiStepLabel-label": {
-                                    color: colors.grey[300],
-                                },
-                                "& .MuiStepLabel-label.Mui-active": {
-                                    color: colors.greenAccent[500],
-                                    fontWeight: 600,
-                                },
-                                "& .MuiStepLabel-label.Mui-completed": {
-                                    color: colors.greenAccent[400],
-                                },
-                                "& .MuiStepIcon-root": {
-                                    color: colors.grey[500],
-                                },
-                                "& .MuiStepIcon-root.Mui-active": {
-                                    color: colors.greenAccent[500],
-                                },
-                                "& .MuiStepIcon-root.Mui-completed": {
-                                    color: colors.greenAccent[500],
-                                },
-                                "& .MuiStepLabel-root.Mui-error .MuiStepLabel-label":
-                                    {
-                                        color: theme.palette.error.main,
-                                    },
-                                "& .MuiStepLabel-root.Mui-error .MuiStepIcon-root":
-                                    {
-                                        color: theme.palette.error.main,
-                                    },
-                            }}
-                        >
+                        <Stepper activeStep={activeStepIndex} alternativeLabel>
                             {TRANSCRIPTION_STEP_ORDER.map((key) => (
                                 <Step key={key}>
                                     <StepLabel
@@ -1743,14 +1707,7 @@ export const UploadAudioPage = () => {
 
                         {activeQueueItem ? (
                             <Box mt={2} aria-live="polite">
-                                <LinearProgress
-                                    sx={{
-                                        "& .MuiLinearProgress-bar": {
-                                            backgroundColor:
-                                                colors.greenAccent[500],
-                                        },
-                                    }}
-                                />
+                                <LinearProgress />
                                 <Typography
                                     variant="body2"
                                     sx={{ color: "text.secondary", mt: 1 }}
@@ -1776,7 +1733,7 @@ export const UploadAudioPage = () => {
                         ) : null}
                     </Box>
 
-                    <Divider sx={{ borderColor: theme.palette.divider }} />
+                    <Divider />
 
                     {/* LEFT PANEL UPLOAD AREA — drag/drop + choose files                   */}
                     <Box
@@ -1792,7 +1749,7 @@ export const UploadAudioPage = () => {
                             borderRadius: 2,
                             border: `1px dashed ${
                                 isDragOver
-                                    ? colors.greenAccent[500]
+                                    ? theme.palette.primary.main
                                     : theme.palette.divider
                             }`,
                             backgroundColor: isDragOver
@@ -1810,12 +1767,6 @@ export const UploadAudioPage = () => {
                             sx={{
                                 width: "fit-content",
                                 alignSelf: "center",
-                                color: colors.grey[100],
-                                borderColor: colors.grey[300],
-                                "&:hover": {
-                                    borderColor: colors.grey[200],
-                                    backgroundColor: theme.palette.action.hover,
-                                },
                             }}
                         >
                             Choose Audio Files
@@ -1845,7 +1796,7 @@ export const UploadAudioPage = () => {
                         </FormHelperText>
                     </Box>
 
-                    <Divider sx={{ borderColor: theme.palette.divider }} />
+                    <Divider />
 
                     {/* LEFT PANEL OPTIONS — speech model / language / speaker / format     */}
                     <Box
@@ -1868,15 +1819,13 @@ export const UploadAudioPage = () => {
                             }}
                         >
                             <Box
-                                sx={{
+                                sx={(surfaceTheme) => ({
+                                    ...appNestedCardSx(surfaceTheme),
                                     display: "flex",
                                     flexDirection: "column",
                                     gap: 1,
-                                    p: 2,
                                     height: "100%",
-                                    borderRadius: 2,
-                                    border: `1px solid ${theme.palette.divider}`,
-                                }}
+                                })}
                             >
                                 <Typography
                                     variant="subtitle2"
@@ -1898,42 +1847,20 @@ export const UploadAudioPage = () => {
                             </Box>
 
                             <Box
-                                sx={{
+                                sx={(surfaceTheme) => ({
+                                    ...appNestedCardSx(surfaceTheme),
                                     display: "flex",
                                     flexDirection: "column",
                                     gap: 1.25,
-                                    p: 2,
                                     height: "100%",
-                                    borderRadius: 2,
-                                    border: `1px solid ${theme.palette.divider}`,
-                                }}
+                                })}
                             >
                                 <InfoLabel
                                     label="Language"
                                     tooltip="Choose a language manually, or use automatic language detection to let AssemblyAI choose the best supported model for the audio."
                                 />
 
-                                <FormControl
-                                    size="small"
-                                    fullWidth
-                                    sx={{
-                                        "& .MuiOutlinedInput-notchedOutline": {
-                                            borderColor: colors.grey[300],
-                                        },
-                                        "&:hover .MuiOutlinedInput-notchedOutline":
-                                            {
-                                                borderColor: colors.grey[200],
-                                            },
-                                        "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
-                                            {
-                                                borderColor:
-                                                    colors.greenAccent[500],
-                                            },
-                                    }}
-                                >
-                                    <InputLabel id="language-label">
-                                        Language
-                                    </InputLabel>
+                                <FormControl size="small" fullWidth>
                                     <Select
                                         labelId="language-label"
                                         label="Language"
@@ -1974,19 +1901,6 @@ export const UploadAudioPage = () => {
                                                     e.target.checked,
                                                 )
                                             }
-                                            sx={{
-                                                "& .MuiSwitch-switchBase.Mui-checked":
-                                                    {
-                                                        color: colors
-                                                            .greenAccent[500],
-                                                    },
-                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
-                                                    {
-                                                        backgroundColor:
-                                                            colors
-                                                                .greenAccent[500],
-                                                    },
-                                            }}
                                         />
                                     }
                                     label={
@@ -2013,22 +1927,20 @@ export const UploadAudioPage = () => {
                                 }}
                             >
                                 <Box
-                                    sx={{
+                                    sx={(surfaceTheme) => ({
+                                        ...appNestedCardSx(surfaceTheme),
                                         display: "flex",
                                         flexDirection: "column",
                                         gap: 1.25,
-                                        p: 2,
                                         height: "100%",
-                                        borderRadius: 2,
-                                        border: `1px solid ${theme.palette.divider}`,
-                                    }}
+                                    })}
                                 >
                                     <InfoLabel
                                         label="Prompt"
                                         tooltip="For best results, start without a prompt first. When you need more control, pick a recommended prompt and then edit it to fit your audio."
                                     />
 
-                                    <FormControl component="fieldset">
+                                    <FormControl component="fieldset" fullWidth>
                                         <RadioGroup
                                             value={selectedPromptPreset}
                                             onChange={(e) =>
@@ -2056,31 +1968,46 @@ export const UploadAudioPage = () => {
                                             ).map(([key, preset]) => (
                                                 <Box
                                                     key={key}
-                                                    sx={{
-                                                        border: `1px solid ${theme.palette.divider}`,
-                                                        borderRadius: 2,
+                                                    sx={(surfaceTheme) => ({
+                                                        ...appNestedCardSx(
+                                                            surfaceTheme,
+                                                        ),
                                                         px: 1.25,
                                                         py: 0.9,
                                                         mb: 1,
-                                                    }}
+                                                    })}
                                                 >
                                                     <FormControlLabel
                                                         value={key}
                                                         control={<Radio />}
+                                                        sx={{
+                                                            alignItems:
+                                                                "flex-start",
+                                                            width: "100%",
+                                                            m: 0,
+                                                            "& .MuiFormControlLabel-label":
+                                                                {
+                                                                    minWidth: 0,
+                                                                    flex: 1,
+                                                                },
+                                                        }}
                                                         label={
                                                             <Box
                                                                 sx={{
                                                                     display:
                                                                         "flex",
                                                                     alignItems:
-                                                                        "center",
+                                                                        "flex-start",
                                                                     gap: 0.75,
+                                                                    minWidth: 0,
                                                                 }}
                                                             >
                                                                 <Typography
-                                                                    variant="body2"
+                                                                    variant="caption"
                                                                     sx={{
-                                                                        fontWeight: 600,
+                                                                        fontWeight: 400,
+                                                                        overflowWrap:
+                                                                            "anywhere",
                                                                     }}
                                                                 >
                                                                     {
@@ -2110,7 +2037,14 @@ export const UploadAudioPage = () => {
                                                                         }}
                                                                         sx={{
                                                                             p: 0.25,
-                                                                            color: "text.secondary",
+                                                                            border: "none",
+                                                                            backgroundColor:
+                                                                                "transparent",
+                                                                            "&:hover":
+                                                                                {
+                                                                                    backgroundColor:
+                                                                                        "transparent",
+                                                                                },
                                                                         }}
                                                                     >
                                                                         <InfoOutlinedIcon fontSize="inherit" />
@@ -2132,23 +2066,14 @@ export const UploadAudioPage = () => {
                                 </Box>
 
                                 <Box
-                                    sx={{
+                                    sx={(surfaceTheme) => ({
+                                        ...appNestedCardSx(surfaceTheme),
                                         display: "flex",
                                         flexDirection: "column",
                                         gap: 1.25,
-                                        p: 2,
                                         height: "100%",
-                                        borderRadius: 2,
-                                        border: `1px solid ${theme.palette.divider}`,
-                                    }}
+                                    })}
                                 >
-                                    <Typography
-                                        variant="subtitle2"
-                                        sx={{ color: "text.secondary" }}
-                                    >
-                                        Custom prompt
-                                    </Typography>
-
                                     <TextField
                                         label="Prompt input"
                                         value={options.prompt ?? ""}
@@ -2157,9 +2082,26 @@ export const UploadAudioPage = () => {
                                                 e.target.value,
                                             )
                                         }
-                                        size="small"
                                         multiline
                                         minRows={8}
+                                        maxRows={12}
+                                        fullWidth
+                                        sx={{
+                                            flex: 1,
+                                            minHeight: 0,
+                                            "& .MuiInputBase-root": {
+                                                alignItems: "flex-start",
+                                                height: "100%",
+                                                minHeight: 240,
+                                                boxSizing: "border-box",
+                                                py: 1.25,
+                                            },
+                                            "& .MuiInputBase-inputMultiline": {
+                                                height: "100% !important",
+                                                overflow: "auto !important",
+                                                boxSizing: "border-box",
+                                            },
+                                        }}
                                         placeholder="e.g. Preserve mixed-language speech, keep filler words, and do not normalize false starts."
                                         helperText="You can pick a recommended prompt, then edit it here."
                                     />
@@ -2186,17 +2128,27 @@ export const UploadAudioPage = () => {
                                 onChange={() =>
                                     setSpeakerSectionOpen((prev) => !prev)
                                 }
-                                sx={{
-                                    borderRadius: 2,
-                                    border: `1px solid ${theme.palette.divider}`,
-                                    backgroundColor: "transparent",
+                                sx={(surfaceTheme) => ({
+                                    ...appNestedCardSx(surfaceTheme),
+                                    p: 0,
                                     "&:before": { display: "none" },
                                     "&.Mui-expanded": { margin: 0 },
                                     alignSelf: "start",
-                                }}
+                                })}
                             >
                                 <AccordionSummary
                                     expandIcon={<ExpandMoreIcon />}
+                                    sx={{
+                                        color: "text.primary",
+                                        opacity: 1,
+                                        "& .MuiAccordionSummary-content": {
+                                            opacity: 1,
+                                        },
+                                        "& .MuiAccordionSummary-expandIconWrapper":
+                                            {
+                                                color: "text.primary",
+                                            },
+                                    }}
                                 >
                                     <Typography variant="subtitle2">
                                         Speaker Handling
@@ -2388,17 +2340,27 @@ export const UploadAudioPage = () => {
                                 onChange={() =>
                                     setFormatSectionOpen((prev) => !prev)
                                 }
-                                sx={{
-                                    borderRadius: 2,
-                                    border: `1px solid ${theme.palette.divider}`,
-                                    backgroundColor: "transparent",
+                                sx={(surfaceTheme) => ({
+                                    ...appNestedCardSx(surfaceTheme),
+                                    p: 0,
                                     "&:before": { display: "none" },
                                     "&.Mui-expanded": { margin: 0 },
                                     alignSelf: "start",
-                                }}
+                                })}
                             >
                                 <AccordionSummary
                                     expandIcon={<ExpandMoreIcon />}
+                                    sx={{
+                                        color: "text.primary",
+                                        opacity: 1,
+                                        "& .MuiAccordionSummary-content": {
+                                            opacity: 1,
+                                        },
+                                        "& .MuiAccordionSummary-expandIconWrapper":
+                                            {
+                                                color: "text.primary",
+                                            },
+                                    }}
                                 >
                                     <Typography variant="subtitle2">
                                         Format Transcript
@@ -2573,7 +2535,7 @@ export const UploadAudioPage = () => {
                             }}
                         >
                             <Button
-                                variant="contained"
+                                variant="outlined"
                                 onClick={processQueueSequentially}
                                 disabled={
                                     isProcessingQueue || items.length === 0
@@ -2583,20 +2545,6 @@ export const UploadAudioPage = () => {
                                     px: 2.5,
                                     py: 1.25,
                                     fontWeight: 600,
-                                    backgroundColor: colors.greenAccent[500],
-                                    color: theme.palette.getContrastText(
-                                        colors.greenAccent[500],
-                                    ),
-                                    "&:hover": {
-                                        backgroundColor:
-                                            colors.greenAccent[600],
-                                    },
-                                    "&.Mui-disabled": {
-                                        backgroundColor:
-                                            theme.palette.action
-                                                .disabledBackground,
-                                        color: theme.palette.action.disabled,
-                                    },
                                 }}
                             >
                                 {isProcessingQueue
@@ -2609,12 +2557,10 @@ export const UploadAudioPage = () => {
 
                 {/* MIDDLE PANEL — upload queue / failed items / batch summary */}
                 <Paper
-                    sx={{
-                        p: 3,
+                    sx={(surfaceTheme) => ({
+                        ...appSectionCardSx(surfaceTheme),
                         width: { xs: "100%", xl: 430 },
                         minWidth: 0,
-                        borderRadius: 3,
-                        border: `1px solid ${theme.palette.divider}`,
                         display: "flex",
                         flexDirection: "column",
                         gap: 2,
@@ -2625,7 +2571,7 @@ export const UploadAudioPage = () => {
                         alignSelf: "start",
                         transition: "box-shadow 150ms ease",
                         "&:hover": { boxShadow: 2 },
-                    }}
+                    })}
                 >
                     {/* MIDDLE PANEL HEADER — queue title + processed action*/}
                     <Box
@@ -2698,19 +2644,19 @@ export const UploadAudioPage = () => {
                                         onClick={() =>
                                             handleSelectResultItem(item.id)
                                         }
-                                        sx={{
+                                        sx={(surfaceTheme) => ({
+                                            ...appNestedCardSx(surfaceTheme),
                                             p: 1.5,
-                                            borderRadius: 2,
                                             cursor: "pointer",
                                             borderColor:
                                                 selectedResultItemId === item.id
-                                                    ? colors.greenAccent[500]
+                                                    ? theme.palette.primary.main
                                                     : theme.palette.divider,
                                             backgroundColor:
                                                 selectedResultItemId === item.id
                                                     ? theme.palette.action.hover
-                                                    : "transparent",
-                                        }}
+                                                    : undefined,
+                                        })}
                                     >
                                         {/* QUEUE ITEM ROW — file info + status/actions */}
                                         <Box
@@ -2937,13 +2883,11 @@ export const UploadAudioPage = () => {
 
                 {/* RIGHT PANEL — selected result / status / transcript rendering  */}
                 <Paper
-                    sx={{
-                        p: 3,
+                    sx={(surfaceTheme) => ({
+                        ...appSectionCardSx(surfaceTheme),
                         width: { xs: "100%", xl: 540 },
                         minWidth: 0,
                         justifySelf: "center",
-                        borderRadius: 3,
-                        border: `1px solid ${theme.palette.divider}`,
                         display: "flex",
                         flexDirection: "column",
                         height: {
@@ -2962,7 +2906,7 @@ export const UploadAudioPage = () => {
                         alignSelf: "start",
                         transition: "box-shadow 150ms ease",
                         "&:hover": { boxShadow: 2 },
-                    }}
+                    })}
                 >
                     <Box
                         sx={{
@@ -3039,7 +2983,17 @@ export const UploadAudioPage = () => {
                             {!selectedResultItem?.result &&
                                 !activeQueueItem && (
                                     <Tooltip title="Results appear here after transcription">
-                                        <IconButton size="small">
+                                        <IconButton
+                                            size="small"
+                                            sx={{
+                                                border: "none",
+                                                backgroundColor: "transparent",
+                                                "&:hover": {
+                                                    backgroundColor:
+                                                        "transparent",
+                                                },
+                                            }}
+                                        >
                                             <DescriptionOutlinedIcon fontSize="small" />
                                         </IconButton>
                                     </Tooltip>
@@ -3148,14 +3102,7 @@ export const UploadAudioPage = () => {
 
                         {!selectedResultItem?.result && activeQueueItem && (
                             <Box sx={{ mt: 1 }}>
-                                <LinearProgress
-                                    sx={{
-                                        "& .MuiLinearProgress-bar": {
-                                            backgroundColor:
-                                                colors.greenAccent[500],
-                                        },
-                                    }}
-                                />
+                                <LinearProgress />
                                 <Typography
                                     variant="body2"
                                     sx={{ color: "text.secondary", mt: 1 }}

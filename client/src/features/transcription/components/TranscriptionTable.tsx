@@ -17,6 +17,7 @@ import {
     Tooltip,
     TablePagination,
 } from "@mui/material";
+import type { SxProps, Theme } from "@mui/material/styles";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 
@@ -31,6 +32,18 @@ type Props = {
     loading: boolean;
     error: string | null;
     onRowClick?: (t: TranscriptData) => void;
+};
+
+const tableIconButtonSx: SxProps<Theme> = {
+    border: "none",
+    backgroundColor: "transparent",
+    "&:hover": {
+        backgroundColor: "transparent",
+    },
+    "&.Mui-disabled": {
+        border: "none",
+        backgroundColor: "transparent",
+    },
 };
 
 export const TranscriptionTable = ({
@@ -360,6 +373,7 @@ export const TranscriptionTable = ({
                                                             t.transcript_id,
                                                         )
                                                     }
+                                                    sx={tableIconButtonSx}
                                                 >
                                                     {copiedTranscriptId ===
                                                     t.transcript_id ? (
@@ -383,8 +397,10 @@ export const TranscriptionTable = ({
                                 <ExportButton
                                     transcriptId={t.id}
                                     fileName={t.file_name}
+                                    iconButtonSx={tableIconButtonSx}
                                 />
                                 <DeleteButton
+                                    iconButtonSx={tableIconButtonSx}
                                     onDelete={async ({
                                         deleteFromAssembly,
                                         deleteServerFiles,

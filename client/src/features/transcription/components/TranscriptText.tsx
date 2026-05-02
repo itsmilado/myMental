@@ -9,6 +9,7 @@ import {
     FormControlLabel,
     Typography,
 } from "@mui/material";
+import { appNestedCardSx } from "../../styles/surfaces";
 
 import type {
     NormalizedTranscriptWord,
@@ -439,7 +440,8 @@ export const TranscriptText: React.FC<Props> = ({
                         px: 0.25,
                         py: 0.75,
                         mb: 1,
-                        bgcolor: "background.paper",
+                        backgroundColor: "transparent",
+                        backdropFilter: "blur(8px)",
                         borderBottom: 1,
                         borderColor: "divider",
                     }}
@@ -485,19 +487,16 @@ export const TranscriptText: React.FC<Props> = ({
                             <Paper
                                 key={index}
                                 variant="outlined"
-                                sx={{
+                                sx={(theme) => ({
+                                    ...appNestedCardSx(theme),
                                     p: 1.5,
-                                    borderRadius: 2,
-                                    bgcolor: activeBlock
-                                        ? "primary.50"
-                                        : "action.hover",
                                     borderColor: activeBlock
                                         ? "primary.main"
                                         : "divider",
                                     boxShadow: activeBlock ? 2 : 0,
                                     transition:
                                         "background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease",
-                                }}
+                                })}
                             >
                                 {(showSpeakers && block.speaker) ||
                                 (showTimestamps &&

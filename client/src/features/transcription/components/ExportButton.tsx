@@ -6,6 +6,7 @@ import {
     Tooltip,
     CircularProgress,
 } from "@mui/material";
+import type { SxProps, Theme } from "@mui/material/styles";
 import DownloadIcon from "@mui/icons-material/Download";
 import { exportTranscription } from "../../auth/api";
 import { downloadBlob } from "../../../utils/downloadFile";
@@ -13,6 +14,7 @@ import { downloadBlob } from "../../../utils/downloadFile";
 type Props = {
     transcriptId: number;
     fileName: string;
+    iconButtonSx?: SxProps<Theme>;
 };
 
 const formats = [
@@ -30,7 +32,7 @@ const formats = [
   - downloads the blob returned by the API 
   - preserves the current user-facing error handling
 */
-export const ExportButton = ({ transcriptId, fileName }: Props) => {
+export const ExportButton = ({ transcriptId, fileName, iconButtonSx }: Props) => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [loading, setLoading] = useState(false);
 
@@ -59,7 +61,11 @@ export const ExportButton = ({ transcriptId, fileName }: Props) => {
         <>
             <Tooltip title="Export/download">
                 <span>
-                    <IconButton onClick={handleClick} disabled={loading}>
+                    <IconButton
+                        onClick={handleClick}
+                        disabled={loading}
+                        sx={iconButtonSx}
+                    >
                         {loading ? (
                             <CircularProgress size={24} />
                         ) : (

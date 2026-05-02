@@ -9,6 +9,7 @@ import { deleteTranscription, fetchTranscriptionById } from "../../auth/api";
 import { TranscriptionDetailContent } from "../components/TranscriptionDetailContent";
 
 import type { TranscriptData } from "../../../types/types";
+import { appSectionCardSx } from "../../styles/surfaces";
 
 const TranscriptionDetailPage = () => {
     const navigate = useNavigate();
@@ -128,18 +129,16 @@ const TranscriptionDetailPage = () => {
     return (
         <Box sx={{ py: 2 }}>
             <Box
-                sx={{
+                sx={(theme) => ({
+                    ...appSectionCardSx(theme),
+                    p: 0,
                     height: {
                         xs: "calc(100dvh - 140px)",
                         md: "calc(100dvh - 180px)",
                     },
                     minHeight: 520,
-                    borderRadius: 3,
                     overflow: "hidden",
-                    border: "1px solid",
-                    borderColor: "divider",
-                    bgcolor: "background.paper",
-                }}
+                })}
             >
                 <TranscriptionDetailContent
                     transcription={transcription}

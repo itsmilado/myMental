@@ -15,6 +15,7 @@ import PauseIcon from "@mui/icons-material/Pause";
 import Replay10Icon from "@mui/icons-material/Replay10";
 import Forward10Icon from "@mui/icons-material/Forward10";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
+import { appNestedCardSx } from "../../styles/surfaces";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import axios from "axios";
 
@@ -239,11 +240,10 @@ export const AudioPlayer = ({
     return (
         <Paper
             variant="outlined"
-            sx={{
-                borderRadius: 3,
+            sx={(theme) => ({
+                ...appNestedCardSx(theme),
                 p: 2,
-                bgcolor: "background.paper",
-            }}
+            })}
         >
             <Stack spacing={1.25}>
                 <Box display="flex" alignItems="center">
