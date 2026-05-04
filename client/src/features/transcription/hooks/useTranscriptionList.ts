@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
-import { fetchUserTranscripts } from "../../auth/api";
+import { fetchUserTranscripts } from "../../../api/authApi";
 
 export const useTranscriptionList = () => {
     const { setList, setLoading, setError, filters, sort } =

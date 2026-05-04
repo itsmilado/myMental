@@ -26,7 +26,7 @@ type OfflineFilterControlsProps = {
 };
 
 /*
-- Offline history filter controls used by OfflineHistoryPage.
+- App history filter controls used by AppHistoryPage.
 - Inputs: applied Project and Category filters plus available filter options.
 - Outputs: store updates for text/date filters plus local Project and Category apply events.
 - Important behavior: keeps offline controls visually aligned with online controls.
@@ -115,7 +115,7 @@ export const OfflineFilterControls = ({
 
     /*
     - Clears store-backed filters and the applied local metadata filters together.
-    - Important behavior: preserves one-click reset parity with online history.
+    - Important behavior: preserves one-click reset parity with AssemblyAI history.
     */
     const handleClearFilters = (): void => {
         setFilters({});
@@ -353,7 +353,7 @@ type OnlineFilterControlsProps = {
 };
 
 /*
-- Online history filter controls used by OnlineHistoryPage
+- AssemblyAI history filter controls used by AssemblyAIHistoryPage.
 - Supports date range, Category radio menu, Project radio menu, and transcript ID search
 */
 export const OnlineFilterControls = ({

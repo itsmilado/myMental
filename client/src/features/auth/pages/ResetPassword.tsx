@@ -12,8 +12,8 @@ import {
     Typography,
     Stack,
 } from "@mui/material";
-import { resetPassword } from "../api";
-import { appSectionCardSx } from "../../styles/surfaces";
+import { resetPassword } from "../../../api/authApi";
+import { appSectionCardSx } from "../../../styles/surfaces";
 
 const ResetPassword: React.FC = () => {
     const navigate = useNavigate();

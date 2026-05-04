@@ -19,7 +19,7 @@ import {
     appDialogActionsSx,
     appDialogContentSx,
     appDialogPaperSx,
-} from "../../styles/surfaces";
+} from "../../../styles/surfaces";
 
 export type DeleteTargets = {
     deleteFromDb: boolean; // always true for now

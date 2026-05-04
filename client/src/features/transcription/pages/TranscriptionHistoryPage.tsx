@@ -10,16 +10,16 @@ const TranscriptionHistoryPage = () => {
     const tabConfig = [
         {
             label: "My Transcriptions",
-            path: "offline",
+            path: "app",
         },
         {
             label: "AssemblyAI History",
-            path: "online",
+            path: "assemblyai",
         },
     ];
 
     const getTabIndexFromPath = (pathname: string): number => {
-        // expects .../history/slug, defaults to 0 ("offline")
+        // expects .../history/slug, defaults to 0 ("app")
         const parts = pathname.split("/").filter(Boolean);
         const slug = parts[parts.length - 1];
         const index = tabConfig.findIndex((tab) => tab.path === slug);

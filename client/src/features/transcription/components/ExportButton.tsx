@@ -8,7 +8,7 @@ import {
 } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
 import DownloadIcon from "@mui/icons-material/Download";
-import { exportTranscription } from "../../auth/api";
+import { exportTranscription } from "../../../api/authApi";
 import { downloadBlob } from "../../../utils/downloadFile";
 
 type Props = {

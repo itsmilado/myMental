@@ -15,7 +15,7 @@ import PauseIcon from "@mui/icons-material/Pause";
 import Replay10Icon from "@mui/icons-material/Replay10";
 import Forward10Icon from "@mui/icons-material/Forward10";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
-import { appNestedCardSx } from "../../styles/surfaces";
+import { appNestedCardSx } from "../../../styles/surfaces";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import axios from "axios";
 

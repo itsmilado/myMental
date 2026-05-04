@@ -5,11 +5,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Box, CircularProgress, Snackbar, Alert } from "@mui/material";
 
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
-import { deleteTranscription, fetchTranscriptionById } from "../../auth/api";
+import {
+    deleteTranscription,
+    fetchTranscriptionById,
+} from "../../../api/authApi";
 import { TranscriptionDetailContent } from "../components/TranscriptionDetailContent";
 
 import type { TranscriptData } from "../../../types/types";
-import { appSectionCardSx } from "../../styles/surfaces";
+import { appSectionCardSx } from "../../../styles/surfaces";
 
 const TranscriptionDetailPage = () => {
     const navigate = useNavigate();
@@ -145,11 +148,11 @@ const TranscriptionDetailPage = () => {
                     showActions={true}
                     onBack={() => {
                         setActive(null);
-                        navigate("/dashboard/transcriptions/history/offline");
+                        navigate("/dashboard/transcriptions/history/app");
                     }}
                     onClose={() => {
                         setActive(null);
-                        navigate("/dashboard/transcriptions/history/offline");
+                        navigate("/dashboard/transcriptions/history/app");
                     }}
                     onOpenFullPage={undefined}
                     onDelete={handleDelete}

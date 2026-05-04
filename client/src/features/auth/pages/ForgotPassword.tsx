@@ -11,12 +11,12 @@ import {
     Alert,
     Stack,
 } from "@mui/material";
-import { requestPasswordReset } from "../api";
+import { requestPasswordReset } from "../../../api/authApi";
 import {
     appDialogActionsSx,
     appDialogContentSx,
     appDialogPaperSx,
-} from "../../styles/surfaces";
+} from "../../../styles/surfaces";
 
 type Props = {
     open: boolean;

@@ -38,7 +38,7 @@ import {
     appDialogPaperSx,
     appNestedCardSx,
     appSectionCardSx,
-} from "../../styles/surfaces";
+} from "../../../styles/surfaces";
 
 import {
     changeMyPassword,
@@ -52,7 +52,7 @@ import {
     updateCurrentUser,
     updateMyAssemblyConnection,
     startGoogleOAuth,
-} from "../../auth/api";
+} from "../../../api/authApi";
 
 import type {
     AssemblyAiConnection,

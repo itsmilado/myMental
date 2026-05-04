@@ -17,7 +17,7 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
-import { getAudioStreamUrl } from "../../auth/api";
+import { getAudioStreamUrl } from "../../../api/authApi";
 import { AudioPlayer } from "./AudioPlayer";
 import { OnlineTranscription } from "../../../types/types";
 import { TranscriptText } from "./TranscriptText";
@@ -26,7 +26,7 @@ import {
     normalizeOnlineHistoryMetadata,
     normalizeTranscriptTiming,
 } from "../utils/transcriptionHistoryAdapters";
-import { appDialogPaperSx, appNestedCardSx } from "../../styles/surfaces";
+import { appDialogPaperSx, appNestedCardSx } from "../../../styles/surfaces";
 
 /*
 - purpose: render one compact metadata field inside the online transcript sidebar

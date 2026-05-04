@@ -19,12 +19,12 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 import { ExportButton } from "./ExportButton";
 import { DeleteButton } from "./DeleteButton";
-import { getAudioStreamUrl } from "../../auth/api";
+import { getAudioStreamUrl } from "../../../api/authApi";
 import { AudioPlayer } from "./AudioPlayer";
 import { TranscriptText } from "./TranscriptText";
 import { useTranscriptPlaybackSync } from "../hooks/useTranscriptPlaybackSync";
 import { normalizeOfflineHistoryMetadata } from "../utils/transcriptionHistoryAdapters";
-import { appNestedCardSx } from "../../styles/surfaces";
+import { appNestedCardSx } from "../../../styles/surfaces";
 
 type DeleteArgs = {
     deleteFromAssembly: boolean;

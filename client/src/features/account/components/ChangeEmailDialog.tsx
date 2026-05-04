@@ -12,12 +12,12 @@ import {
     Stack,
     Alert,
 } from "@mui/material";
-import { requestEmailChange } from "../../auth/api";
+import { requestEmailChange } from "../../../api/authApi";
 import {
     appDialogActionsSx,
     appDialogContentSx,
     appDialogPaperSx,
-} from "../../styles/surfaces";
+} from "../../../styles/surfaces";
 
 const isValidEmail = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());

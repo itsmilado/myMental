@@ -15,7 +15,7 @@ import {
     appDialogActionsSx,
     appDialogContentSx,
     appDialogPaperSx,
-} from "../../styles/surfaces";
+} from "../../../styles/surfaces";
 
 type Props = {
     open: boolean;

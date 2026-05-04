@@ -41,17 +41,17 @@ import {
     fetchMyAssemblyConnections,
     getTranscriptionProgressUrl,
     startTranscriptionJob,
-} from "../../auth/api";
+} from "../../../api/authApi";
 
 import { usePreferencesStore } from "../../../store/usePreferencesStore";
-import { mapPreferencesToUploadOptions } from "../../preferences/utils/mapPreferencesToUploadOptions";
+import { mapPreferencesToUploadOptions } from "../../../utils/mapPreferencesToUploadOptions";
 
 import { useTranscriptPlaybackSync } from "../hooks/useTranscriptPlaybackSync";
 import { AudioPlayer } from "../components/AudioPlayer";
 
 import { DeleteButton } from "../components/DeleteButton";
 import { ExportButton } from "../components/ExportButton";
-import { appNestedCardSx, appSectionCardSx } from "../../styles/surfaces";
+import { appNestedCardSx, appSectionCardSx } from "../../../styles/surfaces";
 
 import type {
     AssemblyAiConnection,

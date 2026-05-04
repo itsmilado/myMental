@@ -12,10 +12,10 @@ import {
     Stack,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
-import { confirmEmail } from "../../auth/api";
+import { confirmEmail } from "../../../api/authApi";
 import { useAuthStore } from "../../../store/useAuthStore";
 import DocumentTitle from "../../../components/global/DocumentTitle";
-import { appSectionCardSx } from "../../styles/surfaces";
+import { appSectionCardSx } from "../../../styles/surfaces";
 
 const PageRoot = styled(Box)(({ theme }) => ({
     minHeight: "100dvh",

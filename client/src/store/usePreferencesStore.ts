@@ -5,7 +5,7 @@ import type { DeepPartial, UserPreferences } from "../types/types";
 import {
     fetchMyPreferences,
     patchMyPreferences,
-} from "../features/preferences/api/preferencesApi";
+} from "../api/preferencesApi";
 
 type PreferencesState = {
     preferences: UserPreferences | null;

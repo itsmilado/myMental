@@ -13,13 +13,13 @@ import {
     IconButton,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { reauthCurrentUser, startGoogleOAuth } from "../../auth/api";
+import { reauthCurrentUser, startGoogleOAuth } from "../../../api/authApi";
 import type { GoogleReauthIntent } from "../../../types/types";
 import {
     appDialogActionsSx,
     appDialogContentSx,
     appDialogPaperSx,
-} from "../../styles/surfaces";
+} from "../../../styles/surfaces";
 
 type Props = {
     open: boolean;

@@ -25,7 +25,7 @@ import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
 import { TranscriptData } from "../../../types/types";
 import { ExportButton } from "./ExportButton";
 import { DeleteButton } from "./DeleteButton";
-import { deleteTranscription } from "../../auth/api";
+import { deleteTranscription } from "../../../api/authApi";
 
 type Props = {
     data: TranscriptData[];

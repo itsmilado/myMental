@@ -21,10 +21,10 @@ import {
 } from "@mui/material";
 
 import ForgotPassword from "./ForgotPassword";
-import { GoogleIcon } from "../../../components/CustomIcons";
+import { GoogleIcon } from "../../../theme/customizations/CustomIcons";
 import { useAuthStore } from "../../../store/useAuthStore";
-import { loginUser, startGoogleOAuth } from "../api";
-import { appSectionCardSx } from "../../styles/surfaces";
+import { loginUser, startGoogleOAuth } from "../../../api/authApi";
+import { appSectionCardSx } from "../../../styles/surfaces";
 
 const isValidEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
 

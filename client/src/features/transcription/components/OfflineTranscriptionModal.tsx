@@ -2,9 +2,9 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Dialog, Snackbar, Alert } from "@mui/material";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore";
-import { deleteTranscription } from "../../auth/api";
+import { deleteTranscription } from "../../../api/authApi";
 import { TranscriptionDetailContent } from "./TranscriptionDetailContent";
-import { appDialogPaperSx } from "../../styles/surfaces";
+import { appDialogPaperSx } from "../../../styles/surfaces";
 
 type Props = {
     open: boolean;

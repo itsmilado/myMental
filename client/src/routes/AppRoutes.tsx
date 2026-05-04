@@ -4,24 +4,24 @@ import { Routes, Route, Navigate } from "react-router-dom";
 
 import DocumentTitle from "../components/global/DocumentTitle";
 
-import LandingPage from "../features/landing/pages/LandingPage";
+import LandingPage from "../pages/LandingPage";
 import SignIn from "../features/auth/pages/Sign-In";
 import SignUp from "../features/auth/pages/SignUp";
-import Dashboard from "../pages/Dashboard";
+import Dashboard from "../components/global/Dashboard";
 import ProtectedRoute from "./ProtectedRoute";
 
 import { UploadAudioPage } from "../features/transcription/pages/UploadAudioPage";
 import TranscriptionHistoryPage from "../features/transcription/pages/TranscriptionHistoryPage";
 import TranscriptionDetailPage from "../features/transcription/pages/TranscriptionDetailPage";
-import { OfflineHistoryPage } from "../features/transcription/pages/OfflineHistoryPage";
-import { OnlineHistoryPage } from "../features/transcription/pages/OnlineHistoryPage";
+import { AppHistoryPage } from "../features/transcription/pages/history/AppHistoryPage";
+import { AssemblyAIHistoryPage } from "../features/transcription/pages/history/AssemblyAIHistoryPage";
 
 import AccountPage from "../features/account/pages/AccountPage";
 import PreferencesPage from "../features/preferences/pages/PreferencesPage";
 import ConfirmEmailPage from "../features/account/pages/ConfirmEmailPage";
 import ResetPassword from "../features/auth/pages/ResetPassword";
 import OAuthCallback from "../features/auth/pages/OAuthCallback";
-import PublicLayout from "../features/public/layout/PublicLayout";
+import PublicLayout from "../layouts/PublicLayout";
 
 const AppRoutes = () => {
     return (
@@ -93,9 +93,14 @@ const AppRoutes = () => {
                         </>
                     }
                 >
-                    <Route path="offline" element={<OfflineHistoryPage />} />
-                    <Route path="online" element={<OnlineHistoryPage />} />
-                    <Route index element={<OfflineHistoryPage />} />
+                    <Route path="app" element={<AppHistoryPage />} />
+                    <Route path="assemblyai" element={<AssemblyAIHistoryPage />} />
+                    <Route path="offline" element={<Navigate to="../app" replace />} />
+                    <Route
+                        path="online"
+                        element={<Navigate to="../assemblyai" replace />}
+                    />
+                    <Route index element={<AppHistoryPage />} />
                 </Route>
                 <Route
                     path="transcriptions/:id"

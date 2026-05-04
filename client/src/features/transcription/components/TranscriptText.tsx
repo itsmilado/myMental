@@ -9,7 +9,7 @@ import {
     FormControlLabel,
     Typography,
 } from "@mui/material";
-import { appNestedCardSx } from "../../styles/surfaces";
+import { appNestedCardSx } from "../../../styles/surfaces";
 
 import type {
     NormalizedTranscriptWord,

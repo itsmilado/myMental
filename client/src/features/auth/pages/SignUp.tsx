@@ -20,10 +20,10 @@ import {
     Typography,
 } from "@mui/material";
 
-import { GoogleIcon } from "../../../components/CustomIcons";
+import { GoogleIcon } from "../../../theme/customizations/CustomIcons";
 import { useAuthStore } from "../../../store/useAuthStore";
-import { signupUser, startGoogleOAuth } from "../api";
-import { appSectionCardSx } from "../../styles/surfaces";
+import { signupUser, startGoogleOAuth } from "../../../api/authApi";
+import { appSectionCardSx } from "../../../styles/surfaces";
 
 const isValidEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
 

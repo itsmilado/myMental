@@ -16,9 +16,9 @@ import type { SxProps, Theme } from "@mui/material/styles";
 
 import GlobalLoader from "../../../components/global/GlobalLoader";
 import DocumentTitle from "../../../components/global/DocumentTitle";
-import { fetchCurrentUser } from "../api";
+import { fetchCurrentUser } from "../../../api/authApi";
 import { useAuthStore } from "../../../store/useAuthStore";
-import { appSectionCardSx } from "../../styles/surfaces";
+import { appSectionCardSx } from "../../../styles/surfaces";
 
 type OAuthUiState =
     | { status: "loading" }

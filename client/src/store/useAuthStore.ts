@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { AuthState } from "../types/types";
-import { fetchCurrentUser } from "../features/auth/api";
+import { fetchCurrentUser } from "../api/authApi";
 
 export const useAuthStore = create<AuthState>((set, get) => ({
     user: null,

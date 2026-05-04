@@ -157,7 +157,7 @@ export interface SidebarProps {
 /*
 - purpose: authenticated user shape returned by auth/account endpoints
 - used in:
-  - imported by src/features/auth/api.ts
+  - imported by src/api/authApi.ts
 */
 export interface User {
     id: number;
@@ -189,7 +189,7 @@ export type AuthState = {
 /*
 - purpose: standard auth endpoint response shape
 - used in:
-  - imported by src/features/auth/api.ts
+  - imported by src/api/authApi.ts
   - returned by login and session-related auth API functions
 */
 export interface AuthResponse {
@@ -201,7 +201,7 @@ export interface AuthResponse {
 /*
 - purpose: allowed Google OAuth intent values
 - used in:
-  - imported by src/features/auth/api.ts
+  - imported by src/api/authApi.ts
   - used by startGoogleOAuth()
 */
 export type GoogleReauthIntent =
@@ -214,14 +214,14 @@ export type GoogleReauthIntent =
 /*
 - purpose: validation state for stored AssemblyAI connections
 - used in:
-  - imported by src/features/auth/api.ts
+  - imported by src/api/authApi.ts
 */
 export type AssemblyAiConnectionStatus = "active" | "invalid";
 
 /*
 - purpose: stored AssemblyAI connection row returned to the client
 - used in:
-  - imported by src/features/auth/api.ts
+  - imported by src/api/authApi.ts
   - imported by src/features/transcription/pages/UploadAudioPage.tsx
 */
 export interface AssemblyAiConnection {
@@ -240,7 +240,7 @@ export interface AssemblyAiConnection {
 /*
 - purpose: payload for creating a new AssemblyAI connection
 - used in:
-  - imported by src/features/auth/api.ts
+  - imported by src/api/authApi.ts
 */
 export interface CreateAssemblyAiConnectionPayload {
     label: string;
@@ -251,7 +251,7 @@ export interface CreateAssemblyAiConnectionPayload {
 /*
 - purpose: payload for updating an existing AssemblyAI connection
 - used in:
-  - imported by src/features/auth/api.ts
+  - imported by src/api/authApi.ts
 */
 export interface UpdateAssemblyAiConnectionPayload {
     label?: string;
@@ -337,18 +337,9 @@ export type DeepPartial<T> = {
 /* Shared UI State Types */
 
 /*
-- purpose: shared dialog open/close prop shape for profile/account dialogs
-- used in: profile/account UI components
-*/
-export type ProfileDialogProps = {
-    open: boolean;
-    onClose: () => void;
-};
-
-/*
 - purpose: offline history sort state shared between store and API requests
 - used in:
-  - imported by src/features/auth/api.ts
+  - imported by src/api/authApi.ts
   - used by src/store/useTranscriptionStore.ts
   - used by src/features/transcription/components/TranscriptionTable.tsx
 */
@@ -436,7 +427,7 @@ export type SpeakerIdentification = {
 - purpose: client-side transcription options shape shared across upload, API, and stored metadata
 - used in:
   - imported by src/features/transcription/pages/UploadAudioPage.tsx
-  - imported by src/features/auth/api.ts through payload types
+  - imported by src/api/authApi.ts through payload types
 */
 export type TranscriptionOptions = {
     speaker_labels?: boolean;
@@ -457,7 +448,7 @@ export type TranscriptionOptions = {
 /*
 - purpose: payload for starting one background transcription job
 - used in:
-  - imported by src/features/auth/api.ts
+  - imported by src/api/authApi.ts
   - consumed by startTranscriptionJob()
 */
 export type StartTranscriptionJobPayload = {
@@ -597,7 +588,7 @@ export interface ErrorEventPayload {
 /*
 - purpose: offline transcription row shape returned from the app database
 - used in:
-  - imported by src/features/auth/api.ts
+  - imported by src/api/authApi.ts
   - imported by src/store/useTranscriptionStore.ts
   - imported by src/features/transcription/components/TranscriptionTable.tsx
 */
@@ -619,7 +610,7 @@ export interface TranscriptData extends TranscriptionConnectionMetadata {
 /*
 - purpose: supported offline history filters sent from the client to the backend
 - used in:
-  - imported by src/features/auth/api.ts
+  - imported by src/api/authApi.ts
   - used by src/store/useTranscriptionStore.ts
 */
 export type Filters = {
@@ -655,7 +646,7 @@ export type TranscriptionState = {
 /*
 - purpose: online AssemblyAI history row shape shown in the AssemblyAI history table
 - used in:
-  - imported by src/features/auth/api.ts
+  - imported by src/api/authApi.ts
 */
 export type OnlineTranscription = TranscriptionConnectionMetadata & {
     transcript_id: string;
@@ -697,7 +688,7 @@ export type AssemblyTranscriptionState = {
 /*
 - purpose: payload used to restore an online transcript back into offline history
 - used in:
-  - imported by src/features/auth/api.ts
+  - imported by src/api/authApi.ts
 */
 export type RestorePayload = {
     transcript_id: string;

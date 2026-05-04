@@ -22,7 +22,7 @@ import {
 
 import GlobalLoader from "../../../components/global/GlobalLoader";
 import DocumentTitle from "../../../components/global/DocumentTitle";
-import { appSectionCardSx } from "../../styles/surfaces";
+import { appSectionCardSx } from "../../../styles/surfaces";
 
 import { usePreferencesStore } from "../../../store/usePreferencesStore";
 import type {

@@ -33,13 +33,15 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { OnlineTranscription } from "../../../types/types";
 import { useTranscriptionStore } from "../../../store/useTranscriptionStore"; // offline state
 import { useAssemblyTranscriptionStore } from "../../../store/useAssemblyTranscriptionStore";
-import { restoreTranscription } from "../../auth/api";
-import { deleteAssemblyTranscription } from "../../auth/api";
+import {
+    deleteAssemblyTranscription,
+    restoreTranscription,
+} from "../../../api/authApi";
 import {
     appDialogActionsSx,
     appDialogContentSx,
     appDialogPaperSx,
-} from "../../styles/surfaces";
+} from "../../../styles/surfaces";
 
 type Props = {
     data: OnlineTranscription[];
@@ -260,7 +262,7 @@ export const OnlineTranscriptionTable = ({ data, onDetails }: Props) => {
     };
 
     if (!filteredData.length) {
-        return <Box p={2}>No online transcriptions found.</Box>;
+        return <Box p={2}>No AssemblyAI transcriptions found.</Box>;
     }
 
     return (

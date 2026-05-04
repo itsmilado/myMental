@@ -269,11 +269,35 @@ server/
 └── utils/
 
 client/src/
-├── features/
+├── api/
 ├── components/
+├── features/
+├── layouts/
+├── pages/
+├── routes/
+├── styles/
 ├── store/
-└── api/
+├── theme/
+├── types/
+└── utils/
 ```
+
+The frontend uses a feature-based structure:
+
+- `features/<domain>/pages` contains route-level screens for a domain.
+- `features/<domain>/components`, `hooks`, and `utils` contain code used only by that domain.
+- `api` contains cross-feature API modules and the shared Axios client.
+- `components/global` contains app shell and public navigation UI shared across routes.
+- `layouts` contains route layout wrappers such as the public auth layout.
+- `pages` contains public top-level pages that are not private product features.
+- `theme` contains Material UI theme provider controls, tokens, and component overrides.
+- `styles` contains shared style helpers used across multiple features.
+- `store`, `types`, and `utils` contain cross-feature state, contracts, and helpers.
+
+Transcription history is split by source:
+
+- `AppHistoryPage.tsx` shows transcripts saved in the app database.
+- `AssemblyAIHistoryPage.tsx` shows AssemblyAI-backed history.
 
 ## Database Overview
 

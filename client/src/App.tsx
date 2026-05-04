@@ -3,10 +3,10 @@ import React from "react";
 import "./App.css";
 import { Box, CssBaseline } from "@mui/material";
 import AppRoutes from "./routes/AppRoutes";
-import AppTheme from "./components/shared-theme/AppTheme";
+import AppTheme from "./theme/AppTheme";
 import { useAuthStore } from "./store/useAuthStore";
 import { usePreferencesStore } from "./store/usePreferencesStore";
-import { fetchCurrentUser } from "./features/auth/api";
+import { fetchCurrentUser } from "./api/authApi";
 import GlobalLoader from "./components/global/GlobalLoader";
 
 function App() {

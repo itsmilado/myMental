@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import { LightMode, DarkMode } from "@mui/icons-material";
 import { useColorScheme, useTheme, styled } from "@mui/material/styles";
-import { logoutUser } from "../../features/auth/api";
+import { logoutUser } from "../../api/authApi";
 import { useAuthStore } from "../../store/useAuthStore";
 import { usePreferencesStore } from "../../store/usePreferencesStore";
 
