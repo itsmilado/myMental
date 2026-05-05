@@ -48,6 +48,7 @@ export const ExportButton = ({ transcriptId, fileName, iconButtonSx }: Props) =>
             const { blob, fileName: downloadName } = await exportTranscription(
                 transcriptId,
                 format,
+                fileName,
             );
             downloadBlob(blob, downloadName);
         } catch (err) {
