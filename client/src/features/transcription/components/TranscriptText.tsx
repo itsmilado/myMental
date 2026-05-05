@@ -75,7 +75,12 @@ const normalizeSpeaker = (
 */
 
 const labelSpeaker = (speaker: string): string => {
-    return speaker.startsWith("Speaker") ? speaker : `Speaker ${speaker}`;
+    if (/^speaker\b/i.test(speaker)) return speaker;
+    if (/^[A-Z]$/i.test(speaker) || /^\d+$/.test(speaker)) {
+        return `Speaker ${speaker}`;
+    }
+
+    return speaker;
 };
 
 /*
@@ -158,7 +163,7 @@ const buildBlocksFromSpeakerLabeledText = (text: string): Block[] => {
         const match = line.match(SPEAKER_LINE_RE);
 
         if (match) {
-            const label = match[1].trim();
+            const label = labelSpeaker(match[1].trim());
             const body = match[2].trim();
 
             if (current && current.speaker === label) {
