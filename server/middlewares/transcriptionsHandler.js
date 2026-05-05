@@ -780,7 +780,9 @@ const exportTranscription = async (request, response, next) => {
         response.setHeader("Content-Type", mime);
         response.setHeader(
             "Content-Disposition",
-            `attachment; filename="${fileName}"`,
+            `attachment; filename="${fileName}"; filename*=UTF-8''${encodeURIComponent(
+                fileName,
+            )}`,
         );
         response.send(buffer);
 
@@ -1509,6 +1511,19 @@ const sanitizeSpeakerIdentificationForStorage = (speakerIdentification) => {
     };
 };
 
+const formatSpeakerLabel = (speaker) => {
+    if (speaker === undefined || speaker === null) return "Speaker";
+
+    const label = String(speaker).trim();
+    if (!label) return "Speaker";
+    if (/^speaker\b/i.test(label)) return label;
+    if (/^[A-Z]$/i.test(label) || /^\d+$/.test(label)) {
+        return `Speaker ${label}`;
+    }
+
+    return label;
+};
+
 /*
 - Normalizes and sanitizes incoming transcription options from the client.
 - Inputs: raw request options object.
@@ -1937,11 +1952,9 @@ const storeTranscriptionText = async ({ transcriptData }) => {
         ) {
             transcriptionText = transcript.utterances
                 .map((utterance) => {
-                    const speakerLabel =
-                        utterance.speaker !== undefined &&
-                        utterance.speaker !== null
-                            ? `Speaker ${utterance.speaker}`
-                            : "Speaker";
+                    const speakerLabel = formatSpeakerLabel(
+                        utterance.speaker,
+                    );
                     return `${speakerLabel}: ${utterance.text}`;
                 })
                 .join("\n");
@@ -2018,10 +2031,7 @@ const flattenTranscription = (transcriptObject) => {
     ) {
         return transcriptObject.utterances
             .map(
-                (u) =>
-                    `Speaker ${u.speaker != null ? u.speaker : ""}: ${
-                        u.text || ""
-                    }`,
+                (u) => `${formatSpeakerLabel(u.speaker)}: ${u.text || ""}`,
             )
             .join("\n");
     }
