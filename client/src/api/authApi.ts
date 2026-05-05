@@ -584,12 +584,20 @@ export const exportTranscription = async (
 
         const cd = (res.headers as any)["content-disposition"];
         let fileName = fallbackFileName
-            ? `${fallbackFileName.replace(/\.[^/.]+$/, "")}-${id}.${format}`
+            ? `${fallbackFileName
+                  .replace(/\.[A-Za-z0-9]{1,8}$/, "")
+                  .replace(/[<>:"/\\|?*]+/g, "-")}.${format}`
             : `${id}.${format}`;
 
         if (cd) {
-            const match = cd.match(/filename="?([^"]+)"?/);
-            if (match) fileName = match[1];
+            const utf8Match = cd.match(/filename\*=UTF-8''([^;]+)/i);
+            const asciiMatch = cd.match(/filename="?([^";]+)"?/i);
+
+            if (utf8Match) {
+                fileName = decodeURIComponent(utf8Match[1]);
+            } else if (asciiMatch) {
+                fileName = asciiMatch[1];
+            }
         }
 
         return { blob: res.data as Blob, fileName };
