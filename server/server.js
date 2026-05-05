@@ -28,6 +28,7 @@ app.use(
         origin: process.env.APP_ORIGIN,
         credentials: true,
         allowedHeaders: ["Content-Type", "X-CSRF-Token"],
+        exposedHeaders: ["Content-Disposition"],
     }),
 );
 
